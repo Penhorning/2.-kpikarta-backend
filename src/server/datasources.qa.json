@@ -1,0 +1,25 @@
+{
+  "db": {
+    "name": "db",
+    "connector": "mongodb",
+    "host": "localhost",
+    "database": "kpikarta-qa"
+  },
+  "email": {
+    "connector": "mail",
+    "transports": [{
+      "type": "smtp",
+      "host": "smtp.ethereal.email",
+      "secure": false,
+      "port": 587,
+      "tls": {
+        "rejectUnauthorized": false
+      },
+      "auth": {
+        "user": "icie.doyle59@ethereal.email",
+        "pass": "yqDq8U83VCDbsWSZSK"
+      }
+    }],
+    "name": "email"
+  }
+}
