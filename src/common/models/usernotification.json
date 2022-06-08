@@ -6,7 +6,11 @@
     "validateUpsert": true
   },
   "mixins": {
-    "TimeStamp": true
+    "TimeStamp": {
+      "required" : true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
   },
   "properties": {
     "title": {
