@@ -1,25 +1,27 @@
 {
   "db": {
-    "name": "db",
-    "connector": "mongodb",
     "host": "localhost",
-    "database": "kpikarta-development"
+    "database": "kpikarta-development",
+    "name": "db",
+    "connector": "mongodb"
   },
   "email": {
+    "name": "email",
     "connector": "mail",
-    "transports": [{
-      "type": "smtp",
-      "host": "smtp.ethereal.email",
-      "secure": false,
-      "port": 587,
-      "tls": {
-        "rejectUnauthorized": false
-      },
-      "auth": {
-        "user": "icie.doyle59@ethereal.email",
-        "pass": "yqDq8U83VCDbsWSZSK"
+    "transports": [
+      {
+        "type": "smtp",
+        "host": "smtp.ethereal.email",
+        "secure": false,
+        "port": 587,
+        "tls": {
+          "rejectUnauthorized": false
+        },
+        "auth": {
+          "user": "icie.doyle59@ethereal.email",
+          "pass": "yqDq8U83VCDbsWSZSK"
+        }
       }
-    }],
-    "name": "email"
+    ]
   }
 }

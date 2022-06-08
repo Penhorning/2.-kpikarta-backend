@@ -1,0 +1,26 @@
+{
+  "name": "userdetails",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "mixins": {
+    "TimeStamp": true
+  },
+  "properties": {
+    "picture": {
+      "type": "string"
+    },
+    "totp": {
+      "type": "string"
+    },
+    "stripe_customer_id": {
+      "type": "string"
+    }
+  },
+  "validations": [],
+  "relations": {},
+  "acls": [],
+  "methods": {}
+}

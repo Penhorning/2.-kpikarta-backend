@@ -1,0 +1,91 @@
+{
+  "name": "kartanode",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "mixins": {
+    "TimeStamp": true
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "definition": {
+      "type": "string"
+    },
+    "due_date": {
+      "type": "date"
+    },
+    "version": {
+      "type": "number"
+    },
+    "notification_type": {
+      "type": "string"
+    },
+    "font_style": {
+      "type": "string"
+    },
+    "alignment": {
+      "type": "string"
+    },
+    "text_color": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
+    },
+    "start_date": {
+      "type": "string"
+    },
+    "days_to_calculate": {
+      "type": "string"
+    },
+    "fiscal_year_start_date": {
+      "type": "date"
+    },
+    "fiscal_year_end_date": {
+      "type": "date"
+    },
+    "target_value": {
+      "type": "number"
+    },
+    "target_value_type": {
+      "type": "string"
+    },
+    "kpi_calc_period": {
+      "type": "string"
+    }
+  },
+  "validations": [],
+  "relations": {
+    "karta_phase": {
+      "type": "hasOne",
+      "model": "kartaphase",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "children": {
+      "type": "hasMany",
+      "model": "kartanode",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "parent": {
+      "type": "belongsTo",
+      "model": "kartanode",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [],
+  "methods": {}
+}

@@ -10,7 +10,8 @@
       "loopback/common/mixins",
       "loopback/server/mixins",
       "../common/mixins",
-      "./mixins"
+      "./mixins",
+      "../node_modules/loopback-ds-timestamp-mixin"
     ]
   },
   "User": {
@@ -36,11 +37,35 @@
     "dataSource": "db",
     "public": false
   },
-  "Email":{
+  "Email": {
     "dataSource": "email",
-    "public":false
+    "public": false
   },
   "user": {
+    "dataSource": "db",
+    "public": true
+  },
+  "userdetails": {
+    "dataSource": "db",
+    "public": true
+  },
+  "useraddress": {
+    "dataSource": "db",
+    "public": true
+  },
+  "usernotification": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta": {
+    "dataSource": "db",
+    "public": true
+  },
+  "kartanode": {
+    "dataSource": "db",
+    "public": true
+  },
+  "kartaphase": {
     "dataSource": "db",
     "public": true
   }

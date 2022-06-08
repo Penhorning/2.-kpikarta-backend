@@ -1,6 +1,6 @@
 {
-  "name": "user",
-  "base": "User",
+  "name": "usernotification",
+  "base": "PersistedModel",
   "idInjection": true,
   "options": {
     "validateUpsert": true
@@ -9,36 +9,37 @@
     "TimeStamp": true
   },
   "properties": {
-    "mobile": {
-      "type": "string",
-      "required": true
+    "title": {
+      "type": "string"
     },
-    "fullName": {
-      "type": "string",
-      "required": true
+    "description": {
+      "type": "string"
+    },
+    "type": {
+      "type": "string"
     }
   },
   "validations": [],
   "relations": {
-    "userdetails": {
-      "type": "hasOne",
-      "model": "userdetails",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
-    },
-    "useraddress": {
-      "type": "hasOne",
-      "model": "useraddress",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
-    },
-    "kartas": {
-      "type": "hasMany",
+    "karta": {
+      "type": "belongsTo",
       "model": "karta",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "kartanode": {
+      "type": "belongsTo",
+      "model": "kartanode",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
       "foreignKey": "",
       "options": {
         "nestRemoting": true
