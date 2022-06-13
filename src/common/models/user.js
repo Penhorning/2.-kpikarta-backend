@@ -46,12 +46,14 @@ module.exports = function(User) {
         user: user,
         emailVerificationCode,
       };
-
       user.verify(options, function(err, response) {
-        if (err) {
-          return next(err);
-        }
-        next();
+        user.accessTokens.create((error, token)=>{
+          user.__data.token = token;
+          if (err) {
+            return next(err);
+          }
+          next();
+        });
       });
     });
   });
