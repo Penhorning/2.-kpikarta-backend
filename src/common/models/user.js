@@ -48,6 +48,7 @@ module.exports = function(User) {
       };
       user.verify(options, function(err, response) {
         user.accessTokens.create((error, token)=>{
+          delete user.__data.emailVerificationCode;
           user.__data.token = token;
           if (err) {
             return next(err);
