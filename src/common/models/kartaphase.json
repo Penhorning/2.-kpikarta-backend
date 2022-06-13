@@ -7,7 +7,7 @@
   },
   "mixins": {
     "TimeStamp": {
-      "required" : true,
+      "required": true,
       "validateUpsert": true,
       "silenceWarnings": true
     }
@@ -20,6 +20,19 @@
   },
   "validations": [],
   "relations": {},
-  "acls": [],
+  "acls": [
+    {
+      "accessType": "*",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "DENY"
+    },
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    }
+  ],
   "methods": {}
 }

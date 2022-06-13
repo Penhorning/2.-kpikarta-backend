@@ -4,12 +4,53 @@
 // License text available at https://opensource.org/licenses/MIT
 
 'use strict';
-
+const path = require('path');
 const loopback = require('loopback');
 const boot = require('loopback-boot');
 
 const app = module.exports = loopback();
+require('dotenv').config();
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, '..', 'templates'));
 
+// Retrieve the currently authenticated user
+app.use(function(req, res, next) {
+  // First, get the access token, either from the url or from the headers
+  var tokenId = false;
+  if (req.query && req.query.access_token) {
+    tokenId = req.query.access_token;
+  }
+  // @TODO - not sure if this is correct since I'm currently not using headers
+  // to pass the access token
+  else if (req.headers && req.headers.access_token) {
+    // tokenId = req.headers.access_token
+  }
+
+  // Now, if there is a tokenId, use it to look up the currently authenticated
+  // user and attach it to the app
+  app.currentUser = false;
+  if (tokenId) {
+    var UserModel = app.models.user;
+    // Logic borrowed from user.js -> User.logout()
+    UserModel.relations.accessTokens.modelTo.findById(tokenId, function(err, accessToken) {
+      if (err) return next(err);
+      if (! accessToken) return next(new Error('could not find accessToken'));
+
+      // Look up the user associated with the accessToken
+      UserModel.findById(accessToken.userId, function(err, user) {
+        if (err) return next(err);
+        if (! user) return next(new Error('could not find a valid user'));
+        app.currentUser = user;
+        next();
+      });
+    });
+  }
+
+  // If no tokenId was found, continue without waiting
+  else {
+    next();
+  }
+});
 app.start = function() {
   // start the web server
   return app.listen(function() {
