@@ -1,5 +1,5 @@
 {
-  "name": "KPI - Karta",
+  "name": "KPI-karta",
   "version": "1.0.0",
   "main": "server/server.js",
   "engines": {
@@ -19,6 +19,7 @@
     "loopback": "^3.22.0",
     "loopback-boot": "^2.6.5",
     "loopback-component-explorer": "^6.2.0",
+    "loopback-component-passport": "^3.12.0",
     "loopback-connector-mongodb": "^6.2.0",
     "loopback-ds-timestamp-mixin": "^3.4.1",
     "serve-favicon": "^2.0.1",

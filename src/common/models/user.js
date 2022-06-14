@@ -15,6 +15,12 @@ module.exports = function(User) {
       });
     } else next(new Error('Invalid OTP'));
   };
+  User.selectPlan = function(plan, next) {
+    this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
+      next(err, this.app.currentUser);
+    });
+  };
+
   // Remote hooks
   User.on('resetPasswordRequest', function(info) {
     var resetLink = 'http://www.example.com/reset-password?access_token=' + info.accessToken.id;
@@ -58,4 +64,22 @@ module.exports = function(User) {
       });
     });
   });
+
+  // User.afterRemote('login', function(context, user, next) {
+  //   var emailVerificationCode = keygen.number({length: 6});
+  //   user.updateAttributes({emailVerificationCode}, {}, err=> {
+  //     var options = {
+  //       name: User.app.get('name'),
+  //       type: 'email',
+  //       to: user.email,
+  //       from: User.app.dataSources.email.settings.transports[0].auth.user,
+  //       subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
+  //       template: path.resolve(__dirname, '../../templates/signup.ejs'),
+  //       redirect: User.app.get('weburl'),
+  //       user: user,
+  //       emailVerificationCode,
+  //     };
+  //   });
+  // });
+
 };

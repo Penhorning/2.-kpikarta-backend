@@ -23,6 +23,10 @@
     },
     "emailVerificationCode": {
       "type": "string"
+    },
+    "currentPlan": {
+      "type": "string",
+      "defualt": "spectator"
     }
   },
   "validations": [],
@@ -82,12 +86,29 @@
       ],
       "returns": {
         "arg": "data",
-        "type": "User",
+        "type": "user",
         "root": true
       },
       "http": {
         "verb": "get",
         "path": "/verify_email"
+      }
+    },
+    "selectPlan": {
+      "accepts": [
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/assign_plan"
       }
     }
   }
