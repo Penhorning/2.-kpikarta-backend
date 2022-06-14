@@ -1,3 +1,4 @@
+/* eslint-disable max-len */
 'use strict';
 
 const path = require('path');
@@ -81,5 +82,4 @@ module.exports = function(User) {
   //     };
   //   });
   // });
-
 };
