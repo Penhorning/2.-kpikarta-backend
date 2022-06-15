@@ -8,8 +8,15 @@
 const path = require('path');
 const loopback = require('loopback');
 const boot = require('loopback-boot');
+const bodyParser = require("body-parser");
+const cookieParser = require("cookie-parser");
+const session = require('express-session');
 
 const app = module.exports = loopback();
+
+app.middleware("parse", bodyParser.json());
+
+
 
 require('dotenv').config();
 app.set('view engine', 'ejs');
@@ -60,34 +67,56 @@ boot(app, __dirname, function(err) {
   // start the server if `$ node server.js`
   if (require.main === module)
     app.start();
+
+  /* Passport configurations */
+  var loopbackPassport = require('loopback-component-passport');
+  var PassportConfigurator = loopbackPassport.PassportConfigurator;
+  var passportConfigurator = new PassportConfigurator(app);
+
+    // Load the provider configurations
+  var config = {};
+  try {
+    config = require('../providers.json');
+  } catch (err) {
+    console.error('Passport configuration', err);
+    process.exit(1);
+  }
+    // Initialize passport
+  passportConfigurator.init();
+
+    // Set up related models
+  passportConfigurator.setupModels({
+    userModel: app.models.user,
+    userIdentityModel: app.models.userIdentity,
+    userCredentialModel: app.models.userCredential,
+  });
+  function customProfileToUser (provider, profile, options) {
+    var userInfo = {
+      username: profile._json.email,
+      password: 'secret',
+      fullName: profile._json.name,
+      email: profile._json.email
+    };
+    return userInfo;
+  }
+    // Configure passport strategies for third party auth providers
+  for (var s in config) {
+    var c = config[s];
+    c.session = c.session !== false;
+    c.profileToUser = customProfileToUser;
+    passportConfigurator.configureProvider(s, c);
+  }
+  /* Passport configurations ends */
 });
 
-/* Passport configurations */
-var loopbackPassport = require('loopback-component-passport');
-var PassportConfigurator = loopbackPassport.PassportConfigurator;
-var passportConfigurator = new PassportConfigurator(app);
+// The access token is only available after boot
+app.middleware('auth', loopback.token({
+  model: app.models.accessToken,
+}));
 
-  // Load the provider configurations
-var config = {};
-try {
-  config = require('../providers.json');
-} catch (err) {
-  console.error('Passport configuration', err);
-  process.exit(1);
-}
-  // Initialize passport
-passportConfigurator.init();
-
-  // Set up related models
-passportConfigurator.setupModels({
-  userModel: app.models.user,
-  userIdentityModel: app.models.UserIdentity,
-  userCredentialModel: app.models.UserCredential,
-});
-  // Configure passport strategies for third party auth providers
-for (var s in config) {
-  var c = config[s];
-  c.session = c.session !== false;
-  passportConfigurator.configureProvider(s, c);
-}
-/* Passport configurations ends */
+app.middleware('session:before', cookieParser(app.get('cookieSecret')));
+app.middleware('session', session({
+  secret: app.get("cookieSecret"),
+  saveUninitialized: true,
+  resave: true,
+}));

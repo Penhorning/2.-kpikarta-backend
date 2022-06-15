@@ -15,11 +15,11 @@
   "properties": {
     "mobile": {
       "type": "string",
-      "required": true
+      "required": false
     },
     "fullName": {
       "type": "string",
-      "required": true
+      "required": false
     },
     "emailVerificationCode": {
       "type": "string"
@@ -31,6 +31,21 @@
   },
   "validations": [],
   "relations": {
+    "accessTokens": {
+      "type": "hasMany",
+      "model": "accessToken",
+      "foreignKey": "userId"
+    },
+    "identities": {
+      "type": "hasMany",
+      "model": "userIdentity",
+      "foreignKey": "userId"
+    },
+    "credentials": {
+      "type": "hasMany",
+      "model": "userCredential",
+      "foreignKey": "userId"
+    },
     "userdetails": {
       "type": "hasOne",
       "model": "userdetails",

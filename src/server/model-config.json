@@ -70,15 +70,15 @@
     "dataSource": "db",
     "public": true
   },
-  "ApplicationCredential": {
+  "accessToken": {
     "dataSource": "db",
     "public": true
   },
-  "UserCredential": {
+  "userCredential": {
     "dataSource": "db",
     "public": true
   },
-  "UserIdentity": {
+  "userIdentity": {
     "dataSource": "db",
     "public": true
   }

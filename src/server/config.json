@@ -20,5 +20,6 @@
       "limit": "100kb"
     },
     "cors": false
-  }
+  },
+  "cookieSecret": "thisiscookiesecret"
 }

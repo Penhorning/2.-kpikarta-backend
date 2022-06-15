@@ -24,7 +24,7 @@ module.exports = function(User) {
 
   // Remote hooks
   User.on('resetPasswordRequest', function(info) {
-    var resetLink = 'http://www.example.com/reset-password?access_token=' + info.accessToken.id;
+    var resetLink = 'http://159.89.234.66:3343/reset-password?access_token=' + info.accessToken.id;
     ejs.renderFile(path.resolve('templates/forgotpassword.ejs'),
     {fullName: info.user.fullName, resetLink}, {}, function(err, html) {
       User.app.models.Email.send({
@@ -66,20 +66,22 @@ module.exports = function(User) {
     });
   });
 
-  // User.afterRemote('login', function(context, user, next) {
-  //   var emailVerificationCode = keygen.number({length: 6});
-  //   user.updateAttributes({emailVerificationCode}, {}, err=> {
-  //     var options = {
-  //       name: User.app.get('name'),
-  //       type: 'email',
-  //       to: user.email,
-  //       from: User.app.dataSources.email.settings.transports[0].auth.user,
-  //       subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
-  //       template: path.resolve(__dirname, '../../templates/signup.ejs'),
-  //       redirect: User.app.get('weburl'),
-  //       user: user,
-  //       emailVerificationCode,
-  //     };
-  //   });
-  // });
+  User.afterRemote('login', function(context, user, next) {
+    console.log("user data = ", user);
+    if (user.emailVerified) {
+      var emailVerificationCode = keygen.number({length: 6});
+      ejs.renderFile(path.resolve('templates/signup.ejs'),
+      {user, emailVerificationCode}, {}, function(err, html) {
+        User.app.models.Email.send({
+          to: user.email,
+          from: User.app.dataSources.email.settings.transports[0].auth.user,
+          subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
+          html,
+        }, function(err) {
+          console.log('> sending verification code email to:', user.email);
+          if (err) return console.log('> error sending verification code email');
+        });
+      });
+    }
+  });
 };
