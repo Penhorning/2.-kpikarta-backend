@@ -67,7 +67,6 @@ module.exports = function(User) {
   });
 
   User.afterRemote('login', function(context, user, next) {
-    console.log("user data = ", user);
     if (user.emailVerified) {
       var emailVerificationCode = keygen.number({length: 6});
       ejs.renderFile(path.resolve('templates/signup.ejs'),
@@ -80,8 +79,9 @@ module.exports = function(User) {
         }, function(err) {
           console.log('> sending verification code email to:', user.email);
           if (err) return console.log('> error sending verification code email');
+          next();
         });
       });
-    }
+    } else next();
   });
 };
