@@ -66,22 +66,26 @@ module.exports = function(User) {
     });
   });
 
-  User.afterRemote('login', function(context, user, next) {
-    if (user.emailVerified) {
-      var emailVerificationCode = keygen.number({length: 6});
-      ejs.renderFile(path.resolve('templates/signup.ejs'),
-      {user, emailVerificationCode}, {}, function(err, html) {
-        User.app.models.Email.send({
-          to: user.email,
-          from: User.app.dataSources.email.settings.transports[0].auth.user,
-          subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
-          html,
-        }, function(err) {
-          console.log('> sending verification code email to:', user.email);
-          if (err) return console.log('> error sending verification code email');
-          next();
-        });
-      });
+  User.afterRemote('login', function(context, accessToken, next) {
+    if(accessToken && accessToken.user){
+      accessToken.user((err, user)=>{
+        if (!user.emailVerified) {
+          var emailVerificationCode = keygen.number({length: 6});
+          ejs.renderFile(path.resolve('templates/signup.ejs'),
+          {user, emailVerificationCode}, {}, function(err, html) {
+            User.app.models.Email.send({
+              to: user.email,
+              from: User.app.dataSources.email.settings.transports[0].auth.user,
+              subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
+              html,
+            }, function(err) {
+              console.log('> sending verification code email to:', user.email);
+              if (err) return console.log('> error sending verification code email');
+              next();
+            });
+          });
+        } else next();
+      })
     } else next();
   });
 };
