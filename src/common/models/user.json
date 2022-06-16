@@ -125,6 +125,16 @@
         "verb": "post",
         "path": "/assign_plan"
       }
+    },
+    "resendCode": {
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/resend_code"
+      }
     }
   }
 }

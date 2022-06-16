@@ -8,7 +8,7 @@ const ejs = require('ejs');
 
 module.exports = function(User) {
   // Custom methods
-  User.verifyEmail = function(otp, next) {
+  User.verifyEmail = function (otp, next) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({emailVerified: true, emailVerificationCode: ''}, (err)=>{
@@ -16,9 +16,27 @@ module.exports = function(User) {
       });
     } else next(new Error('Invalid OTP'));
   };
-  User.selectPlan = function(plan, next) {
+  User.selectPlan = function (plan, next) {
     this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
       next(err, this.app.currentUser);
+    });
+  };
+  User.resendCode = function (next) {
+    var emailVerificationCode = keygen.number({length: 6});
+    this.app.currentUser.updateAttributes({emailVerificationCode}, {}, err => {
+      ejs.renderFile(path.resolve('templates/resend-verification-code.ejs'),
+      {user: User.app.currentUser, redirect: User.app.get('weburl'), emailVerificationCode}, {}, function(err, html) {
+        User.app.models.Email.send({
+          to: User.app.currentUser.email,
+          from: User.app.dataSources.email.settings.transports[0].auth.user,
+          subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
+          html
+        }, function(err) {
+          console.log('> sending verification code email to:', User.app.currentUser.email);
+          if (err) return console.log('> error sending verification code email');
+          next(null, "success");
+        });
+      });
     });
   };
 
@@ -67,21 +85,23 @@ module.exports = function(User) {
   });
 
   User.afterRemote('login', function(context, accessToken, next) {
-    if(accessToken && accessToken.user){
+    if (accessToken && accessToken.user) {
       accessToken.user((err, user)=>{
         if (!user.emailVerified) {
           var emailVerificationCode = keygen.number({length: 6});
-          ejs.renderFile(path.resolve('templates/signup.ejs'),
-          {user, emailVerificationCode}, {}, function(err, html) {
-            User.app.models.Email.send({
-              to: user.email,
-              from: User.app.dataSources.email.settings.transports[0].auth.user,
-              subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
-              html,
-            }, function(err) {
-              console.log('> sending verification code email to:', user.email);
-              if (err) return console.log('> error sending verification code email');
-              next();
+          user.updateAttributes({emailVerificationCode}, {}, err => {
+            ejs.renderFile(path.resolve('templates/resend-verification-code.ejs'),
+            {user, redirect: User.app.get('weburl'), emailVerificationCode}, {}, function(err, html) {
+              User.app.models.Email.send({
+                to: user.email,
+                from: User.app.dataSources.email.settings.transports[0].auth.user,
+                subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
+                html
+              }, function(err) {
+                console.log('> sending verification code email to:', user.email);
+                if (err) return console.log('> error sending verification code email');
+                next();
+              });
             });
           });
         } else next();

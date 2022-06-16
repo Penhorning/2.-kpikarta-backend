@@ -3,6 +3,7 @@
 module.exports = function socialRoutes(app) {
   app.get("/auth/account", (req, res) => {
 
+    console.log(req.headers.cookie)
     let cookies = req.headers.cookie;
     let cookieArray = cookies.split(";");
     let accessTokenString = decodeURIComponent(cookieArray[1].substring(18));

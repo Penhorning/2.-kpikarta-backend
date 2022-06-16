@@ -113,7 +113,7 @@ boot(app, __dirname, function(err) {
 app.middleware('auth', loopback.token({
   model: app.models.accessToken,
 }));
-
+app.use(cookieParser(app.get('coockeSecret')));
 app.middleware('session:before', cookieParser(app.get('cookieSecret')));
 app.middleware('session', session({
   secret: app.get("cookieSecret"),
