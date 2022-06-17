@@ -2,6 +2,6 @@
 
 const socialRoutes = require("./socialRoutes");
 
-module.exports = function so(app) {
+module.exports = function (app) {
     socialRoutes(app);
 };

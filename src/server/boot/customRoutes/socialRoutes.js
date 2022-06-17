@@ -3,21 +3,21 @@
 module.exports = function socialRoutes(app) {
   app.get("/auth/account", (req, res) => {
 
-    console.log(req.headers.cookie)
-    let cookies = req.headers.cookie;
-    let cookieArray = cookies.split(";");
-    let accessTokenString = decodeURIComponent(cookieArray[1].substring(18));
-    let accessTokenArray = accessTokenString.split(".");
-    let access_token = accessTokenArray[0];
-    let userIdString = decodeURIComponent(cookieArray[2].substring(12));
-    let userIdArray = userIdString.split(".");
-    let userId = userIdArray[0];
+    console.log(req.signedCookies);
+    console.log(req.signedCookies.userId);
 
-    if (req.user.emailVerified) {
-        res.redirect(`${process.env.WEB_LOGIN_URL}?name=${req.user.fullName}&email=${req.user.email}&userId=${userId}&access_token=${access_token}` );
+    const user = {
+        userId: req.signedCookies.userId,
+        accessToken: req.signedCookies.access_token,
+        name: req.user.fullName,
+        email: req.user.email
+    }
+
+    if (req.user.emailVerified && req.user.currentPlan) {
+        res.redirect(`${process.env.WEB_LOGIN_URL}?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}` );
     } else {
         req.user.updateAttributes({emailVerified: true}, (err)=>{
-            res.redirect(`${process.env.AUTH_REDIRECT_URL}?name=${req.user.fullName}&email=${req.user.email}&userId=${userId}&access_token=${access_token}`);
+            res.redirect(`${process.env.AUTH_REDIRECT_URL}?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}`);
         });
     }
 

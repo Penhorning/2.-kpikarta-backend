@@ -2,6 +2,6 @@
 
 const customRoutes = require("./customRoutes");
 
-module.exports = function so(app) {
+module.exports = function (app) {
     customRoutes(app);
 };

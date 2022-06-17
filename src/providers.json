@@ -24,5 +24,17 @@
       "failureRedirect": "/login",
       "scope": ["email", "profile"],
       "failureFlash": true
+    },
+    "linkedin-login": {
+      "provider": "linkedin",
+      "module": "passport-linkedin-oauth2",
+      "profileFields": ["gender", "link", "locale", "name", "timezone", "verified", "email", "updated_time"],
+      "clientID": "784nolgv6obuyt",
+      "clientSecret": "sO5dO907h6km8PfO",
+      "callbackURL": "/auth/linkedin/callback",
+      "authPath": "/auth/linkedin",
+      "callbackPath": "/auth/linkedin/callback",
+      "successRedirect": "/auth/account",
+      "scope": ["r_emailaddress", "r_liteprofile"]
     }
   }

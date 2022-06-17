@@ -16,8 +16,6 @@ const app = module.exports = loopback();
 
 app.middleware("parse", bodyParser.json());
 
-
-
 require('dotenv').config();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'templates'));
@@ -35,10 +33,10 @@ app.use(function(req, res, next) {
     const UserModel = app.models.user;
     UserModel.relations.accessTokens.modelTo.findById(tokenId, function(err, accessToken) {
       if (err) return next(err);
-      if (! accessToken) return next(new Error('could not find accessToken'));
+      if (!accessToken) return next(new Error('could not find accessToken'));
       UserModel.findById(accessToken.userId, function(err, user) {
         if (err) return next(err);
-        if (! user) return next(new Error('could not find a valid user'));
+        if (!user) return next(new Error('could not find a valid user'));
         app.currentUser = user;
         next();
       });
@@ -68,12 +66,12 @@ boot(app, __dirname, function(err) {
   if (require.main === module)
     app.start();
 
-  /* Passport configurations */
+/*=================================PASSPORT CONFIGURATIONS==============================================*/
   var loopbackPassport = require('loopback-component-passport');
   var PassportConfigurator = loopbackPassport.PassportConfigurator;
   var passportConfigurator = new PassportConfigurator(app);
 
-    // Load the provider configurations
+  // Load the provider configurations
   var config = {};
   try {
     config = require('../providers.json');
@@ -81,42 +79,54 @@ boot(app, __dirname, function(err) {
     console.error('Passport configuration', err);
     process.exit(1);
   }
-    // Initialize passport
+  // Initialize passport
   passportConfigurator.init();
 
-    // Set up related models
+  // Set up related models
   passportConfigurator.setupModels({
     userModel: app.models.user,
     userIdentityModel: app.models.userIdentity,
     userCredentialModel: app.models.userCredential,
   });
   function customProfileToUser (provider, profile, options) {
-    var userInfo = {
-      username: profile._json.email,
-      password: 'secret',
-      fullName: profile._json.name,
-      email: profile._json.email
-    };
+    var userInfo;
+    if (provider === 'linkedin') {
+      userInfo = {
+        username: profile.emails[0].value,
+        password: 'linkedin_secret',
+        fullName: profile.displayName,
+        email: profile.emails[0].value
+      }
+    } else if (provider === 'google') {
+      userInfo = {
+        username: profile._json.email,
+        password: 'google_secret',
+        fullName: profile._json.name,
+        email: profile._json.email
+      }
+    }
     return userInfo;
   }
-    // Configure passport strategies for third party auth providers
+  // Configure passport strategies for third party auth providers
   for (var s in config) {
     var c = config[s];
     c.session = c.session !== false;
     c.profileToUser = customProfileToUser;
     passportConfigurator.configureProvider(s, c);
   }
-  /* Passport configurations ends */
+/*======================================================================================================*/
 });
 
 // The access token is only available after boot
 app.middleware('auth', loopback.token({
   model: app.models.accessToken,
 }));
-app.use(cookieParser(app.get('coockeSecret')));
-app.middleware('session:before', cookieParser(app.get('cookieSecret')));
+
+// Cookie parser
+app.use(cookieParser(process.env.COOKIE_SECRET));
+app.middleware('session:before', cookieParser(process.env.COOKIE_SECRET));
 app.middleware('session', session({
-  secret: app.get("cookieSecret"),
+  secret: process.env.COOKIE_SECRET,
   saveUninitialized: true,
   resave: true,
 }));

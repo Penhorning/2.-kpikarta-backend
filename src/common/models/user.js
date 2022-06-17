@@ -7,7 +7,7 @@ const fs = require('fs');
 const ejs = require('ejs');
 
 module.exports = function(User) {
-  // Custom methods
+/*=============================CUSTOM METHODS===========================================================*/
   User.verifyEmail = function (otp, next) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
@@ -16,11 +16,13 @@ module.exports = function(User) {
       });
     } else next(new Error('Invalid OTP'));
   };
+  
   User.selectPlan = function (plan, next) {
     this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
       next(err, this.app.currentUser);
     });
   };
+  
   User.resendCode = function (next) {
     var emailVerificationCode = keygen.number({length: 6});
     this.app.currentUser.updateAttributes({emailVerificationCode}, {}, err => {
@@ -40,7 +42,7 @@ module.exports = function(User) {
     });
   };
 
-  // Remote hooks
+/*=============================REMOTE HOOKS===========================================================*/
   User.on('resetPasswordRequest', function(info) {
     var resetLink = 'http://159.89.234.66:3343/reset-password?access_token=' + info.accessToken.id;
     ejs.renderFile(path.resolve('templates/forgotpassword.ejs'),
