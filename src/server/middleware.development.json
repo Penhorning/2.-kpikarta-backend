@@ -6,5 +6,12 @@
         "log": true
       }
     }
+  },
+  "auth": {
+    "loopback#token": {
+      "params": {
+        "currentUserLiteral": "me"
+      }
+    }
   }
 }

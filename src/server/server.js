@@ -8,13 +8,13 @@
 const path = require('path');
 const loopback = require('loopback');
 const boot = require('loopback-boot');
-const bodyParser = require("body-parser");
-const cookieParser = require("cookie-parser");
+const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser');
 const session = require('express-session');
 
 const app = module.exports = loopback();
 
-app.middleware("parse", bodyParser.json());
+app.middleware('parse', bodyParser.json());
 
 require('dotenv').config();
 app.set('view engine', 'ejs');
@@ -66,7 +66,7 @@ boot(app, __dirname, function(err) {
   if (require.main === module)
     app.start();
 
-/*=================================PASSPORT CONFIGURATIONS==============================================*/
+/* =================================PASSPORT CONFIGURATIONS============================================== */
   var loopbackPassport = require('loopback-component-passport');
   var PassportConfigurator = loopbackPassport.PassportConfigurator;
   var passportConfigurator = new PassportConfigurator(app);
@@ -88,22 +88,22 @@ boot(app, __dirname, function(err) {
     userIdentityModel: app.models.userIdentity,
     userCredentialModel: app.models.userCredential,
   });
-  function customProfileToUser (provider, profile, options) {
+  function customProfileToUser(provider, profile, options) {
     var userInfo;
     if (provider === 'linkedin') {
       userInfo = {
         username: profile.emails[0].value,
         password: 'linkedin_secret',
         fullName: profile.displayName,
-        email: profile.emails[0].value
-      }
+        email: profile.emails[0].value,
+      };
     } else if (provider === 'google') {
       userInfo = {
         username: profile._json.email,
         password: 'google_secret',
         fullName: profile._json.name,
-        email: profile._json.email
-      }
+        email: profile._json.email,
+      };
     }
     return userInfo;
   }
@@ -114,7 +114,7 @@ boot(app, __dirname, function(err) {
     c.profileToUser = customProfileToUser;
     passportConfigurator.configureProvider(s, c);
   }
-/*======================================================================================================*/
+/* ====================================================================================================== */
 });
 
 // The access token is only available after boot
