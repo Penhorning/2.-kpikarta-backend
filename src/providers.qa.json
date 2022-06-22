@@ -5,7 +5,7 @@
       "profileFields": ["gender", "link", "locale", "name", "displayName", "timezone", "verified", "email", "updated_time"],
       "clientID": "536668294658429",
       "clientSecret": "333746ba5ee48ba68cc4698b4915dee3",
-      "callbackURL": "http://localhost:3000/auth/facebook/callback",
+      "callbackURL": "https://qa-api.kpikarta.com/auth/facebook/callback",
       "authPath": "/auth/facebook",
       "callbackPath": "/auth/facebook/callback",
       "successRedirect": "/auth/account",
