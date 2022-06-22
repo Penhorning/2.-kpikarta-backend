@@ -91,6 +91,7 @@ boot(app, __dirname, function(err) {
   function customProfileToUser(provider, profile, options) {
     var userInfo;
     if (provider === 'linkedin') {
+      delete profile['_json']['profilePicture'];
       userInfo = {
         username: profile.emails[0].value,
         password: 'linkedin_secret',
@@ -101,6 +102,13 @@ boot(app, __dirname, function(err) {
       userInfo = {
         username: profile._json.email,
         password: 'google_secret',
+        fullName: profile._json.name,
+        email: profile._json.email,
+      };
+    } else if (provider === 'facebook') {
+      userInfo = {
+        username: profile._json.email,
+        password: 'facebook_secret',
         fullName: profile._json.name,
         email: profile._json.email,
       };

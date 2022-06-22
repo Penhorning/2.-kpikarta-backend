@@ -24,6 +24,12 @@
     "emailVerificationCode": {
       "type": "string"
     },
+    "mobileVerified": {
+      "type": "boolean"
+    },
+    "mobileVerificationCode": {
+      "type": "string"
+    },
     "currentPlan": {
       "type": "string",
       "defualt": "spectator"

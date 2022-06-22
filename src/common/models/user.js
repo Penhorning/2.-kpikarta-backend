@@ -28,12 +28,12 @@ module.exports = function(User) {
     var emailVerificationCode = keygen.number({length: 6});
     this.app.currentUser.updateAttributes({emailVerificationCode}, {}, err => {
       ejs.renderFile(path.resolve('templates/resend-verification-code.ejs'),
-      {user: User.app.currentUser, redirect: User.app.get('weburl'), emailVerificationCode}, {}, function(err, html) {
+      {user: User.app.currentUser, emailVerificationCode}, {}, function(err, html) {
         User.app.models.Email.send({
           to: User.app.currentUser.email,
           from: User.app.dataSources.email.settings.transports[0].auth.user,
-          subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
-          html,
+          subject: `Verfication Code | ${User.app.get('name')}`,
+          html
         }, function(err) {
           console.log('> sending verification code email to:', User.app.currentUser.email);
           if (err) return console.log('> error sending verification code email');
@@ -45,7 +45,7 @@ module.exports = function(User) {
 
 /* =============================REMOTE HOOKS=========================================================== */
   User.on('resetPasswordRequest', function(info) {
-    var resetLink = 'http://159.89.234.66:3343/reset-password?access_token=' + info.accessToken.id;
+    var resetLink = `${process.env.URL}/reset-password?access_token=${info.accessToken.id}`;
     ejs.renderFile(path.resolve('templates/forgotpassword.ejs'),
     {fullName: info.user.fullName, resetLink}, {}, function(err, html) {
       User.app.models.Email.send({
@@ -71,7 +71,6 @@ module.exports = function(User) {
           from: User.app.dataSources.email.settings.transports[0].auth.user,
           subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
           template: path.resolve(__dirname, '../../templates/signup.ejs'),
-          redirect: User.app.get('weburl'),
           user: user,
           emailVerificationCode,
         };
@@ -100,7 +99,7 @@ module.exports = function(User) {
               User.app.models.Email.send({
                 to: user.email,
                 from: User.app.dataSources.email.settings.transports[0].auth.user,
-                subject: `${emailVerificationCode} is your verfication code | ${User.app.get('name')}`,
+                subject: `Verfication Code | ${User.app.get('name')}`,
                 html,
               }, function(err) {
                 console.log('> sending verification code email to:', user.email);

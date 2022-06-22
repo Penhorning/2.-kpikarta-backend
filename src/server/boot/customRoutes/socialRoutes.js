@@ -1,10 +1,9 @@
 'use strict';
 
+const keygen = require('keygenerator');
+
 module.exports = function socialRoutes(app) {
   app.get("/auth/account", (req, res) => {
-
-    console.log(req.signedCookies);
-    console.log(req.signedCookies.userId);
 
     const user = {
         userId: req.signedCookies.userId,
@@ -21,5 +20,26 @@ module.exports = function socialRoutes(app) {
         });
     }
 
+  });
+
+  app.post("/send/otp", (req, res) => {
+    let otp = keygen.number({length: 6});
+    let data = {
+      type: 'sms',
+      to: req.body.number || "+918076454846",
+      from: "+16063667831",
+      body: `${otp} is your OTP for KPI Karta mobile verification.`
+    }
+    req.app.models.Twillio.updateAttributes({ mobileVerificationCode: otp }, {}, err => {
+      // req.app.models.Twillio.send(data, function (err, data) {
+      //   if (err) {
+      //       console.log(err);
+      //       res.json({ status: 500, message: err.message });
+      //   } else {
+      //       console.log(data);
+      //       res.json({ status: 200, message: "OTP sent successfully" });
+      //   }
+      // });
+    });
   });
 };
