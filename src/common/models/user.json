@@ -33,6 +33,18 @@
     "currentPlan": {
       "type": "string",
       "defualt": "spectator"
+    },
+    "mfaEnabled":{
+      "type":"boolean",
+      "defualt":false
+    },
+    "mfaSecret":{
+      "type":"string",
+      "defualt":""
+    },
+    "mfaQRCode":{
+      "type":"string",
+      "defualt":""
     }
   },
   "validations": [],
@@ -129,6 +141,62 @@
       "http": {
         "verb": "post",
         "path": "/resend_code"
+      }
+    },
+    "generateMFAQRCode": {
+      "accepts": [
+      ],
+      "returns": {
+        "arg": "qrcode",
+        "type": "string"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/generateMFAQRCode"
+      }
+    },
+    "verifyMFACode": {
+      "accepts": [
+        {
+          "arg": "otp",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "verified",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/verifyMFAToken"
+      }
+    },
+    "enableMFA": {
+      "accepts": [
+        {
+          "arg": "otp",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "enabled",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/enableMFA"
+      }
+    },
+    "resetMFAConfig": {
+      "accepts": [
+      ],
+      "returns": {
+        "arg": "reset",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/resetMFA"
       }
     }
   }

@@ -6,6 +6,8 @@ const keygen = require('keygenerator');
 const fs = require('fs');
 const ejs = require('ejs');
 const RoleManager = require('../../helper').RoleManager;
+const speakeasy = require('speakeasy');
+var QRCode = require('qrcode');
 
 module.exports = function(User) {
 /* =============================CUSTOM METHODS=========================================================== */
@@ -33,13 +35,58 @@ module.exports = function(User) {
           to: User.app.currentUser.email,
           from: User.app.dataSources.email.settings.transports[0].auth.user,
           subject: `Verfication Code | ${User.app.get('name')}`,
-          html
+          html,
         }, function(err) {
           console.log('> sending verification code email to:', User.app.currentUser.email);
           if (err) return console.log('> error sending verification code email');
           next(null, 'success');
         });
       });
+    });
+  };
+
+  User.generateMFAQRCode = function(next) {
+    if (this.app.currentUser.mfaQRCode) {
+      return next(null, this.app.currentUser.mfaQRCode);
+    }
+    var secret = speakeasy.generateSecret({length: 6, name: this.app.get('name') + ' | ' + this.app.currentUser.fullName});
+    QRCode.toDataURL(secret.otpauth_url, function(err, mfaQRCode) {
+      User.app.currentUser.updateAttributes({mfaSecret: secret.base32, mfaQRCode}, (err)=>{
+        next(err, mfaQRCode);
+      });
+    });
+  };
+
+  User.enableMFA = function(token, next) {
+    if (this.app.currentUser.mfaEnabled) {
+      return next(new Error('MFA is already configured for this account'));
+    }
+    var verified = speakeasy.totp.verify({
+      secret: this.app.currentUser.mfaSecret,
+      encoding: 'base32',
+      token,
+    });
+    if (verified) {
+      this.app.currentUser.updateAttribute('mfaEnabled', true, (err)=>{
+        next(null, verified);
+      });
+    } else next(null, verified);
+  };
+
+  User.verifyMFACode = function(token, next) {
+    if (!this.app.currentUser.mfaEnabled) {
+      return next(new Error('Multi factor authentication is disabled. Please enable it first'));
+    }
+    next(null, speakeasy.totp.verify({
+      secret: this.app.currentUser.mfaSecret,
+      encoding: 'base32',
+      token,
+    }));
+  };
+
+  User.resetMFAConfig = function(next) {
+    this.app.currentUser.updateAttributes({mfaSecret: '', mfaQRCode: '', mfaEnabled: ''}, (err)=>{
+      next(err, true);
     });
   };
 
