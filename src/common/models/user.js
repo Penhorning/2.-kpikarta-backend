@@ -45,7 +45,7 @@ module.exports = function(User) {
 
 /* =============================REMOTE HOOKS=========================================================== */
   User.on('resetPasswordRequest', function(info) {
-    var resetLink = `${process.env.URL}/reset-password?access_token=${info.accessToken.id}`;
+    var resetLink = `${process.env.WEB_URL}/reset-password?access_token=${info.accessToken.id}`;
     ejs.renderFile(path.resolve('templates/forgotpassword.ejs'),
     {fullName: info.user.fullName, resetLink}, {}, function(err, html) {
       User.app.models.Email.send({
