@@ -10,9 +10,11 @@
       "type": "string",
       "required": true
     },
-    "description": {
+    "descriptions": {
       "type": [
-        "string"
+        {
+          "description": "string"
+        }
       ]
     }
   },
