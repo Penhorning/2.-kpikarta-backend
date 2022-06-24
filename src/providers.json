@@ -9,6 +9,7 @@
       "authPath": "/auth/facebook",
       "callbackPath": "/auth/facebook/callback",
       "successRedirect": "/auth/account",
+      "failureRedirect": "http://localhost:4412/login",
       "scope": ["email", "public_profile"]
     },
     "google-login": {
@@ -21,7 +22,7 @@
       "authPath": "/auth/google",
       "callbackPath": "/auth/google/callback",
       "successRedirect": "/auth/account",
-      "failureRedirect": "/login",
+      "failureRedirect": "http://localhost:4412/login",
       "scope": ["email", "profile"],
       "failureFlash": true
     },
@@ -35,6 +36,7 @@
       "authPath": "/auth/linkedin",
       "callbackPath": "/auth/linkedin/callback",
       "successRedirect": "/auth/account",
+      "failureRedirect": "http://localhost:4412/login",
       "scope": ["r_emailaddress", "r_liteprofile"]
     }
   }
