@@ -87,6 +87,12 @@
       "type": "hasOne",
       "model": "suggestion",
       "foreignKey": ""
+    },
+    "roles": {
+      "type": "hasMany",
+      "model": "Role",
+      "foreignKey": "principalId",
+      "through": "RoleMapping"
     }
   },
   "acls": [
@@ -98,6 +104,13 @@
     },
     {
       "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW"
+    },
+    {
+      "accessType": "EXECUTE",
+      "property": "adminLogin",
       "principalType": "ROLE",
       "principalId": "$everyone",
       "permission": "ALLOW"
@@ -202,6 +215,29 @@
       "http": {
         "verb": "put",
         "path": "/resetMFA"
+      }
+    },
+    "adminLogin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required":true
+        },
+        {
+          "arg": "password",
+          "type": "string",
+          "required":true
+        }
+      ],
+      "returns": {
+        "arg": "accessToken",
+        "type": "AccessToken",
+        "root":true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/login/admin"
       }
     }
   }

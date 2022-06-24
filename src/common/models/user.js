@@ -11,6 +11,21 @@ var QRCode = require('qrcode');
 
 module.exports = function(User) {
 /* =============================CUSTOM METHODS=========================================================== */
+
+  User.adminLogin = (email, password, next)=>{
+    User.login({email, password}, 'user', (err, token)=>{
+      if (err) return next(err);
+      token.user((_e, user)=>{
+        user.roles((e, roles)=>{
+          roles = roles.map(r=>r.name);
+          if (roles.indexOf('admin') > -1) {
+            next(null, token);
+          } else next(new Error('Only admins are allowed to login'));
+        });
+      });
+    });
+  };
+
   User.verifyEmail = function(otp, next) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
