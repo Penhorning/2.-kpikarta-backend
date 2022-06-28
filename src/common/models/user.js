@@ -21,6 +21,17 @@ module.exports = function(User) {
     });
   };
 
+  User.forgotPasswordAdmin = (email, next)=>{
+    User.findOne({where: {email}, include: 'roles'}, (err, user)=>{
+      var isAdmin = user.roles().map(r=>r.name).indexOf('admin') > -1;
+      if (isAdmin) {
+        User.resetPassword({email}, next);
+      } else {
+        next(null, err ? err.message : 'You are not an administrator');
+      };
+    });
+  };
+
   User.adminLogin = (email, password, next)=>{
     User.login({email, password}, 'user', (err, token)=>{
       if (err) return next(err);

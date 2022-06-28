@@ -114,6 +114,13 @@
       "principalType": "ROLE",
       "principalId": "$everyone",
       "permission": "ALLOW"
+    },
+     {
+      "accessType": "EXECUTE",
+      "property": "forgotPasswordAdmin",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW"
     }
   ],
   "methods": {
@@ -251,6 +258,23 @@
       "http": {
         "verb": "get",
         "path": "/all"
+      }
+    },
+    "forgotPasswordAdmin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required":true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/reset/admin"
       }
     }
   }
