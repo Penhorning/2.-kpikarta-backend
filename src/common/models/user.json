@@ -239,6 +239,19 @@
         "verb": "post",
         "path": "/login/admin"
       }
+    },
+    "findUsersExceptAdmin": {
+      "accepts": [
+      ],
+      "returns": {
+        "arg": ["users"],
+        "type": "user",
+        "root":true
+      },
+      "http": {
+        "verb": "get",
+        "path": "/all"
+      }
     }
   }
 }

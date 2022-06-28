@@ -12,6 +12,15 @@ var QRCode = require('qrcode');
 module.exports = function(User) {
 /* =============================CUSTOM METHODS=========================================================== */
 
+  User.findUsersExceptAdmin = (next)=>{
+    User.find({include: 'roles'}, (err, users)=>{
+      users = users.filter(user=>{
+        return user.roles().map(r=>r.name).indexOf('admin') == -1;
+      });
+      next(err, users);
+    });
+  };
+
   User.adminLogin = (email, password, next)=>{
     User.login({email, password}, 'user', (err, token)=>{
       if (err) return next(err);
