@@ -11,10 +11,44 @@ var QRCode = require('qrcode');
 
 module.exports = function(User) {
 /* =============================CUSTOM METHODS=========================================================== */
-// Verify email
-  User.verifyEmail = function(code, next) {
-    var codeVerified = this.app.currentUser.emailVerificationCode == code;
-    if (codeVerified) {
+
+  User.findUsersExceptAdmin = (next)=>{
+    User.find({include: 'roles'}, (err, users)=>{
+      users = users.filter(user=>{
+        return user.roles().map(r=>r.name).indexOf('admin') == -1;
+      });
+      next(err, users);
+    });
+  };
+
+  User.forgotPasswordAdmin = (email, next)=>{
+    User.findOne({where: {email}, include: 'roles'}, (err, user)=>{
+      var isAdmin = user.roles().map(r=>r.name).indexOf('admin') > -1;
+      if (isAdmin) {
+        User.resetPassword({email}, next);
+      } else {
+        next(null, err ? err.message : 'You are not an administrator');
+      };
+    });
+  };
+
+  User.adminLogin = (email, password, next)=>{
+    User.login({email, password}, 'user', (err, token)=>{
+      if (err) return next(err);
+      token.user((_e, user)=>{
+        user.roles((e, roles)=>{
+          roles = roles.map(r=>r.name);
+          if (roles.indexOf('admin') > -1) {
+            next(null, token);
+          } else next(new Error('Only admins are allowed to login'));
+        });
+      });
+    });
+  };
+
+  User.verifyEmail = function(otp, next) {
+    var otpVerified = this.app.currentUser.emailVerificationCode == otp;
+    if (otpVerified) {
       this.app.currentUser.updateAttributes({emailVerified: true, emailVerificationCode: ''}, (err)=>{
         next(err, this.app.currentUser);
       });
