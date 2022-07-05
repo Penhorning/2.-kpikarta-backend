@@ -20,6 +20,7 @@ require('dotenv').config();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'templates'));
 
+
 app.use(function(req, res, next) {
   var tokenId = false;
   if (req.query && req.query.access_token) {
@@ -106,11 +107,14 @@ boot(app, __dirname, function(err) {
         email: profile._json.email,
       };
     } else if (provider === 'facebook') {
+      let email = "";
+      if (profile._json.email) email = profile._json.email;
+      else email = `${profile._json.id}@facebook.com`;
       userInfo = {
-        username: profile._json.email,
+        username: email,
         password: 'facebook_secret',
         fullName: profile._json.name,
-        email: profile._json.email,
+        email: email,
       };
     }
     return userInfo;

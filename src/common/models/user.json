@@ -13,10 +13,6 @@
     }
   },
   "properties": {
-    "mobile": {
-      "type": "string",
-      "required": false
-    },
     "fullName": {
       "type": "string",
       "required": false
@@ -24,27 +20,46 @@
     "emailVerificationCode": {
       "type": "string"
     },
-    "mobileVerified": {
-      "type": "boolean"
+    "mobile": {
+      "type": "object",
+      "required": false
     },
     "mobileVerificationCode": {
       "type": "string"
+    },
+    "mobileVerified": {
+      "type": "boolean"
     },
     "currentPlan": {
       "type": "string",
       "defualt": "spectator"
     },
-    "mfaEnabled":{
-      "type":"boolean",
-      "defualt":false
+    "mfaEnabled": {
+      "type": "boolean",
+      "defualt": false
     },
-    "mfaSecret":{
-      "type":"string",
-      "defualt":""
+    "mfaSecret": {
+      "type": "string",
+      "defualt": ""
     },
-    "mfaQRCode":{
-      "type":"string",
-      "defualt":""
+    "mfaQRCode": {
+      "type": "string",
+      "defualt": ""
+    },
+    "street": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -107,7 +122,7 @@
     "verifyEmail": {
       "accepts": [
         {
-          "arg": "otp",
+          "arg": "code",
           "type": "string"
         }
       ],
@@ -117,8 +132,59 @@
         "root": true
       },
       "http": {
-        "verb": "get",
+        "verb": "post",
         "path": "/verify_email"
+      }
+    },
+    "sendEmailCode": {
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send_email_code"
+      }
+    },
+    "verifyMobile": {
+      "accepts": [
+        {
+          "arg": "code",
+          "type": "string"
+        },
+        {
+          "arg": "mobile",
+          "type": "object"
+        }
+      ],
+      "returns": {
+        "arg": "verified",
+        "type": "boolean",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify_mobile"
+      }
+    },
+    "sendMobileCode": {
+      "accepts": [
+        {
+          "arg": "type",
+          "type": "string"
+        },
+        {
+          "arg": "mobile",
+          "type": "object"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send_mobile_code"
       }
     },
     "selectPlan": {
@@ -138,19 +204,8 @@
         "path": "/assign_plan"
       }
     },
-    "resendCode": {
-      "returns": {
-        "arg": "status",
-        "type": "string"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/resend_code"
-      }
-    },
     "generateMFAQRCode": {
-      "accepts": [
-      ],
+      "accepts": [],
       "returns": {
         "arg": "qrcode",
         "type": "string"
@@ -163,7 +218,7 @@
     "verifyMFACode": {
       "accepts": [
         {
-          "arg": "otp",
+          "arg": "code",
           "type": "string"
         }
       ],
@@ -179,7 +234,7 @@
     "enableMFA": {
       "accepts": [
         {
-          "arg": "otp",
+          "arg": "code",
           "type": "string"
         }
       ],
@@ -193,8 +248,7 @@
       }
     },
     "resetMFAConfig": {
-      "accepts": [
-      ],
+      "accepts": [],
       "returns": {
         "arg": "reset",
         "type": "boolean"

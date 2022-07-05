@@ -50,10 +50,6 @@
     "dataSource": "db",
     "public": true
   },
-  "useraddress": {
-    "dataSource": "db",
-    "public": true
-  },
   "usernotification": {
     "dataSource": "db",
     "public": true
@@ -82,12 +78,16 @@
     "dataSource": "db",
     "public": true
   },
-  "Twillio": {
+  "Twilio": {
     "dataSource": "twilio",
     "public": false
   },
-  "mobile": {
+  "company": {
     "dataSource": "db",
+    "public": true
+  },
+  "Container": {
+    "dataSource": "storage",
     "public": true
   }
 }
