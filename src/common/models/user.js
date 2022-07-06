@@ -109,12 +109,12 @@ module.exports = function(User) {
           from: "+16063667831",
           body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
         }
-        // User.app.models.Twilio.send(twilio_data, function (err, data) {
-        //   console.log('> sending code to mobile number:', mobileNumber);
-        //   if (err) return console.log('> error while sending code to mobile number');
-        //   next(null, 'sent');
-        // });
-        next(null, 'sent');
+        User.app.models.Twilio.send(twilio_data, function (err, data) {
+          console.log('> sending code to mobile number:', mobileNumber);
+          if (err) return console.log('> error while sending code to mobile number');
+          next(null, 'sent');
+        });
+        // next(null, 'sent');
       }
     });
   };
@@ -214,10 +214,10 @@ module.exports = function(User) {
           if (err) return console.log('> error while creating company data');
         });
 
-        // User.app.models.Twilio.send(twilio_data, function (err, data) {
-        //   console.log('> sending code to mobile number:', user.mobile.e164Number);
-        //   if (err) return console.log('> error while sending code to mobile number');
-        // });
+        User.app.models.Twilio.send(twilio_data, function (err, data) {
+          console.log('> sending code to mobile number:', user.mobile.e164Number);
+          if (err) return console.log('> error while sending code to mobile number');
+        });
 
         user.verify(options, function(err, response) {
           user.accessTokens.create((error, token)=>{
@@ -263,12 +263,12 @@ module.exports = function(User) {
               from: "+16063667831",
               body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
             }
-            // User.app.models.Twilio.send(twilio_data, function (err, data) {
-            //   console.log('> sending code to mobile number:', user.mobile.e164Number);
-            //   if (err) return console.log('> error while sending code to mobile number');
-            //   next();
-            // });
-            next();
+            User.app.models.Twilio.send(twilio_data, function (err, data) {
+              console.log('> sending code to mobile number:', user.mobile.e164Number);
+              if (err) return console.log('> error while sending code to mobile number');
+              next();
+            });
+            // next();
           });
         } else {
           User.app.models.company.findOne({ userId: user.id }, function (err, result) {
