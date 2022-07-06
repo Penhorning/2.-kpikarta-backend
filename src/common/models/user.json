@@ -17,6 +17,10 @@
       "type": "string",
       "required": false
     },
+    "profilePic": {
+      "type": "string",
+      "required": false
+    },
     "emailVerificationCode": {
       "type": "string"
     },
