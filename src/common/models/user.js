@@ -131,7 +131,7 @@ module.exports = function(User) {
     }
     var secret = speakeasy.generateSecret({length: 6, name: this.app.get('name') + ' | ' + this.app.currentUser.fullName});
     QRCode.toDataURL(secret.otpauth_url, function(err, mfaQRCode) {
-      User.app.currentUser.updateAttributes({mfaSecret: secret.base32, mfaQRCode}, (err)=>{
+      User.app.currentUser.updateAttributes({ "mfaSecret": secret.base32, mfaQRCode }, (err)=>{
         next(err, mfaQRCode);
       });
     });
@@ -139,7 +139,9 @@ module.exports = function(User) {
 // Enable MFA
   User.enableMFA = function(token, next) {
     if (this.app.currentUser.mfaEnabled) {
-      return next(new Error('MFA is already configured for this account'));
+      let error = new Error("MFA is already configured for this account");
+      error.status = 400;
+      return next(error);
     }
     var verified = speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
@@ -150,12 +152,18 @@ module.exports = function(User) {
       this.app.currentUser.updateAttribute('mfaEnabled', true, (err)=>{
         next(null, verified);
       });
-    } else next(null, verified);
+    } else {
+      let error = new Error("Invalid Code");
+      error.status = 400;
+      return next(error);
+    }
   };
 // Verify MFA code
   User.verifyMFACode = function(token, next) {
     if (!this.app.currentUser.mfaEnabled) {
-      return next(new Error('Multi factor authentication is disabled. Please enable it first'));
+      let error = new Error("Multi factor authentication is disabled. Please enable it first");
+      error.status = 400;
+      return next(error);
     }
     next(null, speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
@@ -165,8 +173,19 @@ module.exports = function(User) {
   };
 // Reset MFA
   User.resetMFAConfig = function(next) {
-    this.app.currentUser.updateAttributes({mfaSecret: '', mfaQRCode: '', mfaEnabled: ''}, (err)=>{
+    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaEnabled": false }, (err)=>{
       next(err, true);
+    });
+  };
+// Enable/Disable MFA
+  User.checkMFAEnabled = function(next) {
+    if (this.app.currentUser.mfaEnabled) next (null, true);
+    else next(null, false);
+  };
+// Enable/Disable MFA
+  User.toggleMFA = function(type, next) {
+    this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
+      next(err, type);
     });
   };
 
@@ -271,9 +290,9 @@ module.exports = function(User) {
             // next();
           });
         } else {
-          User.app.models.company.findOne({ userId: user.id }, function (err, result) {
+          user.company((err, company) => {
             if (err) return console.log('> error while fetching company details');
-            context.result.companyLogo = result.__data.logo;
+            context.result.companyLogo = company.__data.logo ? company.__data.logo : "";
             next();
           });
         }

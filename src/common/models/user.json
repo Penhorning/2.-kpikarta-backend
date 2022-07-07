@@ -73,6 +73,11 @@
       "model": "userIdentity",
       "foreignKey": "userId"
     },
+    "company": {
+      "type": "hasOne",
+      "model": "company",
+      "foreignKey": "userId"
+    },
     "credentials": {
       "type": "hasMany",
       "model": "userCredential",
@@ -280,6 +285,33 @@
       "http": {
         "verb": "put",
         "path": "/resetMFA"
+      }
+    },
+    "checkMFAEnabled": {
+      "accepts": [],
+      "returns": {
+        "arg": "enabled",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/checkMFAEnabled"
+      }
+    },
+    "toggleMFA": {
+      "accepts": [
+        {
+          "arg": "type",
+          "type": "boolean"
+        }
+      ],
+      "returns": {
+        "arg": "type",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/toggleMFA"
       }
     },
     "adminLogin": {
