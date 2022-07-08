@@ -96,5 +96,13 @@
   "Container": {
     "dataSource": "storage",
     "public": true
+  },
+  "department": {
+    "dataSource": "db",
+    "public": true
+  },
+  "employees_range": {
+    "dataSource": "db",
+    "public": true
   }
 }

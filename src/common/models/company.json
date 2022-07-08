@@ -15,12 +15,6 @@
     },
     "job_title": {
       "type": "string"
-    },
-    "department": {
-      "type": "string"
-    },
-    "employees_count": {
-      "type": "number"
     }
   },
   "validations": [],
@@ -29,6 +23,22 @@
       "type": "belongsTo",
       "model": "user",
       "foreignKey": "userId",
+      "options": {
+        "disableInclude": true
+      }
+    },
+    "departments": {
+      "type": "hasOne",
+      "model": "department",
+      "foreignKey": "departmentId",
+      "options": {
+        "disableInclude": true
+      }
+    },
+    "employeesRanges": {
+      "type": "hasOne",
+      "model": "employees_range",
+      "foreignKey": "employeesRangeId",
       "options": {
         "disableInclude": true
       }

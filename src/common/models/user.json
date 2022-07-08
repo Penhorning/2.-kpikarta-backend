@@ -134,17 +134,17 @@
     },
     {
       "accessType": "EXECUTE",
-      "property": "adminLogin",
       "principalType": "ROLE",
       "principalId": "$everyone",
-      "permission": "ALLOW"
+      "permission": "ALLOW",
+      "property": "adminLogin"
     },
-     {
+    {
       "accessType": "EXECUTE",
-      "property": "forgotPasswordAdmin",
       "principalType": "ROLE",
       "principalId": "$everyone",
-      "permission": "ALLOW"
+      "permission": "ALLOW",
+      "property": "forgotPasswordAdmin"
     }
   ],
   "methods": {
@@ -287,15 +287,15 @@
         "path": "/resetMFA"
       }
     },
-    "checkMFAEnabled": {
+    "checkMFAConfig": {
       "accepts": [],
       "returns": {
-        "arg": "enabled",
-        "type": "boolean"
+        "arg": "mfa",
+        "type": "object"
       },
       "http": {
         "verb": "post",
-        "path": "/checkMFAEnabled"
+        "path": "/checkMFAConfig"
       }
     },
     "toggleMFA": {
@@ -319,18 +319,18 @@
         {
           "arg": "email",
           "type": "string",
-          "required":true
+          "required": true
         },
         {
           "arg": "password",
           "type": "string",
-          "required":true
+          "required": true
         }
       ],
       "returns": {
         "arg": "accessToken",
         "type": "AccessToken",
-        "root":true
+        "root": true
       },
       "http": {
         "verb": "post",
@@ -338,12 +338,13 @@
       }
     },
     "findUsersExceptAdmin": {
-      "accepts": [
-      ],
+      "accepts": [],
       "returns": {
-        "arg": ["users"],
+        "arg": [
+          "users"
+        ],
         "type": "user",
-        "root":true
+        "root": true
       },
       "http": {
         "verb": "get",
@@ -355,7 +356,7 @@
         {
           "arg": "email",
           "type": "string",
-          "required":true
+          "required": true
         }
       ],
       "returns": {

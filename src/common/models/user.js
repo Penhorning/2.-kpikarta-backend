@@ -177,10 +177,14 @@ module.exports = function(User) {
       next(err, true);
     });
   };
-// Enable/Disable MFA
-  User.checkMFAEnabled = function(next) {
-    if (this.app.currentUser.mfaEnabled) next (null, true);
-    else next(null, false);
+// Check MFA config
+  User.checkMFAConfig = function(next) {
+    let mfa = {
+      secret: this.app.currentUser.mfaSecret,
+      qrCode: this.app.currentUser.mfaQRCode,
+      enabled: this.app.currentUser.mfaEnabled
+    };
+    next(null, mfa);
   };
 // Enable/Disable MFA
   User.toggleMFA = function(type, next) {
@@ -222,17 +226,16 @@ module.exports = function(User) {
           emailVerificationCode
         };
 
+        User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
+          if (err) return console.log('> error while creating company data');
+        });
+
         let twilio_data = {
           type: 'sms',
           to: user.mobile.e164Number,
           from: "+16063667831",
           body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
         }
-
-        User.app.models.company.create({ name: context.req.body.companyName, userId: user.id }, {}, err => {
-          if (err) return console.log('> error while creating company data');
-        });
-
         User.app.models.Twilio.send(twilio_data, function (err, data) {
           console.log('> sending code to mobile number:', user.mobile.e164Number);
           if (err) return console.log('> error while sending code to mobile number');
