@@ -104,5 +104,9 @@
   "employees_range": {
     "dataSource": "db",
     "public": true
+  },
+  "color_setting": {
+    "dataSource": "db",
+    "public": true
   }
 }

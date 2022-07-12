@@ -21,29 +21,44 @@ module.exports = function(User) {
     });
   };
 
-  User.forgotPasswordAdmin = (email, next)=>{
-    User.findOne({where: {email}, include: 'roles'}, (err, user)=>{
-      var isAdmin = user.roles().map(r=>r.name).indexOf('admin') > -1;
-      if (isAdmin) {
+  function forgotWithRole(email, next, role) {
+    User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
+      let isValidRole = user.roles().map(r=>r.name).indexOf(role) > -1;
+      if (isValidRole) {
         User.resetPassword({email}, next);
       } else {
-        next(null, err ? err.message : 'You are not an administrator');
+        next(null, err ? err.message : 'You are not allowed');
       };
     });
+  }
+  User.forgotPasswordAdmin = (email, next)=>{
+    forgotWithRole(email, next, 'admin');
   };
 
-  User.adminLogin = (email, password, next)=>{
+  User.forgotPasswordUser = (email, next) => {
+    forgotWithRole(email, next, 'user');
+  };
+
+  function loginWithRole(email, password, next, role) {
     User.login({email, password}, 'user', (err, token)=>{
       if (err) return next(err);
       token.user((_e, user)=>{
         user.roles((e, roles)=>{
           roles = roles.map(r=>r.name);
-          if (roles.indexOf('admin') > -1) {
+          if (roles.indexOf(role) > -1) {
             next(null, token);
-          } else next(new Error('Only admins are allowed to login'));
+          } else next(new Error('You are not allowed to login'));
         });
       });
     });
+  };
+
+  User.adminLogin = (email, password, next) => {
+    loginWithRole(email, password, next, 'admin');
+  };
+
+  User.userLogin = (email, password, next) => {
+    loginWithRole(email, password, next, 'user');
   };
 
   User.verifyEmail = function(otp, next) {
@@ -114,7 +129,7 @@ module.exports = function(User) {
           if (err) return console.log('> error while sending code to mobile number');
           next(null, 'sent');
         });
-        // next(null, 'sent');
+        //next(null, 'sent');
       }
     });
   };
@@ -165,11 +180,20 @@ module.exports = function(User) {
       error.status = 400;
       return next(error);
     }
-    next(null, speakeasy.totp.verify({
+    var verified = speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
       encoding: 'base32',
-      token,
-    }));
+      token
+    });
+    if (verified) {
+      this.app.currentUser.updateAttribute('mfaEnabled', true, (err)=>{
+        next(null, verified);
+      });
+    } else {
+      let error = new Error("Invalid Code");
+      error.status = 400;
+      return next(error);
+    }
   };
 // Reset MFA
   User.resetMFAConfig = function(next) {
@@ -211,52 +235,58 @@ module.exports = function(User) {
   });
 
   User.afterRemote('create', function(context, user, next) {
-    RoleManager.assignRoles(User.app, ['user'], user.id, ()=>{
-      let emailVerificationCode = keygen.number({length: 6});
-      let mobileVerificationCode = keygen.number({length: 6});
-      user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
-        var options = {
-          name: User.app.get('name'),
-          type: 'email',
-          to: user.email,
-          from: User.app.dataSources.email.settings.transports[0].auth.user,
-          subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
-          template: path.resolve(__dirname, '../../templates/signup.ejs'),
-          user: user,
-          emailVerificationCode
-        };
+    User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+      RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+        let emailVerificationCode = keygen.number({length: 6});
+        let mobileVerificationCode = keygen.number({length: 6});
 
-        User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
-          if (err) return console.log('> error while creating company data');
-        });
-
-        let twilio_data = {
-          type: 'sms',
-          to: user.mobile.e164Number,
-          from: "+16063667831",
-          body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-        }
-        User.app.models.Twilio.send(twilio_data, function (err, data) {
-          console.log('> sending code to mobile number:', user.mobile.e164Number);
-          if (err) return console.log('> error while sending code to mobile number');
-        });
-
-        user.verify(options, function(err, response) {
-          user.accessTokens.create((error, token)=>{
-            delete user.__data.emailVerificationCode;
-            delete user.__data.mobileVerificationCode;
-            user.__data.token = token;
-            if (err) {
-              return next(err);
-            }
-            next();
+        // Update email and mobile code
+        user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
+          var options = {
+            name: User.app.get('name'),
+            type: 'email',
+            to: user.email,
+            from: User.app.dataSources.email.settings.transports[0].auth.user,
+            subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
+            template: path.resolve(__dirname, '../../templates/signup.ejs'),
+            user: user,
+            emailVerificationCode
+          };
+  
+          // Set company name
+          User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
+            if (err) return console.log('> error while creating company data');
+          });
+  
+          // Send sms
+          let twilio_data = {
+            type: 'sms',
+            to: user.mobile.e164Number,
+            from: "+16063667831",
+            body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+          }
+          User.app.models.Twilio.send(twilio_data, function (err, data) {
+            console.log('> sending code to mobile number:', user.mobile.e164Number);
+            if (err) return console.log('> error while sending code to mobile number');
+          });
+  
+          user.verify(options, function(err, response) {
+            user.accessTokens.create((error, token)=>{
+              delete user.__data.emailVerificationCode;
+              delete user.__data.mobileVerificationCode;
+              user.__data.token = token;
+              if (err) {
+                return next(err);
+              }
+              next();
+            });
           });
         });
       });
     });
   });
 
-  User.afterRemote('login', function(context, accessToken, next) {
+  User.afterRemote('userLogin', function(context, accessToken, next) {
     if (accessToken && accessToken.user) {
       User.findById(accessToken.userId.toString(), ((err, user)=>{
         if (!user.emailVerified) {
@@ -290,9 +320,24 @@ module.exports = function(User) {
               if (err) return console.log('> error while sending code to mobile number');
               next();
             });
-            // next();
           });
         } else {
+          if (!user.mfaEnabled) {
+            let mobileVerificationCode = keygen.number({length: 6});
+            user.updateAttributes({mobileVerificationCode}, {}, err => {
+              let twilio_data = {
+                type: 'sms',
+                to: user.mobile.e164Number,
+                from: "+16063667831",
+                body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+              }
+              User.app.models.Twilio.send(twilio_data, function (err, data) {
+                console.log('> sending code to mobile number:', user.mobile.e164Number);
+                if (err) return console.log('> error while sending code to mobile number');
+              });
+            });
+          }
+          // Get company name
           user.company((err, company) => {
             if (err) return console.log('> error while fetching company details');
             context.result.companyLogo = company.__data.logo ? company.__data.logo : "";
@@ -308,31 +353,40 @@ module.exports = function(User) {
     const req = context.req;
 
     if (req.body.type == "social_user") {
-      // Send welcome email to social users
-      let password = generator.generate({
-        length: 8,
-        numbers: true,
-        symbols: true,
-        strict: true
-      });
-      user.updateAttributes({password}, {}, (err) => {
-        if (!user.email.includes("facebook.com")) {
-          ejs.renderFile(path.resolve('templates/welcome.ejs'),
-          { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
-            User.app.models.Email.send({
-              to: user.email,
-              from: User.app.dataSources.email.settings.transports[0].auth.user,
-              subject: `Welcome to | ${req.app.get('name')}`,
-              html
-            }, function(err) {
-              console.log('> sending welcome email to social user:', user.email);
-              if (err) return console.log('> error while sending welcome email to social user');
+      User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+        RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+          // Set company name
+          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, err => {
+            if (err) return console.log('> error while creating company data');
+          });
+          // Send welcome email to social users
+          let password = generator.generate({
+            length: 8,
+            numbers: true,
+            symbols: true,
+            strict: true
+          });
+          user.updateAttributes({password}, {}, (err) => {
+            if (!user.email.includes("facebook.com")) {
+              ejs.renderFile(path.resolve('templates/welcome.ejs'),
+              { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
+                User.app.models.Email.send({
+                  to: user.email,
+                  from: User.app.dataSources.email.settings.transports[0].auth.user,
+                  subject: `Welcome to | ${req.app.get('name')}`,
+                  html
+                }, function(err) {
+                  console.log('> sending welcome email to social user:', user.email);
+                  if (err) return console.log('> error while sending welcome email to social user');
+                });
+              });
+            }
+            // Create access token
+            user.accessTokens.create((err, token) => {
+              userInstance.__data.accessToken = token.id;
+              next();
             });
           });
-        }
-        user.accessTokens.create((err, token) => {
-          userInstance.__data.accessToken = token.id;
-          next();
         });
       });
     } else next();

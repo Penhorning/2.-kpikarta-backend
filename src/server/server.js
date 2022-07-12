@@ -11,15 +11,21 @@ const boot = require('loopback-boot');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
+const morgan = require('morgan');
 
 const app = module.exports = loopback();
 
 app.middleware('parse', bodyParser.json());
 
+// parse application/x-www-form-urlencoded
+app.use(bodyParser.urlencoded({ extended: false }))
+
 require('dotenv').config();
 app.set('view engine', 'ejs');
 app.set('views', path.join(__dirname, '..', 'templates'));
 
+// Setup log for every request
+app.use(morgan('dev')); // log every request to the console
 
 app.use(function(req, res, next) {
   var tokenId = false;

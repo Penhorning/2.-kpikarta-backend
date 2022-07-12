@@ -144,7 +144,21 @@
       "principalType": "ROLE",
       "principalId": "$everyone",
       "permission": "ALLOW",
+      "property": "userLogin"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
       "property": "forgotPasswordAdmin"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
+      "property": "forgotPasswordUser"
     }
   ],
   "methods": {
@@ -314,6 +328,29 @@
         "path": "/toggleMFA"
       }
     },
+    "userLogin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "password",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "accessToken",
+        "type": "AccessToken",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/login/user"
+      }
+    },
     "adminLogin": {
       "accepts": [
         {
@@ -366,6 +403,23 @@
       "http": {
         "verb": "post",
         "path": "/reset/admin"
+      }
+    },
+    "forgotPasswordUser": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/forgot-password/user"
       }
     }
   }
