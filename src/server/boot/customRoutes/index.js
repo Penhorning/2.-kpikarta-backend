@@ -30,7 +30,12 @@ module.exports = function (app) {
                       }
                       req.app.models.Twilio.send(twilio_data, function (err, data) {
                         console.log('> sending code to mobile number:', req.user.mobile.e164Number);
-                        if (err) return console.log('> error while sending code to mobile number');
+                        if (err) {
+                            console.log('> error while sending code to mobile number', err);
+                            let error = err;
+                            error.status = 500;
+                            return next(error);
+                        }
                       });
                     });
                 }

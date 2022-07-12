@@ -86,7 +86,10 @@ module.exports = function(User) {
           html
         }, function(err) {
           console.log('> sending verification code email to:', User.app.currentUser.email);
-          if (err) return console.log('> error while sending verification code email');
+          if (err) {
+            console.log('> error while sending verification code email', err);
+            return next(err);
+          }
           next(null, 'success');
         });
       });
@@ -126,7 +129,12 @@ module.exports = function(User) {
         }
         User.app.models.Twilio.send(twilio_data, function (err, data) {
           console.log('> sending code to mobile number:', mobileNumber);
-          if (err) return console.log('> error while sending code to mobile number');
+          if (err) {
+            console.log('> error while sending code to mobile number', err);
+            let error = err;
+            error.status = 500;
+            return next(error);
+          }
           next(null, 'sent');
         });
         //next(null, 'sent');
@@ -229,7 +237,7 @@ module.exports = function(User) {
         html
       }, function(err) {
         console.log('> sending password reset email to:', info.email);
-        if (err) return console.log('> error while sending password reset email');
+        if (err) return console.log('> error while sending password reset email', err);
       });
     });
   });
@@ -255,7 +263,10 @@ module.exports = function(User) {
   
           // Set company name
           User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
-            if (err) return console.log('> error while creating company data');
+            if (err) {
+              console.log('> error while creating company data', err);
+              return next(err);
+            }
           });
   
           // Send sms
@@ -267,7 +278,12 @@ module.exports = function(User) {
           }
           User.app.models.Twilio.send(twilio_data, function (err, data) {
             console.log('> sending code to mobile number:', user.mobile.e164Number);
-            if (err) return console.log('> error while sending code to mobile number');
+            if (err) {
+              console.log('> error while sending code to mobile number', err);
+              let error = err;
+              error.status = 500;
+              return next(error);
+            }
           });
   
           user.verify(options, function(err, response) {
@@ -301,7 +317,10 @@ module.exports = function(User) {
                 html
               }, function(err) {
                 console.log('> sending verification code email to:', user.email);
-                if (err) return console.log('> error while sending verification code email');
+                if (err) {
+                  console.log('> error while sending verification code email', err);
+                  return next(err);
+                }
                 next();
               });
             });
@@ -317,7 +336,12 @@ module.exports = function(User) {
             }
             User.app.models.Twilio.send(twilio_data, function (err, data) {
               console.log('> sending code to mobile number:', user.mobile.e164Number);
-              if (err) return console.log('> error while sending code to mobile number');
+              if (err) {
+                console.log('> error while sending code to mobile number', err);
+                let error = err;
+                error.status = 500;
+                return next(error);
+              }
               next();
             });
           });
@@ -333,13 +357,21 @@ module.exports = function(User) {
               }
               User.app.models.Twilio.send(twilio_data, function (err, data) {
                 console.log('> sending code to mobile number:', user.mobile.e164Number);
-                if (err) return console.log('> error while sending code to mobile number');
+                if (err) {
+                  console.log('> error while sending code to mobile number', err);
+                  let error = err;
+                  error.status = 500;
+                  return next(error);
+                }
               });
             });
           }
           // Get company name
           user.company((err, company) => {
-            if (err) return console.log('> error while fetching company details');
+            if (err) {
+              console.log('> error while fetching company details', err);
+              return next(err);
+            }
             context.result.companyLogo = company.__data.logo ? company.__data.logo : "";
             next();
           });
@@ -357,7 +389,10 @@ module.exports = function(User) {
         RoleManager.assignRoles(User.app, [role.id], user.id, () => {
           // Set company name
           User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, err => {
-            if (err) return console.log('> error while creating company data');
+            if (err) {
+              console.log('> error while creating company data', err);
+              return next(err);
+            }
           });
           // Send welcome email to social users
           let password = generator.generate({
@@ -377,7 +412,10 @@ module.exports = function(User) {
                   html
                 }, function(err) {
                   console.log('> sending welcome email to social user:', user.email);
-                  if (err) return console.log('> error while sending welcome email to social user');
+                  if (err) {
+                    console.log('> error while sending welcome email to social user', err);
+                    return next(err);
+                  }
                 });
               });
             }
