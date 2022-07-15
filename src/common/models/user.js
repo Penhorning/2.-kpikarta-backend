@@ -9,7 +9,24 @@ const RoleManager = require('../../helper').RoleManager;
 const speakeasy = require('speakeasy');
 var QRCode = require('qrcode');
 
+
 module.exports = function(User) {
+// Common functions
+const sendSMS = (user, mobileVerificationCode) => {
+  let smsOptions = {
+    type: 'sms',
+    to: user.mobile.e164Number,
+    from: "+16063667831",
+    body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+  };
+  User.app.models.Twilio.send(smsOptions, (err, data) => {
+    console.log('> sending code to mobile number:', user.mobile.e164Number);
+    if (err) console.log('> error while sending code to mobile number', err);
+  });
+}
+
+
+
 /* =============================CUSTOM METHODS=========================================================== */
 
   User.findUsersExceptAdmin = (next)=>{
@@ -23,11 +40,14 @@ module.exports = function(User) {
 
   function forgotWithRole(email, next, role) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
-      let isValidRole = user.roles().map(r=>r.name).indexOf(role) > -1;
+      if (err) return next(err);
+      let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
       if (isValidRole) {
         User.resetPassword({email}, next);
       } else {
-        next(null, err ? err.message : 'You are not allowed');
+        let error = new Error("You are not allowed");
+        error.status = 400;
+        next(error);
       };
     });
   }
@@ -47,7 +67,11 @@ module.exports = function(User) {
           roles = roles.map(r=>r.name);
           if (roles.indexOf(role) > -1) {
             next(null, token);
-          } else next(new Error('You are not allowed to login'));
+          } else {
+            let error = new Error("You are not allowed to login");
+            error.status = 400;
+            next(error);
+          }
         });
       });
     });
@@ -242,80 +266,79 @@ module.exports = function(User) {
     });
   });
 
-  User.afterRemote('create', function(context, user, next) {
+  User.afterRemote('create', (context, user, next) => {
+    // Find role
     User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+      if (err) {
+        console.log('> error while finding role', err);
+        return next(err);
+      }
+      // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+        // Set company name
+        User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
+          if (err) {
+            console.log('> error while creating company', err);
+            return next(err);
+          }
+        });
+        // Create token
+        user.accessTokens.create((err, token) => {
+          user.__data.token = token;
+          if (err) {
+            console.log('> error while creating access token', err);
+            return next(err);
+          }
+          next();
+        });
+
+        // Generate verification code and update in db
         let emailVerificationCode = keygen.number({length: 6});
         let mobileVerificationCode = keygen.number({length: 6});
-
-        // Update email and mobile code
         user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
-          var options = {
+          if (err) {
+            console.log('> error while update attributes', err);
+            return next(err);
+          }
+          let emailOptions = {
             name: User.app.get('name'),
             type: 'email',
             to: user.email,
             from: User.app.dataSources.email.settings.transports[0].auth.user,
             subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
             template: path.resolve(__dirname, '../../templates/signup.ejs'),
-            user: user,
+            user,
             emailVerificationCode
           };
-  
-          // Set company name
-          User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
-            if (err) {
-              console.log('> error while creating company data', err);
-              return next(err);
-            }
+          // Send email
+          user.verify(emailOptions, function(err, response) {
+            console.log('> sending email to: ', user.email);
+            if (err) console.log('> error while sending code to email', user.email);
           });
-  
           // Send sms
-          let twilio_data = {
-            type: 'sms',
-            to: user.mobile.e164Number,
-            from: "+16063667831",
-            body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-          }
-          User.app.models.Twilio.send(twilio_data, function (err, data) {
-            console.log('> sending code to mobile number:', user.mobile.e164Number);
-            if (err) {
-              console.log('> error while sending code to mobile number', err);
-              let error = err;
-              error.status = 500;
-              return next(error);
-            }
-          });
-  
-          user.verify(options, function(err, response) {
-            user.accessTokens.create((error, token)=>{
-              delete user.__data.emailVerificationCode;
-              delete user.__data.mobileVerificationCode;
-              user.__data.token = token;
-              if (err) {
-                return next(err);
-              }
-              next();
-            });
-          });
+          sendSMS(user, mobileVerificationCode);
         });
       });
     });
   });
 
-  User.afterRemote('userLogin', function(context, accessToken, next) {
+
+  User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
-      User.findById(accessToken.userId.toString(), ((err, user)=>{
+      // Find user by access token
+      User.findById(accessToken.userId.toString(), (err, user) => {
+        // If email is not verified
         if (!user.emailVerified) {
           var emailVerificationCode = keygen.number({length: 6});
-          user.updateAttributes({emailVerificationCode}, {}, err => {
+          user.updateAttributes({ emailVerificationCode }, {}, err => {
             ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
-            { user, emailVerificationCode }, {}, function(err, html) {
+            { user, emailVerificationCode }, {}, (err, html) => {
               User.app.models.Email.send({
                 to: user.email,
                 from: User.app.dataSources.email.settings.transports[0].auth.user,
                 subject: `Verfication Code | ${User.app.get('name')}`,
                 html
-              }, function(err) {
+              }, (err) => {
                 console.log('> sending verification code email to:', user.email);
                 if (err) {
                   console.log('> error while sending verification code email', err);
@@ -325,45 +348,12 @@ module.exports = function(User) {
               });
             });
           });
-        } else if (!user.emailVerified && !user.mobileVerified) {
-          let mobileVerificationCode = keygen.number({length: 6});
-          user.updateAttributes({mobileVerificationCode}, {}, err => {
-            let twilio_data = {
-              type: 'sms',
-              to: user.mobile.e164Number,
-              from: "+16063667831",
-              body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-            }
-            User.app.models.Twilio.send(twilio_data, function (err, data) {
-              console.log('> sending code to mobile number:', user.mobile.e164Number);
-              if (err) {
-                console.log('> error while sending code to mobile number', err);
-                let error = err;
-                error.status = 500;
-                return next(error);
-              }
-              next();
-            });
-          });
         } else {
+          // User is verified, checking for mfa enabled or not
           if (!user.mfaEnabled) {
             let mobileVerificationCode = keygen.number({length: 6});
-            user.updateAttributes({mobileVerificationCode}, {}, err => {
-              let twilio_data = {
-                type: 'sms',
-                to: user.mobile.e164Number,
-                from: "+16063667831",
-                body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-              }
-              User.app.models.Twilio.send(twilio_data, function (err, data) {
-                console.log('> sending code to mobile number:', user.mobile.e164Number);
-                if (err) {
-                  console.log('> error while sending code to mobile number', err);
-                  let error = err;
-                  error.status = 500;
-                  return next(error);
-                }
-              });
+            user.updateAttributes({ mobileVerificationCode }, {}, err => {
+              sendSMS(user, mobileVerificationCode);
             });
           }
           // Get company name
@@ -376,7 +366,7 @@ module.exports = function(User) {
             next();
           });
         }
-      }));
+      });
     } else next();
   });
 
