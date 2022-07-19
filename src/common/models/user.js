@@ -45,7 +45,7 @@ const sendSMS = (user, mobileVerificationCode) => {
       if (isValidRole) {
         User.resetPassword({email}, next);
       } else {
-        let error = new Error("You are not allowed");
+        let error = new Error("You are not allowed to Reset Password here");
         error.status = 400;
         next(error);
       };
@@ -68,7 +68,7 @@ const sendSMS = (user, mobileVerificationCode) => {
           if (roles.indexOf(role) > -1) {
             next(null, token);
           } else {
-            let error = new Error("You are not allowed to login");
+            let error = new Error("You are not allowed to login here");
             error.status = 400;
             next(error);
           }
@@ -350,7 +350,7 @@ const sendSMS = (user, mobileVerificationCode) => {
           });
         } else {
           // User is verified, checking for mfa enabled or not
-          if (!user.mfaEnabled) {
+          if (!user.mfaEnabled && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({length: 6});
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user, mobileVerificationCode);

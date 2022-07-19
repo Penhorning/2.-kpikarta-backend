@@ -72,10 +72,10 @@ module.exports = function (app) {
 
         try {
             let result;
-            let userRresult = await req.app.models.color_setting.find({ where: { userId } });
+            let userRresult = await req.app.models.color_setting.findOne({ where: { userId } });
             if (userRresult) result = userRresult;
             else {
-                let globalRresult = await req.app.models.color_setting.find({ where: { "userId" : { "eq": null }, "type": "global" } });
+                let globalRresult = await req.app.models.color_setting.findOne({ where: { "userId" : { "exists" : false } } });
                 result = globalRresult;
             }
             res.json(result);
