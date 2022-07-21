@@ -32,7 +32,8 @@
       "type": "string"
     },
     "mobileVerified": {
-      "type": "boolean"
+      "type": "boolean",
+      "defualt": false
     },
     "currentPlan": {
       "type": "string",
@@ -64,6 +65,10 @@
     },
     "country": {
       "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "defualt": true
     }
   },
   "validations": [],
@@ -162,265 +167,127 @@
     }
   ],
   "methods": {
+    "sendEmailCode": {
+      "returns": { "arg": "status", "type": "string" },
+      "http": { "verb": "post", "path": "/send-email-code" }
+    },
     "verifyEmail": {
       "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        }
+        { "arg": "code", "type": "string" }
       ],
-      "returns": {
-        "arg": "data",
-        "type": "user",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/verify_email"
-      }
+      "returns": { "arg": "data", "type": "user", "root": true },
+      "http": { "verb": "post", "path": "/verify-email" }
     },
-    "sendEmailCode": {
-      "returns": {
-        "arg": "status",
-        "type": "string"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/send_email_code"
-      }
+
+    "sendMobileCode": {
+      "accepts": [
+        { "arg": "type", "type": "string" },
+        { "arg": "mobile", "type": "object" }
+      ],
+      "returns": { "arg": "status", "type": "string" },
+      "http": { "verb": "post", "path": "/send-mobile-code" }
     },
     "verifyMobile": {
       "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        },
-        {
-          "arg": "mobile",
-          "type": "object"
-        }
+        { "arg": "code", "type": "string" },
+        { "arg": "mobile", "type": "object" }
       ],
-      "returns": {
-        "arg": "verified",
-        "type": "boolean",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/verify_mobile"
-      }
+      "returns": { "arg": "verified", "type": "boolean", "root": true },
+      "http": { "verb": "post", "path": "/verify-mobile" }
     },
-    "sendMobileCode": {
-      "accepts": [
-        {
-          "arg": "type",
-          "type": "string"
-        },
-        {
-          "arg": "mobile",
-          "type": "object"
-        }
-      ],
-      "returns": {
-        "arg": "status",
-        "type": "string"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/send_mobile_code"
-      }
-    },
+
     "selectPlan": {
-      "accepts": [
-        {
-          "arg": "plan",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "user",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/assign_plan"
-      }
+      "accepts": [{ "arg": "plan", "type": "string" }],
+      "returns": { "arg": "data", "type": "user", "root": true },
+      "http": { "verb": "post", "path": "/assign-plan" }
     },
+
     "generateMFAQRCode": {
       "accepts": [],
-      "returns": {
-        "arg": "qrcode",
-        "type": "string"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/generateMFAQRCode"
-      }
+      "returns": { "arg": "qrcode", "type": "string" },
+      "http": { "verb": "put", "path": "/generateMFAQRCode" }
     },
     "verifyMFACode": {
-      "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "verified",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/verifyMFAToken"
-      }
+      "accepts": [{ "arg": "code", "type": "string" }],
+      "returns": { "arg": "verified", "type": "boolean" },
+      "http": { "verb": "put", "path": "/verifyMFAToken" }
     },
     "enableMFA": {
-      "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "enabled",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/enableMFA"
-      }
+      "accepts": [{ "arg": "code", "type": "string" }],
+      "returns": { "arg": "enabled", "type": "boolean" },
+      "http": { "verb": "put", "path": "/enableMFA" }
     },
     "resetMFAConfig": {
       "accepts": [],
-      "returns": {
-        "arg": "reset",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/resetMFA"
-      }
+      "returns": { "arg": "reset", "type": "boolean" },
+      "http": { "verb": "put", "path": "/resetMFA" }
     },
     "checkMFAConfig": {
       "accepts": [],
-      "returns": {
-        "arg": "mfa",
-        "type": "object"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/checkMFAConfig"
-      }
+      "returns": { "arg": "mfa", "type": "object" },
+      "http": { "verb": "post", "path": "/checkMFAConfig" }
     },
     "toggleMFA": {
-      "accepts": [
-        {
-          "arg": "type",
-          "type": "boolean"
-        }
-      ],
-      "returns": {
-        "arg": "type",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/toggleMFA"
-      }
+      "accepts": [{ "arg": "type", "type": "boolean" }],
+      "returns": { "arg": "type", "type": "boolean" },
+      "http": { "verb": "put", "path": "/toggleMFA" }
     },
+
     "userLogin": {
       "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "password",
-          "type": "string",
-          "required": true
-        }
+        { "arg": "email", "type": "string", "required": true },
+        { "arg": "password", "type": "string", "required": true }
       ],
-      "returns": {
-        "arg": "accessToken",
-        "type": "AccessToken",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/login/user"
-      }
+      "returns": { "arg": "accessToken", "type": "AccessToken", "root": true },
+      "http": { "path": "/login/user", "verb": "post" }
     },
     "adminLogin": {
       "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "password",
-          "type": "string",
-          "required": true
-        }
+        { "arg": "email", "type": "string", "required": true },
+        { "arg": "password", "type": "string", "required": true }
       ],
-      "returns": {
-        "arg": "accessToken",
-        "type": "AccessToken",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/login/admin"
-      }
+      "returns": { "arg": "accessToken", "type": "AccessToken", "root": true },
+      "http": { "path": "/login/admin", "verb": "post" }
     },
-    "findUsersExceptAdmin": {
-      "accepts": [],
-      "returns": {
-        "arg": [
-          "users"
-        ],
-        "type": "user",
-        "root": true
-      },
-      "http": {
-        "verb": "get",
-        "path": "/all"
-      }
-    },
+
     "forgotPasswordAdmin": {
-      "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/reset/admin"
-      }
+      "accepts": [{ "arg": "email", "type": "string", "required": true }],
+      "returns": { "arg": "message", "type": "string" },
+      "http": { "verb": "post", "path": "/reset/admin" }
     },
+
     "forgotPasswordUser": {
+      "accepts": [{ "arg": "email", "type": "string", "required": true }],
+      "returns": { "arg": "message", "type": "string" },
+      "http": { "verb": "post", "path": "/forgot-password/user" }
+    },
+
+    "getAll": {
       "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        }
+        { "arg": "page", "type": "number", "required": false },
+        { "arg": "limit", "type": "number", "required": false },
+        { "arg": "search_query", "type": "string", "required": false },
+        { "arg": "start", "type": "string", "required": false },
+        { "arg": "end", "type": "string", "required": false }
       ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "verb": "post",
-        "path": "/forgot-password/user"
-      }
+      "returns": { "arg": "users", "type": "user" },
+      "http": { "path": "/get-all", "verb": "post" }
+    },
+
+    "getCount": {
+      "returns": { "arg": "count", "type": "number" },
+      "http": { "path": "/count", "verb": "post" }
+    },
+
+    "blockUser": {
+      "accepts": [{ "arg": "userId", "type": "string" }],
+      "returns": { "arg": "status", "type": "boolean" },
+      "http": { "verb": "put", "path": "/block" }
+    },
+    "unblockUser": {
+      "accepts": [{ "arg": "userId", "type": "string" }],
+      "returns": { "arg": "status", "type": "boolean" },
+      "http": { "verb": "put", "path": "/unblock" }
     }
   }
 }

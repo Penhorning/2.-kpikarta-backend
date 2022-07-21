@@ -1,0 +1,23 @@
+{
+    "name": "RoleMapping",
+    "description": "Map principals to roles",
+    "properties": {
+      "principalType": {
+        "type": "string",
+        "description": "The principal type, such as USER, APPLICATION, ROLE, or user model name in case of multiple user models"
+      }
+    },
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "user",
+        "foreignKey": "userId"
+      },
+      "role": {
+        "type": "belongsTo",
+        "model": "Role",
+        "foreignKey": "roleId"
+      }
+    }
+  }
+  

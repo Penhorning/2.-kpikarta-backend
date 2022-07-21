@@ -5,36 +5,141 @@ const path = require('path');
 const keygen = require('keygenerator');
 const generator = require('generate-password');
 const ejs = require('ejs');
-const RoleManager = require('../../helper').RoleManager;
+const { RoleManager } = require('../../helper');
 const speakeasy = require('speakeasy');
-var QRCode = require('qrcode');
-
+const QRCode = require('qrcode');
+const moment = require('moment');
 
 module.exports = function(User) {
-// Common functions
-const sendSMS = (user, mobileVerificationCode) => {
-  let smsOptions = {
-    type: 'sms',
-    to: user.mobile.e164Number,
-    from: "+16063667831",
-    body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-  };
-  User.app.models.Twilio.send(smsOptions, (err, data) => {
-    console.log('> sending code to mobile number:', user.mobile.e164Number);
-    if (err) console.log('> error while sending code to mobile number', err);
-  });
-}
+  // Send SMS
+  const sendSMS = (user, mobileVerificationCode) => {
+    try {
+      let smsOptions = {
+        type: 'sms',
+        to: user.mobile.e164Number,
+        from: "+16063667831",
+        body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+      };
+      User.app.models.Twilio.send(smsOptions, (err, data) => {
+        console.log('> sending code to mobile number:', user.mobile.e164Number);
+        if (err) console.log('> error while sending code to mobile number', err);
+      });
+    } catch (error) {
+      console.error("> error in SMS function", error);
+    }
+  }
+
+  // QUERY VARIABLES
+  const ROLE_LOOKUP = (roleId) => {
+    return {
+      $lookup: {
+        from: "RoleMapping",
+        let: {
+          user_id: "$_id"
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$principalId", "$$user_id"] },
+                  { $eq: ["$roleId", roleId] }
+                ]
+              }
+            }
+          }
+        ],
+        as: "role"
+      }
+    }
+  }
+  const UNWIND_ROLE = {
+    $unwind: {
+      path: "$role"
+    }
+  }
 
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-
-  User.findUsersExceptAdmin = (next)=>{
-    User.find({include: 'roles'}, (err, users)=>{
-      users = users.filter(user=>{
-        return user.roles().map(r=>r.name).indexOf('admin') == -1;
+  // Get all user count
+  User.getCount = function(next) {
+    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+      User.getDataSource().connector.connect(function(err, db) {
+        const userCollection = db.collection('user');
+        userCollection.aggregate([
+          ROLE_LOOKUP(role.id),
+          UNWIND_ROLE
+        ]).toArray((err, result) => {
+          next(err, result.length);
+        });
       });
-      next(err, users);
+    });
+  };
+  // Get all users
+  User.getAll = (page, limit, search_query, start, end, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    let query = {};
+
+    if (start && end) {
+      query.createdAt = {
+          $gte: moment(start).toDate(),
+          $lte: moment(end).toDate()
+      }
+    }
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'fullName': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
+          },
+          {
+            'email': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
+          },
+          {
+            'mobile.internationalNumber': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
+    // Find user role
+    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+      User.getDataSource().connector.connect(function(err, db) {
+        const userCollection = db.collection('user');
+        userCollection.aggregate([
+          { 
+            $match: query
+          },
+          {
+            $sort: { "createdAt": -1 }
+          },
+          ROLE_LOOKUP(role.id),
+          UNWIND_ROLE,
+          SEARCH_MATCH,
+          {
+            $facet: {
+              metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+              data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+            }
+          }
+        ]).toArray((err, result) => {
+          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          next(err, result);
+        });
+      });
     });
   };
 
@@ -60,7 +165,7 @@ const sendSMS = (user, mobileVerificationCode) => {
   };
 
   function loginWithRole(email, password, next, role) {
-    User.login({email, password}, 'user', (err, token)=>{
+    User.login({ email, password }, 'user', (err, token) => {
       if (err) return next(err);
       token.user((_e, user)=>{
         user.roles((e, roles)=>{
@@ -97,7 +202,7 @@ const sendSMS = (user, mobileVerificationCode) => {
       next(error);
     }
   };
-// Send email code
+  // Send email code
   User.sendEmailCode = function(next) {
     var emailVerificationCode = keygen.number({length: 6});
     this.app.currentUser.updateAttributes({emailVerificationCode}, {}, err => {
@@ -119,7 +224,7 @@ const sendSMS = (user, mobileVerificationCode) => {
       });
     });
   };
-// Verify mobile
+  // Verify mobile
   User.verifyMobile = function(code, mobile, next) {
     let codeVerified = this.app.currentUser.mobileVerificationCode == code;
     if (codeVerified) {
@@ -136,7 +241,7 @@ const sendSMS = (user, mobileVerificationCode) => {
       next(error);
     }
   };
-// Send mobile code
+  // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
     let mobileVerificationCode = keygen.number({length: 6});
     this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, err => {
@@ -161,17 +266,16 @@ const sendSMS = (user, mobileVerificationCode) => {
           }
           next(null, 'sent');
         });
-        //next(null, 'sent');
       }
     });
   };
-// Assign plan
+  // Assign plan
   User.selectPlan = function(plan, next) {
     this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
       next(err, this.app.currentUser);
     });
   };
-// Generate MFA Qr code
+  // Generate MFA Qr code
   User.generateMFAQRCode = function(next) {
     if (this.app.currentUser.mfaQRCode) {
       return next(null, this.app.currentUser.mfaQRCode);
@@ -183,7 +287,7 @@ const sendSMS = (user, mobileVerificationCode) => {
       });
     });
   };
-// Enable MFA
+  // Enable MFA
   User.enableMFA = function(token, next) {
     if (this.app.currentUser.mfaEnabled) {
       let error = new Error("MFA is already configured for this account");
@@ -204,8 +308,8 @@ const sendSMS = (user, mobileVerificationCode) => {
       error.status = 400;
       return next(error);
     }
-  };
-// Verify MFA code
+  };  
+  // Verify MFA code
   User.verifyMFACode = function(token, next) {
     if (!this.app.currentUser.mfaEnabled) {
       let error = new Error("Multi factor authentication is disabled. Please enable it first");
@@ -227,13 +331,13 @@ const sendSMS = (user, mobileVerificationCode) => {
       return next(error);
     }
   };
-// Reset MFA
+  // Reset MFA
   User.resetMFAConfig = function(next) {
     this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaEnabled": false }, (err)=>{
       next(err, true);
     });
   };
-// Check MFA config
+  // Check MFA config
   User.checkMFAConfig = function(next) {
     let mfa = {
       secret: this.app.currentUser.mfaSecret,
@@ -242,10 +346,24 @@ const sendSMS = (user, mobileVerificationCode) => {
     };
     next(null, mfa);
   };
-// Enable/Disable MFA
+  // Enable/Disable MFA
   User.toggleMFA = function(type, next) {
     this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
       next(err, type);
+    });
+  };
+
+  // Block user
+  User.blockUser = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : false }, (err)=>{
+      next(err, true);
+    });
+  };
+
+  // Unblock user
+  User.unblockUser = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : true }, (err)=>{
+      next(err, true);
     });
   };
 
