@@ -37,7 +37,7 @@
     "owner": {
       "type": "belongsTo",
       "model": "user",
-      "foreignKey": "",
+      "foreignKey": "userId",
       "options": {
         "nestRemoting": true
       }
