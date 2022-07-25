@@ -288,7 +288,7 @@ module.exports = function(User) {
     });
   };
   // Enable MFA
-  User.enableMFA = function(token, next) {
+  User.enableMFA = function(code, next) {
     if (this.app.currentUser.mfaEnabled) {
       let error = new Error("MFA is already configured for this account");
       error.status = 400;
@@ -297,10 +297,10 @@ module.exports = function(User) {
     var verified = speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
       encoding: 'base32',
-      token
+      code
     });
     if (verified) {
-      this.app.currentUser.updateAttribute('mfaEnabled', true, (err)=>{
+      this.app.currentUser.updateAttribute( { "mfaVerified": true, "mfaEnabled": true }, (err)=>{
         next(null, verified);
       });
     } else {
@@ -309,7 +309,7 @@ module.exports = function(User) {
       return next(error);
     }
   };  
-  // Verify MFA code
+  // Verify MFA code (Used while login)
   User.verifyMFACode = function(token, next) {
     if (!this.app.currentUser.mfaEnabled) {
       let error = new Error("Multi factor authentication is disabled. Please enable it first");
@@ -321,11 +321,8 @@ module.exports = function(User) {
       encoding: 'base32',
       token
     });
-    if (verified) {
-      this.app.currentUser.updateAttribute('mfaEnabled', true, (err)=>{
-        next(null, verified);
-      });
-    } else {
+    if (verified) next(null, verified);
+    else {
       let error = new Error("Invalid Code");
       error.status = 400;
       return next(error);
@@ -333,7 +330,7 @@ module.exports = function(User) {
   };
   // Reset MFA
   User.resetMFAConfig = function(next) {
-    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaEnabled": false }, (err)=>{
+    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaVerified": false, "mfaEnabled": false }, (err)=>{
       next(err, true);
     });
   };
@@ -342,15 +339,27 @@ module.exports = function(User) {
     let mfa = {
       secret: this.app.currentUser.mfaSecret,
       qrCode: this.app.currentUser.mfaQRCode,
+      verified: this.app.currentUser.mfaVerified,
       enabled: this.app.currentUser.mfaEnabled
     };
     next(null, mfa);
   };
   // Enable/Disable MFA
   User.toggleMFA = function(type, next) {
-    this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
-      next(err, type);
-    });
+
+    if (type && this.app.currentUser.mfaQRCode && this.app.currentUser.mfaSecret && this.app.currentUser.mfaVerified) {
+      this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
+        next(err, type);
+      });
+    } else if (!type) {
+      this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
+        next(err, type);
+      });
+    } else {
+      let error = new Error("You cannot enable MFA, before setup");
+      error.status = 400;
+      next(error);
+    }
   };
 
   // Block user

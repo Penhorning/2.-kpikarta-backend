@@ -43,6 +43,10 @@
       "type": "boolean",
       "defualt": false
     },
+    "mfaVerified": {
+      "type": "boolean",
+      "defualt": false
+    },
     "mfaSecret": {
       "type": "string",
       "defualt": ""
@@ -207,15 +211,15 @@
       "returns": { "arg": "qrcode", "type": "string" },
       "http": { "verb": "put", "path": "/generateMFAQRCode" }
     },
-    "verifyMFACode": {
-      "accepts": [{ "arg": "code", "type": "string" }],
-      "returns": { "arg": "verified", "type": "boolean" },
-      "http": { "verb": "put", "path": "/verifyMFAToken" }
-    },
     "enableMFA": {
       "accepts": [{ "arg": "code", "type": "string" }],
       "returns": { "arg": "enabled", "type": "boolean" },
       "http": { "verb": "put", "path": "/enableMFA" }
+    },
+    "verifyMFACode": {
+      "accepts": [{ "arg": "code", "type": "string" }],
+      "returns": { "arg": "verified", "type": "boolean" },
+      "http": { "verb": "put", "path": "/verifyMFAToken" }
     },
     "resetMFAConfig": {
       "accepts": [],

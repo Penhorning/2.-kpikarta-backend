@@ -40,10 +40,18 @@ app.use(function(req, res, next) {
     const UserModel = app.models.user;
     UserModel.relations.accessTokens.modelTo.findById(tokenId, function(err, accessToken) {
       if (err) return next(err);
-      if (!accessToken) return next(new Error('could not find accessToken'));
+      if (!accessToken) {
+        let error = new Error("could not find accessToken");
+        error.status = 401;
+        return next(error);
+      }
       UserModel.findById(accessToken.userId, function(err, user) {
         if (err) return next(err);
-        if (!user) return next(new Error('could not find a valid user'));
+        if (!user) {
+          let error = new Error("could not find a valid user");
+          error.status = 401;
+          return next(error);
+        }
         app.currentUser = user;
         next();
       });
