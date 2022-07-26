@@ -1,6 +1,7 @@
 /* eslint-disable max-len */
 'use strict';
 
+const fs = require("fs");
 const path = require('path');
 const keygen = require('keygenerator');
 const generator = require('generate-password');
@@ -544,6 +545,11 @@ module.exports = function(User) {
           });
         });
       });
-    } else next();
+    } else {
+      if (req.body.oldImage) {
+        fs.unlink(path.resolve('storage/user/', req.body.oldImage), (err) => { console.log(err) });
+      }
+      next();
+    }
   });
 };
