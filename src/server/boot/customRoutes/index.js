@@ -48,8 +48,8 @@ module.exports = function (app) {
         }
     });
 
-    // Get suggestion by userId or global
-    app.post("/api/suggestion-by-user", async (req, res) => {
+    // Get suggestion by phase
+    app.post("/api/suggestion-by-phase", async (req, res) => {
         let { userId, phaseId } = req.body;
 
         try {

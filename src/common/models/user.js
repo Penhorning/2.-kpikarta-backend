@@ -283,7 +283,7 @@ module.exports = function(User) {
     }
     var secret = speakeasy.generateSecret({length: 6, name: this.app.get('name') + ' | ' + this.app.currentUser.fullName});
     QRCode.toDataURL(secret.otpauth_url, function(err, mfaQRCode) {
-      User.app.currentUser.updateAttributes({ "mfaSecret": secret.base32, mfaQRCode }, (err)=>{
+      User.app.currentUser.updateAttributes({ "mfaSecret": secret.base32, mfaQRCode }, (err) => {
         next(err, mfaQRCode);
       });
     });
@@ -298,11 +298,12 @@ module.exports = function(User) {
     var verified = speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
       encoding: 'base32',
-      code
+      token: code,
+      window: 2
     });
     if (verified) {
-      this.app.currentUser.updateAttribute( { "mfaVerified": true, "mfaEnabled": true }, (err)=>{
-        next(null, verified);
+      this.app.currentUser.updateAttributes({ "mfaVerified": true, "mfaEnabled": true }, err => {
+        next(err, true);
       });
     } else {
       let error = new Error("Invalid Code");
@@ -311,7 +312,7 @@ module.exports = function(User) {
     }
   };  
   // Verify MFA code (Used while login)
-  User.verifyMFACode = function(token, next) {
+  User.verifyMFACode = function(code, next) {
     if (!this.app.currentUser.mfaEnabled) {
       let error = new Error("Multi factor authentication is disabled. Please enable it first");
       error.status = 400;
@@ -320,7 +321,8 @@ module.exports = function(User) {
     var verified = speakeasy.totp.verify({
       secret: this.app.currentUser.mfaSecret,
       encoding: 'base32',
-      token
+      token: code,
+      window: 2
     });
     if (verified) next(null, verified);
     else {
@@ -331,7 +333,7 @@ module.exports = function(User) {
   };
   // Reset MFA
   User.resetMFAConfig = function(next) {
-    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaVerified": false, "mfaEnabled": false }, (err)=>{
+    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaVerified": false, "mfaEnabled": false }, (err) => {
       next(err, true);
     });
   };
