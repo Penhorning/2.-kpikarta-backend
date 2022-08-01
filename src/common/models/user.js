@@ -422,32 +422,59 @@ module.exports = function(User) {
           next();
         });
 
-        // Generate verification code and update in db
-        let emailVerificationCode = keygen.number({length: 6});
-        let mobileVerificationCode = keygen.number({length: 6});
-        user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
-          if (err) {
-            console.log('> error while update attributes', err);
-            return next(err);
-          }
-          let emailOptions = {
-            name: User.app.get('name'),
-            type: 'email',
-            to: user.email,
-            from: User.app.dataSources.email.settings.transports[0].auth.user,
-            subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
-            template: path.resolve(__dirname, '../../templates/signup.ejs'),
-            user,
-            emailVerificationCode
-          };
-          // Send email
-          user.verify(emailOptions, function(err, response) {
-            console.log('> sending email to: ', user.email);
-            if (err) console.log('> error while sending code to email', user.email);
+        const req = context.req;
+        if (req.body.type == "admin") {
+          // Send email and password to new users
+          let password = generator.generate({
+            length: 8,
+            numbers: true,
+            symbols: true,
+            strict: true
           });
-          // Send sms
-          sendSMS(user, mobileVerificationCode);
-        });
+          user.updateAttributes({ password }, {}, err => {
+            ejs.renderFile(path.resolve('templates/welcome.ejs'),
+              { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
+                User.app.models.Email.send({
+                  to: user.email,
+                  from: User.app.dataSources.email.settings.transports[0].auth.user,
+                  subject: `Welcome to | ${req.app.get('name')}`,
+                  html
+                }, function(err) {
+                  console.log('> sending welcome email to admin side user:', user.email);
+                  if (err) {
+                    console.log('> error while sending welcome email to admin side user', err);
+                  }
+                });
+            });
+          });
+        } else {
+          // Generate verification code and update in db
+          let emailVerificationCode = keygen.number({length: 6});
+          let mobileVerificationCode = keygen.number({length: 6});
+          user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
+            if (err) {
+              console.log('> error while update attributes', err);
+              return next(err);
+            }
+            let emailOptions = {
+              name: User.app.get('name'),
+              type: 'email',
+              to: user.email,
+              from: User.app.dataSources.email.settings.transports[0].auth.user,
+              subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
+              template: path.resolve(__dirname, '../../templates/signup.ejs'),
+              user,
+              emailVerificationCode
+            };
+            // Send email
+            user.verify(emailOptions, function(err, response) {
+              console.log('> sending email to: ', user.email);
+              if (err) console.log('> error while sending code to email', user.email);
+            });
+            // Send sms
+            sendSMS(user, mobileVerificationCode);
+          });
+        }
       });
     });
   });
