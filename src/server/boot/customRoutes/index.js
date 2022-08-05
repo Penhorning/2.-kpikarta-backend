@@ -19,7 +19,9 @@ module.exports = function (app) {
                 user.companyLogo = company.__data.logo ? company.__data.logo : "";
                 user.profilePic = req.user.profilePic ? req.user.profilePic : "";
                 user.mfaEnabled = req.user.mfaEnabled ? req.user.mfaEnabled : false;
-                if (!req.user.mfaEnabled) {
+                user.mfaVerified = req.user.mfaVerified ? req.user.mfaVerified : false;
+                user.mobileVerified = req.user.mobileVerified ? req.user.mobileVerified : false;
+                if (!req.user.mfaEnabled && req.user.mobileVerified) {
                     let mobileVerificationCode = keygen.number({length: 6});
                     req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
                       let twilio_data = {
@@ -30,16 +32,16 @@ module.exports = function (app) {
                       }
                       req.app.models.Twilio.send(twilio_data, function (err, data) {
                         console.log('> sending code to mobile number:', req.user.mobile.e164Number);
-                        if (err) {
-                            console.log('> error while sending code to mobile number', err);
-                            let error = err;
-                            error.status = 500;
-                            return next(error);
-                        }
+                        // if (err) {
+                        //     console.log('> error while sending code to mobile number', err);
+                        //     let error = err;
+                        //     error.status = 500;
+                        //     return next(error);
+                        // }
                       });
                     });
                 }
-                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&mfaEnabled=${user.mfaEnabled}`);
+                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&mfaEnabled=${user.mfaEnabled}&mfaVerified=${user.mfaVerified}&mobileVerified=${user.mobileVerified}`);
             });
         } else {
             req.user.updateAttributes({emailVerified: true}, (err) => {
