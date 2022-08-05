@@ -65,6 +65,14 @@
   },
   "validations": [],
   "relations": {
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
     "karta_phase": {
       "type": "hasOne",
       "model": "kartaphase",

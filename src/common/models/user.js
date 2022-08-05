@@ -499,7 +499,7 @@ module.exports = function(User) {
       User.findById(accessToken.userId.toString(), (err, user) => {
         // Check if user is active or not
         if (!user.active) {
-          let error = new Error("Seems, your account is inactivated, please contact Admin at support@kpikarta.com for more details.");
+          let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
           error.status = 400;
           next(error);
         }
