@@ -41,6 +41,14 @@
       "options": {
         "nestRemoting": true
       }
+    },
+    "node": {
+      "type": "hasOne",
+      "model": "kartanode",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
     }
   },
   "acls": [

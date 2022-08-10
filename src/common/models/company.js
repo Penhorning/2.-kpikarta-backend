@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require('path');
 
 module.exports = function(Company) {
-    Company.afterRemote('prototype.patchAttributes', function(context, instance,  next) {
+  Company.afterRemote('prototype.patchAttributes', function(context, instance,  next) {
     const req = context.req;
 
     if (req.body.oldCompanyLogo) {

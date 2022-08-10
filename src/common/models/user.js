@@ -479,20 +479,6 @@ module.exports = function(User) {
     });
   });
 
-  // User.beforeRemote('userLogin', (context, next) => {
-  //   if (accessToken && accessToken.user) {
-  //     // Find user by access token
-  //     User.findById(accessToken.userId.toString(), (err, user) => {
-  //       // If email is not verified
-  //       if (!user.active) {
-  //         let error = new Error("Seems, your account is inactivated, please contact Admin at support@kpikarta.com for more details.");
-  //         error.status = 400;
-  //         next(error);
-  //       }
-  //     });
-  //   } else next();
-  // });
-
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
@@ -526,7 +512,7 @@ module.exports = function(User) {
           });
         } else {
           // User is verified, checking for mfa enabled or not
-          if (!user.mfaEnabled && user.mobileVerified) {
+          if ((!user.mfaEnabled || !user.mfaVerified) && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({length: 6});
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user, mobileVerificationCode);

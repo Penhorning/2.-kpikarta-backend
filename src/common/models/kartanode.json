@@ -17,9 +17,6 @@
       "type": "string",
       "required": true
     },
-    "definition": {
-      "type": "string"
-    },
     "due_date": {
       "type": "date"
     },
@@ -68,7 +65,7 @@
     "karta": {
       "type": "belongsTo",
       "model": "karta",
-      "foreignKey": "",
+      "foreignKey": "kartaId",
       "options": {
         "nestRemoting": true
       }
@@ -76,7 +73,7 @@
     "karta_phase": {
       "type": "hasOne",
       "model": "kartaphase",
-      "foreignKey": "",
+      "foreignKey": "phaseId",
       "options": {
         "nestRemoting": true
       }
@@ -84,7 +81,7 @@
     "children": {
       "type": "hasMany",
       "model": "kartanode",
-      "foreignKey": "",
+      "foreignKey": "parentId",
       "options": {
         "nestRemoting": true
       }
@@ -92,7 +89,7 @@
     "parent": {
       "type": "belongsTo",
       "model": "kartanode",
-      "foreignKey": "",
+      "foreignKey": "parentId",
       "options": {
         "nestRemoting": true
       }
