@@ -147,14 +147,20 @@ module.exports = function(User) {
   function forgotWithRole(email, next, role) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
       if (err) return next(err);
-      let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
-      if (isValidRole) {
-        User.resetPassword({email}, next);
+      if (user) {
+        let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
+        if (isValidRole) {
+          User.resetPassword({email}, next);
+        } else {
+          let error = new Error("You are not allowed to Reset Password here");
+          error.status = 400;
+          next(error);
+        }
       } else {
-        let error = new Error("You are not allowed to Reset Password here");
+        let error = new Error("User does not exists");
         error.status = 400;
         next(error);
-      };
+      }
     });
   }
   User.forgotPasswordAdmin = (email, next)=>{
@@ -491,7 +497,7 @@ module.exports = function(User) {
         }
         // If email is not verified
         else if (!user.emailVerified) {
-          var emailVerificationCode = keygen.number({length: 6});
+          let emailVerificationCode = keygen.number({length: 6});
           user.updateAttributes({ emailVerificationCode }, {}, err => {
             ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
             { user, emailVerificationCode }, {}, (err, html) => {

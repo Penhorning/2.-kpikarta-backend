@@ -41,9 +41,15 @@ app.use(function(req, res, next) {
     UserModel.relations.accessTokens.modelTo.findById(tokenId, function(err, accessToken) {
       if (err) return next(err);
       if (!accessToken) {
-        let error = new Error("could not find accessToken");
-        error.status = 401;
-        return next(error);
+        if (req.body.confirmPassword && req.body.newPassword) {
+          let error = new Error("Reset token expired");
+          error.status = 400;
+          return next(error);
+        } else {
+          let error = new Error("could not find accessToken");
+          error.status = 401;
+          return next(error);
+        }
       }
       UserModel.findById(accessToken.userId, function(err, user) {
         if (err) return next(err);
