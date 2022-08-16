@@ -420,11 +420,19 @@ module.exports = function(User) {
         });
         // Create token
         user.accessTokens.create((err, token) => {
-          user.__data.token = token;
+          // user.__data.token = token;
           if (err) {
             console.log('> error while creating access token', err);
             return next(err);
           }
+          let data = {
+            token,
+            id: user.id,
+            fullName: user.fullName,
+            email: user.email,
+            companyName: user.companyName
+          }
+          context.result = data;
           next();
         });
 

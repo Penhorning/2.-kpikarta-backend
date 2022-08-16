@@ -37,27 +37,27 @@
     },
     "mobileVerified": {
       "type": "boolean",
-      "defualt": false
+      "default": false
     },
     "currentPlan": {
       "type": "string",
-      "defualt": "spectator"
+      "default": ""
     },
     "mfaEnabled": {
       "type": "boolean",
-      "defualt": false
+      "default": false
     },
     "mfaVerified": {
       "type": "boolean",
-      "defualt": false
+      "default": false
     },
     "mfaSecret": {
       "type": "string",
-      "defualt": ""
+      "default": ""
     },
     "mfaQRCode": {
       "type": "string",
-      "defualt": ""
+      "default": ""
     },
     "street": {
       "type": "string"
@@ -76,7 +76,7 @@
     },
     "active": {
       "type": "boolean",
-      "defualt": true
+      "default": true
     }
   },
   "validations": [],
