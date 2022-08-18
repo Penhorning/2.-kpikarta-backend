@@ -27,13 +27,16 @@
       "type": "string"
     },
     "font_style": {
-      "type": "string"
+      "type": "string",
+      "default": "roboto"
     },
     "alignment": {
-      "type": "string"
+      "type": "string",
+      "default": "center"
     },
     "text_color": {
-      "type": "string"
+      "type": "string",
+      "default": "#000000"
     },
     "type": {
       "type": "string"
