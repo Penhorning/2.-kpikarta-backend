@@ -1,4 +1,4 @@
 # KPI-Karta-Staging
 
 Testing & Development
-push source files
+only deploy to Development
