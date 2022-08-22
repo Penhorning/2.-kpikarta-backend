@@ -27,16 +27,13 @@
       "type": "string"
     },
     "font_style": {
-      "type": "string",
-      "default": "roboto"
+      "type": "string"
     },
     "alignment": {
-      "type": "string",
-      "default": "center"
+      "type": "string"
     },
     "text_color": {
-      "type": "string",
-      "default": "#000000"
+      "type": "string"
     },
     "type": {
       "type": "string"
@@ -53,7 +50,13 @@
     "fiscal_year_end_date": {
       "type": "date"
     },
+    "weightage": {
+      "type": "number"
+    },
     "target_value": {
+      "type": "number"
+    },
+    "achieved_value": {
       "type": "number"
     },
     "target_value_type": {
