@@ -1,5 +1,4 @@
 # KPI-Karta-Staging
 
 Testing & Development
-deploy to development
-.
+only deploy to Development
