@@ -53,14 +53,16 @@
     "weightage": {
       "type": "number"
     },
-    "target_value": {
-      "type": "number"
+    "target": {
+      "type": [
+        {
+          "type": "string",
+          "value": "number"
+        }
+      ]
     },
     "achieved_value": {
       "type": "number"
-    },
-    "target_value_type": {
-      "type": "string"
     },
     "kpi_calc_period": {
       "type": "string"
