@@ -56,7 +56,7 @@
     "target": {
       "type": [
         {
-          "type": "string",
+          "frequecy": "string",
           "value": "number"
         }
       ]
