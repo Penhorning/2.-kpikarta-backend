@@ -37,6 +37,10 @@
     "root": "./storage",
     "nameConflict": "makeUnique",
     "maxFileSize": "20000000",
-    "allowedContentTypes":["image/jpeg", "image/jpg", "image/png"]
+    "allowedContentTypes": [
+      "image/jpeg",
+      "image/jpg",
+      "image/png"
+    ]
   }
 }

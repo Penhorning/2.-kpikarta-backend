@@ -108,5 +108,9 @@
   "color_setting": {
     "dataSource": "db",
     "public": true
+  },
+  "karta_sub_phase": {
+    "dataSource": "db",
+    "public": true
   }
 }
