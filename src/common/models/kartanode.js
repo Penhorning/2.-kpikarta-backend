@@ -6,5 +6,5 @@ module.exports = function(Kartanode) {
             ctx.query.include = "children"
         }
         next();
-    })
+    });
 };

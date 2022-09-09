@@ -66,6 +66,13 @@
     },
     "kpi_calc_period": {
       "type": "string"
+    },
+    "contributors": {
+      "type": [
+        {
+          "userId": "string"
+        }
+      ]
     }
   },
   "validations": [],
