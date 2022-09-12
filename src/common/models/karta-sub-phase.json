@@ -36,10 +36,10 @@
         "nestRemoting": true
       }
     },
-    "kartaphase": {
+    "karta_phase": {
       "type": "belongsTo",
-      "model": "kartaphase",
-      "foreignKey": "kartaphaseId",
+      "model": "karta_phase",
+      "foreignKey": "kartaPhaseId",
       "options": {
         "nestRemoting": true
       }

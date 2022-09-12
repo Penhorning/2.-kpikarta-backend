@@ -1,5 +1,5 @@
 {
-  "name": "employees_range",
+  "name": "karta_phase",
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
@@ -13,13 +13,20 @@
     }
   },
   "properties": {
-    "range": {
+    "name": {
       "type": "string",
       "required": true
     }
   },
   "validations": [],
   "relations": {},
-  "acls": [],
+  "acls": [
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    }
+  ],
   "methods": {}
 }

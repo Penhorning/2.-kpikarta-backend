@@ -34,7 +34,7 @@
     },
     "phase": {
       "type": "belongsTo",
-      "model": "kartaphase",
+      "model": "karta_phase",
       "foreignKey": "phaseId"
     }
   },

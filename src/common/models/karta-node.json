@@ -1,5 +1,5 @@
 {
-  "name": "kartanode",
+  "name": "karta_node",
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
@@ -77,6 +77,14 @@
   },
   "validations": [],
   "relations": {
+    "karta_detail": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaDetailId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
     "karta": {
       "type": "belongsTo",
       "model": "karta",
@@ -87,7 +95,7 @@
     },
     "karta_phase": {
       "type": "hasOne",
-      "model": "kartaphase",
+      "model": "karta_phase",
       "foreignKey": "phaseId",
       "options": {
         "nestRemoting": true
@@ -95,7 +103,7 @@
     },
     "children": {
       "type": "hasMany",
-      "model": "kartanode",
+      "model": "karta_node",
       "foreignKey": "parentId",
       "options": {
         "nestRemoting": true
@@ -103,7 +111,7 @@
     },
     "parent": {
       "type": "belongsTo",
-      "model": "kartanode",
+      "model": "karta_node",
       "foreignKey": "parentId",
       "options": {
         "nestRemoting": true

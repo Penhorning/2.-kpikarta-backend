@@ -44,7 +44,7 @@
     },
     "node": {
       "type": "hasOne",
-      "model": "kartanode",
+      "model": "karta_node",
       "foreignKey": "",
       "options": {
         "nestRemoting": true

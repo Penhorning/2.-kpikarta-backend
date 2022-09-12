@@ -33,9 +33,9 @@
         "nestRemoting": true
       }
     },
-    "kartanode": {
+    "karta_node": {
       "type": "belongsTo",
-      "model": "kartanode",
+      "model": "karta_node",
       "foreignKey": "",
       "options": {
         "nestRemoting": true

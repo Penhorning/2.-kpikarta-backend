@@ -65,11 +65,11 @@
     "dataSource": "db",
     "public": true
   },
-  "kartanode": {
+  "karta_node": {
     "dataSource": "db",
     "public": true
   },
-  "kartaphase": {
+  "karta_phase": {
     "dataSource": "db",
     "public": true
   },
@@ -101,7 +101,7 @@
     "dataSource": "db",
     "public": true
   },
-  "employees_range": {
+  "employee_range": {
     "dataSource": "db",
     "public": true
   },
