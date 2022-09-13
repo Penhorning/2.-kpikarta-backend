@@ -85,16 +85,4 @@ module.exports = function (app) {
             res.json(err);
         }
     });
-
-    // Get karta_nodes by contributor's userId
-    // app.post("/api/kpis-by-user", async (req, res) => {
-    //     let { userId } = req.body;
-
-    //     try {
-    //         let karta_nodes = await req.app.models.karta_node.findOne({ where: { "contributors.userId": userId } });
-    //         res.json(karta_nodes);
-    //     } catch(err) {
-    //         res.json(err);
-    //     }
-    // });
 };
