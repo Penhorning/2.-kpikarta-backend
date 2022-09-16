@@ -57,7 +57,8 @@
       "type": [
         {
           "frequecy": "string",
-          "value": "number"
+          "value": "number",
+          "percentage": "number"
         }
       ]
     },
