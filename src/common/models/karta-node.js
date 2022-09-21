@@ -130,18 +130,35 @@ module.exports = function (Kartanode) {
         KARTA_LOOKUP,
         UNWIND_KARTA,
         {
+          // $lookup: {
+          //   from: "user",
+          //   localField: "karta.userId",
+          //   foreignField: "_id",
+          //   pipeline: [
+          //     { $project: {
+          //         "fullName": "$fullName",
+          //         "email": "$email"
+          //       } 
+          //     }
+          //   ],
+          //   as: "karta.user",
+          // }
           $lookup: {
             from: "user",
-            localField: "karta.userId",
-            foreignField: "_id",
+            let: {
+                user_id: "$karta.userId"
+            },
             pipeline: [
-              { $project: {
-                  "fullName": "$fullName",
-                  "email": "$email"
+              { 
+                $match: { 
+                  $expr: { $eq: ["$_id", "$$user_id"] }
                 } 
+              },
+              {
+                $project: { "fullName": 1, "email": 1 }
               }
             ],
-            as: "karta.user",
+            as: "karta.user"
           }
         },
         {
