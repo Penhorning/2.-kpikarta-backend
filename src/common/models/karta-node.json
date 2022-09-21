@@ -135,6 +135,23 @@
     }
   ],
   "methods": {
+    "kpiStats": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "karta_nodes",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/kpiStats",
+        "verb": "post"
+      }
+    },
     "kpiNodes": {
       "accepts": [
         {
@@ -169,7 +186,7 @@
         },
         {
           "arg": "percentage",
-          "type": "object",
+          "type": "array",
           "required": false
         },
         {
@@ -184,6 +201,16 @@
         },
         {
           "arg": "endUpdatedDate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "startDueDate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "endDueDate",
           "type": "string",
           "required": false
         }
