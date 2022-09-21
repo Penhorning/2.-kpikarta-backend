@@ -22,16 +22,35 @@ module.exports = function (Kartanode) {
   //     return result;
   // }
 
+  const KARTA_LOOKUP = {
+    $lookup: {
+      from: 'karta',
+      localField: 'kartaDetailId',
+      foreignField: '_id',
+      as: 'karta'
+    },
+  }
+  const UNWIND_KARTA = {
+    $unwind: {
+      path: "$karta"
+    }
+  }
+
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Get kpi nodes by contributor's userId
-  Kartanode.kpiNodes = (page, limit, searchQuery, userId, percentage, startUpdatedDate, endUpdatedDate, next) => {
+  Kartanode.kpiNodes = (page, limit, searchQuery, userId, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     userId = Kartanode.getDataSource().ObjectID(userId);
     let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-    let query = { "contributors.userId": userId };
+
+    let query;
+
+    // Find shared or assigned nodes
+    if (kpiType === "shared") query = { "sharedTo.userId": userId };
+    else query = { "contributors.userId": userId };
 
     // endUpdatedDate = addDays(endUpdatedDate, 1);
     // if (startUpdatedDate && endUpdatedDate) {
@@ -41,12 +60,27 @@ module.exports = function (Kartanode) {
     //   }
     // }
 
+    // Filter nodes by last updated date ranges
     if (startUpdatedDate && endUpdatedDate) {
       query.updatedAt = {
         $gte: moment(startUpdatedDate).toDate(),
         $lte: moment(endUpdatedDate).toDate()
       }
     }
+    // Filter nodes by frequency
+    if (targetTypes.length > 0) {
+      query["target.0.frequency"] = { $in: targetTypes }
+    }
+    // Filter nodes by percentage
+    if (percentage) {
+      query["target.0.percentage"] = { $gte: percentage.min, $lte: percentage.max }
+    }
+
+    // Sort nodes by date and percentage
+    let SORT = { "createdAt": -1 };
+    if (sortBy === "oldest") SORT = { "createdAt": 1 };
+    else if (sortBy === "worst") SORT = { "target.0.percentage": 1 };
+    else if (sortBy === "best") SORT = { "target.0.percentage": -1 };
 
     const SEARCH_MATCH = {
       $match: {
@@ -68,9 +102,11 @@ module.exports = function (Kartanode) {
           $match: query
         },
         {
-          $sort: { "createdAt": -1 }
+          $sort: SORT
         },
         SEARCH_MATCH,
+        KARTA_LOOKUP,
+        UNWIND_KARTA,
         {
           $facet: {
             metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],

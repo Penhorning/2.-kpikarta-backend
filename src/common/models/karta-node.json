@@ -74,6 +74,13 @@
           "userId": "string"
         }
       ]
+    },
+    "sharedTo": {
+      "type": [
+        {
+          "userId": "string"
+        }
+      ]
     }
   },
   "validations": [],
@@ -151,8 +158,23 @@
           "required": true
         },
         {
+          "arg": "kpiType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "sortBy",
+          "type": "string",
+          "required": false
+        },
+        {
           "arg": "percentage",
-          "type": "number",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "targetTypes",
+          "type": "array",
           "required": false
         },
         {
