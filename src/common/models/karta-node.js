@@ -32,9 +32,42 @@ module.exports = function (Kartanode) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-  // Get kpi status by contributor's userId
+  // Get unique creators by contributor's userId
+  Kartanode.kpiCreators = (userId, next) => {
+
+    userId = Kartanode.getDataSource().ObjectID(userId);
+    
+    Kartanode.getDataSource().connector.connect(function (err, db) {
+      const kartaNodeCollection = db.collection('karta_node');
+      kartaNodeCollection.aggregate([
+        {
+          $match: { "contributors.userId": userId }
+        },
+        {
+          $sort: { "createdAt": -1 }
+        },
+        KARTA_LOOKUP,
+        UNWIND_KARTA,
+        {
+          $group: {
+            "_id": null,
+            "userId": { $addToSet: "$karta.userId" }
+          }
+        }
+      ]).toArray((err, result) => {
+        if (err) next (err);
+        else {
+          Kartanode.app.models.user.find({ where: { "_id": { $in: result[0].userId } }, fields: { "id": true, "email": true, fullName: true } }, (err2, result2) => {
+            next(err2, result2);
+          });
+        }
+      });
+    });
+  }
+
+  // Get kpi stats by contributor's userId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributors.userId": userId, $expr: { $eq: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributors.userId": userId, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributors.userId": userId, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count(completedQuery, (err, result) => {
@@ -80,12 +113,12 @@ module.exports = function (Kartanode) {
       }
     }
     // Filter nodes by frequency
-    if (targetTypes.length > 0) {
+    if (targetTypes && targetTypes.length > 0) {
       query["target.0.frequency"] = { $in: targetTypes }
     }
     // Filter nodes by percentage
     let percentage_query = {};
-    if (percentage) {
+    if (percentage && percentage.length > 0) {
       let percentageRange = [];
       percentage.forEach(item => {
         percentageRange.push({
@@ -109,6 +142,12 @@ module.exports = function (Kartanode) {
               $regex: search_query,
               $options: 'i'
             }
+          },
+          {
+            'karta.name': {
+              $regex: search_query,
+              $options: 'i'
+            }
           }
         ]
       }
@@ -126,9 +165,9 @@ module.exports = function (Kartanode) {
         {
           $sort: SORT
         },
-        SEARCH_MATCH,
         KARTA_LOOKUP,
         UNWIND_KARTA,
+        SEARCH_MATCH,
         {
           // $lookup: {
           //   from: "user",
