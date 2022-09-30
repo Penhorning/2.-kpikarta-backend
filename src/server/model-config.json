@@ -112,5 +112,9 @@
   "karta_sub_phase": {
     "dataSource": "db",
     "public": true
+  },
+  "notification": {
+    "dataSource": "db",
+    "public": true
   }
 }

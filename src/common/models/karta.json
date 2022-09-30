@@ -3,7 +3,11 @@
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
-    "validateUpsert": true
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta",
+      "allowExtendedOperators": true
+    }
   },
   "mixins": {
     "TimeStamp": {
@@ -16,20 +20,21 @@
     "name": {
       "type": "string"
     },
-    "target": {
-      "type": "number"
-    },
-    "due_date": {
-      "type": "date"
-    },
     "version": {
+      "type": "string"
+    },
+    "type": {
       "type": "string"
     },
     "status": {
       "type": "string"
     },
-    "completion_percent": {
-      "type": "number"
+    "sharedTo": {
+      "type": [
+        {
+          "email": "string"
+        }
+      ]
     }
   },
   "validations": [],
@@ -59,5 +64,28 @@
       "permission": "ALLOW"
     }
   ],
-  "methods": {}
+  "methods": {
+    "share": {
+      "accepts": [
+        {
+          "arg": "karta",
+          "type": "object",
+          "required": true
+        },
+        {
+          "arg": "emails",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/share",
+        "verb": "post"
+      }
+    }
+  }
 }

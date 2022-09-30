@@ -32,7 +32,27 @@ module.exports = function (Kartanode) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-  // Get unique creators by contributor's userId
+  // Share karta to multiple users
+  Kartanode.share = (nodeId, userIds, next) => {
+
+    if (userIds.length > 0) {
+      // Prepare data for updating in the sharedTo field
+      let data = [];
+      for (let i = 0; i < userIds.length; i++) {
+        data.push({ userId: userIds[i] });
+      }
+
+      Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+        if (err) console.log('> error while updating the node sharedTo property ', err);
+        else next(null, "Node shared successfully!");
+      });
+    } else {
+      let error = new Error("Please send an userId array");
+      error.status = 400;
+      next(error);
+    }
+  }
+  // Get unique creators by contributorId
   Kartanode.kpiCreators = (userId, next) => {
 
     userId = Kartanode.getDataSource().ObjectID(userId);
@@ -41,7 +61,7 @@ module.exports = function (Kartanode) {
       const kartaNodeCollection = db.collection('karta_node');
       kartaNodeCollection.aggregate([
         {
-          $match: { "contributors.userId": userId }
+          $match: { "contributorId": userId }
         },
         {
           $sort: { "createdAt": -1 }
@@ -57,22 +77,24 @@ module.exports = function (Kartanode) {
       ]).toArray((err, result) => {
         if (err) next (err);
         else {
-          Kartanode.app.models.user.find({ where: { "_id": { $in: result[0].userId } }, fields: { "id": true, "email": true, fullName: true } }, (err2, result2) => {
-            next(err2, result2);
-          });
+          if (result.length > 0) {
+            Kartanode.app.models.user.find({ where: { "_id": { $in: result[0].userId } }, fields: { "id": true, "email": true, fullName: true } }, (err2, result2) => {
+              next(err2, result2);
+            });
+          } else next(null, result);
         }
       });
     });
   }
 
-  // Get kpi stats by contributor's userId
+  // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributors.userId": userId, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
-    let inCompletedQuery = { "contributors.userId": userId, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributorId": userId, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let inCompletedQuery = { "contributorId": userId, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count(completedQuery, (err, result) => {
       Kartanode.count(inCompletedQuery, (err2, result2) => {
-        Kartanode.count({ "contributors.userId": userId }, (err2, result3) => {
+        Kartanode.count({ "contributorId": userId }, (err2, result3) => {
           let data = {
             "All": result3,
             "InProgress": result2,
@@ -84,8 +106,8 @@ module.exports = function (Kartanode) {
     });
   }
 
-  // Get kpi nodes by contributor's userId
-  Kartanode.kpiNodes = (page, limit, searchQuery, userId, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
+  // Get kpi nodes by contributorId
+  Kartanode.kpiNodes = (page, limit, searchQuery, userId, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -94,9 +116,18 @@ module.exports = function (Kartanode) {
 
     let query;
 
+    // Filter nodes by creator's id
+    let creator_query = {}, kartaCreators = [];
+    if (kartaCreatorIds && kartaCreatorIds.length > 0) {
+      kartaCreatorIds.map(id => {
+        kartaCreators.push(Kartanode.getDataSource().ObjectID(id));
+      });
+      creator_query = { "karta.userId" : { $in: kartaCreators } };
+    }
+
     // Find shared or assigned nodes
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
-    else query = { "contributors.userId": userId };
+    else query = { "contributorId": userId };
 
     // Filter nodes by last updated date ranges
     if (startUpdatedDate && endUpdatedDate) {
@@ -202,6 +233,9 @@ module.exports = function (Kartanode) {
         },
         {
           $unwind: "$karta.user"
+        },
+        {
+          $match: creator_query
         },
         {
           $facet: {
