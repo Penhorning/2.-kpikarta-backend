@@ -36,14 +36,11 @@ module.exports = function (Kartanode) {
   Kartanode.share = (nodeId, userIds, next) => {
 
     if (userIds.length > 0) {
-      // Prepare data for updating in the sharedTo field
-      // let data = [];
-      // for (let i = 0; i < userIds.length; i++) {
-      //   data.push({ userId: userIds[i] });
-      // }
-
       Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err) => {
-        if (err) console.log('> error while updating the node sharedTo property ', err);
+        if (err) {
+          console.log('> error while updating the node sharedTo property ', err);
+          next(err);
+        }
         else next(null, "Node shared successfully!");
       });
     } else {
@@ -52,6 +49,7 @@ module.exports = function (Kartanode) {
       next(error);
     }
   }
+
   // Get unique creators by contributorId
   Kartanode.kpiCreators = (userId, next) => {
 
@@ -111,7 +109,6 @@ module.exports = function (Kartanode) {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    userId = Kartanode.getDataSource().ObjectID(userId);
     let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
     let query;
@@ -127,7 +124,7 @@ module.exports = function (Kartanode) {
 
     // Find shared or assigned nodes
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
-    else query = { "contributorId": userId };
+    else query = { "contributorId": Kartanode.getDataSource().ObjectID(userId) };
 
     // Filter nodes by last updated date ranges
     if (startUpdatedDate && endUpdatedDate) {
@@ -160,8 +157,8 @@ module.exports = function (Kartanode) {
     }
 
     // Sort nodes by date and percentage
-    let SORT = { "createdAt": -1 };
-    if (sortBy === "oldest") SORT = { "createdAt": 1 };
+    let SORT = { "assigned_date": -1 };
+    if (sortBy === "oldest") SORT = { "assigned_date": 1 };
     else if (sortBy === "worst") SORT = { "target.0.percentage": 1 };
     else if (sortBy === "best") SORT = { "target.0.percentage": -1 };
 
@@ -200,19 +197,6 @@ module.exports = function (Kartanode) {
         UNWIND_KARTA,
         SEARCH_MATCH,
         {
-          // $lookup: {
-          //   from: "user",
-          //   localField: "karta.userId",
-          //   foreignField: "_id",
-          //   pipeline: [
-          //     { $project: {
-          //         "fullName": "$fullName",
-          //         "email": "$email"
-          //       } 
-          //     }
-          //   ],
-          //   as: "karta.user",
-          // }
           $lookup: {
             from: "user",
             let: {
@@ -256,6 +240,16 @@ module.exports = function (Kartanode) {
   Kartanode.observe("access", (ctx, next) => {
     if (!ctx.query.include) ctx.query.include = "children";
     next();
+  });
+
+  // Update assigned date when a contributor added in a given node
+  Kartanode.afterRemote('prototype.patchAttributes', function(context, instance, next) {
+    const req = context.req;
+    if (req.body.contributorId) {
+      Kartanode.update({ "_id": instance.id, $set: { "assigned_date": new Date() } }, (err, result) => {
+        next(err, result);
+      });
+    }
   });
 
   // Delete node with all child nodes

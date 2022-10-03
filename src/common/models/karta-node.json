@@ -21,6 +21,9 @@
       "type": "string",
       "required": true
     },
+    "assigned_date": {
+      "type": "date"
+    },
     "due_date": {
       "type": "date"
     },

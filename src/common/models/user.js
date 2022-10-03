@@ -567,7 +567,7 @@ module.exports = function(User) {
             symbols: true,
             strict: true
           });
-          user.updateAttributes({password}, {}, (err) => {
+          user.updateAttributes({ password }, {}, (err) => {
             if (!user.email.includes("facebook.com")) {
               ejs.renderFile(path.resolve('templates/welcome.ejs'),
               { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
