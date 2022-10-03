@@ -37,12 +37,12 @@ module.exports = function (Kartanode) {
 
     if (userIds.length > 0) {
       // Prepare data for updating in the sharedTo field
-      let data = [];
-      for (let i = 0; i < userIds.length; i++) {
-        data.push({ userId: userIds[i] });
-      }
+      // let data = [];
+      // for (let i = 0; i < userIds.length; i++) {
+      //   data.push({ userId: userIds[i] });
+      // }
 
-      Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+      Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err) => {
         if (err) console.log('> error while updating the node sharedTo property ', err);
         else next(null, "Node shared successfully!");
       });
