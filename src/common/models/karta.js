@@ -99,11 +99,11 @@ module.exports = function(Karta) {
                 $project: { "fullName": 1, "email": 1 }
               }
             ],
-            as: "karta.user"
+            as: "user"
           }
         },
         {
-          $unwind: "$karta.user"
+          $unwind: "$user"
         },
         {
           $facet: {
@@ -118,6 +118,18 @@ module.exports = function(Karta) {
         next(err, result);
       });
     });
+  }
+
+  Karta.softDelete = (id, next) => {
+    Karta.app.models.karta_node.updateMany({ or: [ {"kartaId": id}, {"kartaDetailId": id} ] }, { $set: { "status": false } }, (err) => {
+      if(err){
+        console.log('error while soft deleting karta node', err);
+        return next(err);
+      }
+      else {
+        next();
+      }
+    })
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
