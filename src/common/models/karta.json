@@ -27,7 +27,8 @@
       "type": "string"
     },
     "status": {
-      "type": "string"
+      "type": "boolean",
+      "default": true
     },
     "sharedTo": {
       "type": [
@@ -111,6 +112,23 @@
       },
       "http": {
         "path": "/sharedKartas",
+        "verb": "post"
+      }
+    },
+    "softDelete": {
+      "accepts": [
+        {
+          "arg": "id",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "kartas",
+        "type": "karta"
+      },
+      "http": {
+        "path": "/delete",
         "verb": "post"
       }
     }
