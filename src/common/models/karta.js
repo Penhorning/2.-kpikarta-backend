@@ -6,7 +6,7 @@ const ejs = require('ejs');
 module.exports = function(Karta) {
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta to multiple users
-  Karta.share = (karta, emails, next) => {
+  Karta.share = (karta, email, next) => {
 
     if (emails.length > 0) {
       // Remove duplicate emails
@@ -68,6 +68,56 @@ module.exports = function(Karta) {
       error.status = 400;
       next(error);
     }
+  }
+
+  Karta.sharedKartas = (email, page, limit, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    Karta.getDataSource().connector.connect(function (err, db) {
+      const KartaCollection = db.collection('karta');
+      let data = KartaCollection.aggregate([
+        {
+          $match: { "sharedTo.email": email }
+        },
+        {
+          $sort: { "createdAt" : -1 }
+        },
+        {
+          $lookup: {
+            from: "user",
+            let: {
+                user_email: email
+            },
+            pipeline: [
+              { 
+                $match: { 
+                  $expr: { $eq: ["$email", "$$user_email"] }
+                } 
+              },
+              {
+                $project: { "fullName": 1, "email": 1 }
+              }
+            ],
+            as: "karta.user"
+          }
+        },
+        {
+          $unwind: "$karta.user"
+        },
+        {
+          $facet: {
+            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+          }
+        }
+      ]);
+
+      data.toArray((err, result) => {
+        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
   }
 
 /* =============================REMOTE HOOKS=========================================================== */

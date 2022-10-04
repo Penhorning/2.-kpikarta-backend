@@ -86,6 +86,33 @@
         "path": "/share",
         "verb": "post"
       }
+    },
+    "sharedKartas": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "kartas",
+        "type": "karta"
+      },
+      "http": {
+        "path": "/sharedKartas",
+        "verb": "post"
+      }
     }
   }
 }
