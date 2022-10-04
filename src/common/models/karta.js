@@ -6,7 +6,7 @@ const ejs = require('ejs');
 module.exports = function(Karta) {
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta to multiple users
-  Karta.share = (karta, email, next) => {
+  Karta.share = (karta, emails, next) => {
 
     if (emails.length > 0) {
       // Remove duplicate emails
