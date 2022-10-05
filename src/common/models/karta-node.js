@@ -245,14 +245,9 @@ module.exports = function (Kartanode) {
       else {
         Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
           if (err) console.log('> error while finding child nodes', err);
-
-          if(result.length > 0 ){
-            deleteChildNodes(result);
-          }
-          else {
-            return next(null, "Child Nodes deleted successfully..!!");
-          }
+          deleteChildNodes(result);
         });
+        return next(null, "Child Nodes deleted successfully..!!");
       }
     })
   }
