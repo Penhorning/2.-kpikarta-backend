@@ -94,9 +94,9 @@ module.exports = function (Kartanode) {
       Kartanode.count(inCompletedQuery, (err2, result2) => {
         Kartanode.count({ "contributorId": Kartanode.getDataSource().ObjectID(userId) }, (err2, result3) => {
           let data = {
-            "All": result3,
-            "InProgress": result2,
-            "Completed": result
+            "All": result3 || 0,
+            "InProgress": result2 || 0,
+            "Completed": result || 0
           }
           next(err2, data);
         });
