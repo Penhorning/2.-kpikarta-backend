@@ -283,8 +283,8 @@
     "deleteNodes": {
       "accepts": [
         {
-          "arg": "nodeIds",
-          "type": "array",
+          "arg": "nodeId",
+          "type": "string",
           "required": true
         }
       ],
