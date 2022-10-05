@@ -110,7 +110,6 @@ module.exports = function (Kartanode) {
     limit = parseInt(limit, 10) || 100;
 
     let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-
     let query;
 
     // Filter nodes by creator's id
