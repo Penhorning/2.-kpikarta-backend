@@ -132,7 +132,7 @@
         "type": "karta"
       },
       "http": {
-        "path": "/delete-karta",
+        "path": "/delete-shared-karta",
         "verb": "post"
       }
     }
