@@ -60,7 +60,7 @@
     "weightage": {
       "type": "number"
     },
-    "isDeleted": {
+    "is_deleted": {
       "type": "boolean",
       "default": false
     },
