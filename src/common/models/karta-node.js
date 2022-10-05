@@ -238,7 +238,7 @@ module.exports = function (Kartanode) {
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (nodeId, next) => {
     Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, (err) => {
-      if(err){
+      if (err) {
         console.log('error while soft deleting karta Nodes', err);
         return next(err);
       }
@@ -247,7 +247,7 @@ module.exports = function (Kartanode) {
           if (err) console.log('> error while finding child nodes', err);
           deleteChildNodes(result);
         });
-        return next(null, "Child Nodes deleted successfully..!!");
+        return next(null, "Node deleted successfully..!!");
       }
     })
   }
@@ -268,16 +268,5 @@ module.exports = function (Kartanode) {
         next(err, result);
       });
     }
-  });
-
-  // Delete node with all child nodes
-  Kartanode.observe('after delete', function (ctx, next) {
-    next();
-    // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
-    // Kartanode.find({ where: { "parentId": ctx.where.id } }, (err, result) => {
-    //   if (err) console.log('> error while finding child nodes', err);
-    //   else deleteChildNodes(result);
-    // });
-    // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
   });
 };

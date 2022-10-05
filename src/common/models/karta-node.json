@@ -289,11 +289,11 @@
         }
       ],
       "returns": {
-        "arg": "nodes",
-        "type": "karta_node"
+        "arg": "message",
+        "type": "string"
       },
       "http": {
-        "path": "/delete-node",
+        "path": "/delete",
         "verb": "post"
       }
     }
