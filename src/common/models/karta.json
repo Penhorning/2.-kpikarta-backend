@@ -31,7 +31,7 @@
       "type": "boolean",
       "default": true
     },
-    "isDeleted": {
+    "is_deleted": {
       "type": "boolean",
       "default": false
     },
