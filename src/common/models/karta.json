@@ -24,7 +24,8 @@
       "type": "string"
     },
     "type": {
-      "type": "string"
+      "type": "string",
+      "default": "private"
     },
     "status": {
       "type": "boolean",
