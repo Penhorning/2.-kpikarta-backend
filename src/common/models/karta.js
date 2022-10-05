@@ -78,7 +78,7 @@ module.exports = function(Karta) {
       const KartaCollection = db.collection('karta');
       let data = KartaCollection.aggregate([
         {
-          $match: { "sharedTo.email": email, "is_deleted": false }
+          $match: { "sharedTo.email": email, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] }
         },
         {
           $sort: { "createdAt" : -1 }

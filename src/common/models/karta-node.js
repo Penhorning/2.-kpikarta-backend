@@ -89,8 +89,8 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
-    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
+    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
 
     Kartanode.count({completedQuery}, (err, result) => {
       Kartanode.count(inCompletedQuery, (err2, result2) => {
