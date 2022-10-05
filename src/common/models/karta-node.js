@@ -234,6 +234,19 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Soft delete Karta Nodes
+  Kartanode.deleteNodes = (nodeIds, next) => {
+    Kartanode.update( { "_id": { $in: nodeIds} } , { $set: { "isDeleted": true } }, (err) => {
+      if(err){
+        console.log('error while soft deleting karta Nodes', err);
+        return next(err);
+      }
+      else {
+        next(null, true);
+      }
+    })
+  }
+
 
 /* =============================REMOTE HOOKS=========================================================== */
   // Include childrens when fetching nodes by kartaId

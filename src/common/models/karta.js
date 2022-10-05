@@ -120,14 +120,15 @@ module.exports = function(Karta) {
     });
   }
 
-  Karta.softDelete = (id, next) => {
-    Karta.app.models.karta_node.updateMany({ or: [ {"kartaId": id}, {"kartaDetailId": id} ] }, { $set: { "status": false } }, (err) => {
+// Soft delete Karta
+  Karta.softDelete = (kartaId, next) => {
+    Karta.update( { "_id": kartaId } , { $set: { "isDeleted": true } }, (err) => {
       if(err){
-        console.log('error while soft deleting karta node', err);
+        console.log('error while soft deleting karta', err);
         return next(err);
       }
       else {
-        next();
+        next(null, true);
       }
     })
   }
