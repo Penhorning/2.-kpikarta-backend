@@ -267,6 +267,6 @@ module.exports = function (Kartanode) {
       Kartanode.update({ "_id": instance.id, $set: { "assigned_date": new Date() } }, (err, result) => {
         next(err, result);
       });
-    }
+    } else next();
   });
 };
