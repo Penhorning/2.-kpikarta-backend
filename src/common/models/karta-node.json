@@ -60,6 +60,10 @@
     "weightage": {
       "type": "number"
     },
+    "isDeleted": {
+      "type": "boolean",
+      "default": false
+    },
     "target": {
       "type": [
         {
@@ -273,6 +277,23 @@
       },
       "http": {
         "path": "/kpis",
+        "verb": "post"
+      }
+    },
+    "deleteNodes": {
+      "accepts": [
+        {
+          "arg": "nodeIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "nodes",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/delete-node",
         "verb": "post"
       }
     }

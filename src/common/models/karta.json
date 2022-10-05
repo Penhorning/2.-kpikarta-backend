@@ -30,6 +30,10 @@
       "type": "boolean",
       "default": true
     },
+    "isDeleted": {
+      "type": "boolean",
+      "default": false
+    },
     "sharedTo": {
       "type": [
         {
@@ -118,7 +122,7 @@
     "softDelete": {
       "accepts": [
         {
-          "arg": "id",
+          "arg": "kartaId",
           "type": "string",
           "required": true
         }
@@ -128,7 +132,7 @@
         "type": "karta"
       },
       "http": {
-        "path": "/delete",
+        "path": "/delete-karta",
         "verb": "post"
       }
     }
