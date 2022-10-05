@@ -78,7 +78,7 @@ module.exports = function(Karta) {
       const KartaCollection = db.collection('karta');
       let data = KartaCollection.aggregate([
         {
-          $match: { "sharedTo.email": email }
+          $match: { "sharedTo.email": email, "is_deleted": false }
         },
         {
           $sort: { "createdAt" : -1 }
@@ -120,14 +120,15 @@ module.exports = function(Karta) {
     });
   }
 
-  Karta.softDelete = (id, next) => {
-    Karta.app.models.karta_node.updateMany({ or: [ {"kartaId": id}, {"kartaDetailId": id} ] }, { $set: { "status": false } }, (err) => {
+// Soft delete Karta
+  Karta.softDelete = (kartaId, next) => {
+    Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
-        console.log('error while soft deleting karta node', err);
+        console.log('error while soft deleting karta', err);
         return next(err);
       }
       else {
-        next();
+        next(null, true);
       }
     })
   }
@@ -152,9 +153,13 @@ module.exports = function(Karta) {
     // });
     Karta.observe('after delete', function(ctx, next) {
         next();
-        Karta.app.models.karta_node.destroyAll({ or: [ {"kartaId": ctx.where.id}, {"kartaDetailId": ctx.where.id} ] }, (err, result) => {
-            if (err) console.log('> error while deleting karta nodes', err);
-        });
+        // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
+        // Karta.app.models.karta_node.destroyAll({ or: [ {"kartaId": ctx.where.id}, {"kartaDetailId": ctx.where.id} ] }, (err, result) => {
+        //     if (err) console.log('> error while deleting karta nodes', err);
+        // });
+        // ---------------------------- Commented Above code as Hard Delete changed to Soft Delete ----------------------------
+
+
         // Karta.app.models.karta_sub_phase.destroyAll({ "kartaId": ctx.where.id }, (err, result) => {
         //     if (err) console.log('> error while deleting karta sub phases', err);
         // });

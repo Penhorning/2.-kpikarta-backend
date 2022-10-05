@@ -6,11 +6,13 @@ module.exports = function (Kartanode) {
   // Delete child nodes
   const deleteChildNodes = (params) => {
     try {
-      params.forEach(async item => {
-        let childrens = await Kartanode.find({ where: { "parentId": item.id } });
-        await Kartanode.deleteById(item.id);
-        if (childrens.length > 0) deleteChildNodes(childrens);
-      });
+      if(params.length > 0){
+        params.forEach(async item => {
+          let childrens = await Kartanode.find({ where: { "parentId": item.id } });
+          await Kartanode.updateAll({ "_id": item.id }, { $set: { "is_deleted": true } });
+          if (childrens.length > 0) deleteChildNodes(childrens);
+        });
+      }
     } catch (err) {
       console.log('> error while deleting child nodes', err);
     }
@@ -233,6 +235,23 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Soft delete Karta Nodes
+  Kartanode.deleteNodes = (nodeId, next) => {
+    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, (err) => {
+      if(err){
+        console.log('error while soft deleting karta Nodes', err);
+        return next(err);
+      }
+      else {
+        Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
+          if (err) console.log('> error while finding child nodes', err);
+          deleteChildNodes(result);
+        });
+        return next(null, "Child Nodes deleted successfully..!!");
+      }
+    })
+  }
+
 
 /* =============================REMOTE HOOKS=========================================================== */
   // Include childrens when fetching nodes by kartaId
@@ -254,9 +273,11 @@ module.exports = function (Kartanode) {
   // Delete node with all child nodes
   Kartanode.observe('after delete', function (ctx, next) {
     next();
-    Kartanode.find({ where: { "parentId": ctx.where.id } }, (err, result) => {
-      if (err) console.log('> error while finding child nodes', err);
-      else deleteChildNodes(result);
-    });
+    // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
+    // Kartanode.find({ where: { "parentId": ctx.where.id } }, (err, result) => {
+    //   if (err) console.log('> error while finding child nodes', err);
+    //   else deleteChildNodes(result);
+    // });
+    // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
   });
 };
