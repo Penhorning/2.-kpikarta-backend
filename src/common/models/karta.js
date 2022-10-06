@@ -128,9 +128,39 @@ module.exports = function(Karta) {
         return next(err);
       }
       else {
-        next(null, true);
+        Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
+            if (err) console.log('> error while deleting karta', err);
+            next(null, "Karta deleted successfully..!!");
+        });
       }
     })
+  }
+
+  Karta.kartaCopy = async (kartaId, next) => {
+    try {
+      let kartaData = await Karta.findOne({ where: {_id: kartaId } });
+      if(kartaData){
+        let newObj = {
+          name: kartaData.name ? kartaData.name : null,
+          userId: kartaData.userId ? kartaData.userId : null,
+          sharedTo: kartaData.sharedTo ? kartaData.sharedTo : null,
+          status: kartaData.status ? kartaData.status : null,
+          type: kartaData.type ? kartaData.type : null,
+        }
+        let newKarta = await Karta.create(newObj);
+
+        let oldKartaId = kartaData.id;
+        let newKartaId = newKarta.id;
+        let currNodeId = null;
+
+        
+        next(null, newKarta)
+      }
+    }
+    catch(err){
+      console.log(err);
+      next(err);
+    }
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
@@ -151,17 +181,4 @@ module.exports = function(Karta) {
     //         }
     //     });
     // });
-    Karta.observe('after delete', function(ctx, next) {
-        next();
-        // ---------------------------- Commented Below code as Hard Delete changed to Soft Delete ----------------------------
-        // Karta.app.models.karta_node.destroyAll({ or: [ {"kartaId": ctx.where.id}, {"kartaDetailId": ctx.where.id} ] }, (err, result) => {
-        //     if (err) console.log('> error while deleting karta nodes', err);
-        // });
-        // ---------------------------- Commented Above code as Hard Delete changed to Soft Delete ----------------------------
-
-
-        // Karta.app.models.karta_sub_phase.destroyAll({ "kartaId": ctx.where.id }, (err, result) => {
-        //     if (err) console.log('> error while deleting karta sub phases', err);
-        // });
-    });
 };

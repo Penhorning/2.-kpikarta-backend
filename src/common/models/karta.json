@@ -129,11 +129,28 @@
         }
       ],
       "returns": {
-        "arg": "kartas",
-        "type": "karta"
+        "arg": "message",
+        "type": "string"
       },
       "http": {
         "path": "/delete-shared-karta",
+        "verb": "post"
+      }
+    },
+    "kartaCopy": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/copy-shared-karta",
         "verb": "post"
       }
     }

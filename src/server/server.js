@@ -12,12 +12,14 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const morgan = require('morgan');
+const cors = require('cors');
 
 const app = module.exports = loopback();
 
 app.middleware('parse', bodyParser.json());
 
 // parse application/x-www-form-urlencoded
+app.use(cors());
 app.use(bodyParser.urlencoded({ extended: false }))
 
 require('dotenv').config();
