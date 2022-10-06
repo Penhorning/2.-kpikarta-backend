@@ -178,28 +178,34 @@ module.exports = function(Karta) {
 
         // Recursion function created below to create child nodes of the parent node
         async function createChildNodes(NodeIdOld, NodeIdNew){
-          let ChildNodeData = await Karta.app.models.karta_node.find({ where: {'kartaDetailId': oldKartaId, 'parentId': NodeIdOld } });
-          if(ChildNodeData.length > 0){
-            for(let i = 0; i < ChildNodeData.length; i++){
-              let newChildObj = {
-                name: ChildNodeData[i].name,
-                font_style: ChildNodeData[i].font_style,
-                alignment: ChildNodeData[i].alignment,
-                text_color: ChildNodeData[i].text_color,
-                weightage: ChildNodeData[i].weightage,
-                kartaDetailId: newKartaId,
-                phaseId: ChildNodeData[i].phaseId,
-                parentId: NodeIdNew
-              }
-
-              let newChildNode = await Karta.app.models.karta_node.create(newChildObj);
-              if(newChildNode){
-                createChildNodes(ChildNodeData[i].id, newChildNode.id);
+          try{
+            let ChildNodeData = await Karta.app.models.karta_node.find({ where: {'kartaDetailId': oldKartaId, 'parentId': NodeIdOld } });
+            if(ChildNodeData.length > 0){
+              for(let i = 0; i < ChildNodeData.length; i++){
+                let newChildObj = {
+                  name: ChildNodeData[i].name,
+                  font_style: ChildNodeData[i].font_style,
+                  alignment: ChildNodeData[i].alignment,
+                  text_color: ChildNodeData[i].text_color,
+                  weightage: ChildNodeData[i].weightage,
+                  kartaDetailId: newKartaId,
+                  phaseId: ChildNodeData[i].phaseId,
+                  parentId: NodeIdNew
+                }
+  
+                let newChildNode = await Karta.app.models.karta_node.create(newChildObj);
+                if(newChildNode){
+                  createChildNodes(ChildNodeData[i].id, newChildNode.id);
+                }
               }
             }
+            else {
+              return;
+            }
           }
-          else {
-            return;
+          catch(er){
+            console.log(er);
+            return next(er);
           }
         }
 
