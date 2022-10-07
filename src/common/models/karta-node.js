@@ -257,6 +257,11 @@ module.exports = function (Kartanode) {
   // Include childrens when fetching nodes by kartaId
   Kartanode.observe("access", (ctx, next) => {
     if (!ctx.query.include) ctx.query.include = "children";
+    // ctx.query = {
+    //   where : {
+    //     $or: [ { "is_deleted": { $exists: false }} , { "is_deleted": false }]
+    //   },
+    // };
     next();
   });
 

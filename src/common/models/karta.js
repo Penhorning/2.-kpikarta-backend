@@ -76,7 +76,7 @@ module.exports = function(Karta) {
 
     Karta.getDataSource().connector.connect(function (err, db) {
       const KartaCollection = db.collection('karta');
-      let data = KartaCollection.aggregate([
+      KartaCollection.aggregate([
         {
           $match: { "sharedTo.email": email, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] }
         },
@@ -111,9 +111,7 @@ module.exports = function(Karta) {
             data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
           }
         }
-      ]);
-
-      data.toArray((err, result) => {
+      ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
       });
@@ -138,8 +136,11 @@ module.exports = function(Karta) {
 
   Karta.kartaCopy = async (kartaId, next) => {
     try {
+      // Finding Karta details which will be copied
       let kartaData = await Karta.findOne({ where: {_id: kartaId } });
+
       if(kartaData){
+        // Creating new Karta with old details
         let newObj = {
           name: kartaData.name ? kartaData.name : null,
           userId: kartaData.userId ? kartaData.userId : null,
@@ -147,19 +148,77 @@ module.exports = function(Karta) {
           status: kartaData.status ? kartaData.status : null,
           type: kartaData.type ? kartaData.type : null,
         }
+
+        // New Carta details accessed in newKarta variable
         let newKarta = await Karta.create(newObj);
 
+        // Initializing values Ids
         let oldKartaId = kartaData.id;
         let newKartaId = newKarta.id;
-        let currNodeId = null;
+        let oldNodeId = null;
+        let newNodeId = null;
 
-        
-        next(null, newKarta)
+        // Finding parent node with kartaId
+        let NodeData = await Karta.app.models.karta_node.findOne({ where: {'kartaId': oldKartaId } });
+        oldNodeId = NodeData.id;
+
+        // Creating new Parent Node with old data
+        let newNodeObj = {
+          name: NodeData.name,
+          font_style: NodeData.font_style,
+          alignment: NodeData.alignment,
+          text_color: NodeData.text_color,
+          weightage: NodeData.weightage,
+          kartaId: newKartaId,
+          phaseId: NodeData.phaseId,
+        };
+
+        let newParentNode = await Karta.app.models.karta_node.create(newNodeObj);
+        newNodeId = newParentNode.id;
+
+        // Recursion function created below to create child nodes of the parent node
+        async function createChildNodes(NodeIdOld, NodeIdNew){
+          try{
+            let ChildNodeData = await Karta.app.models.karta_node.find({ where: {'kartaDetailId': oldKartaId, 'parentId': NodeIdOld } });
+            if(ChildNodeData.length > 0){
+              for(let i = 0; i < ChildNodeData.length; i++){
+                let newChildObj = {
+                  name: ChildNodeData[i].name,
+                  font_style: ChildNodeData[i].font_style,
+                  alignment: ChildNodeData[i].alignment,
+                  text_color: ChildNodeData[i].text_color,
+                  weightage: ChildNodeData[i].weightage,
+                  kartaDetailId: newKartaId,
+                  phaseId: ChildNodeData[i].phaseId,
+                  parentId: NodeIdNew
+                }
+  
+                let newChildNode = await Karta.app.models.karta_node.create(newChildObj);
+                if(newChildNode){
+                  createChildNodes(ChildNodeData[i].id, newChildNode.id);
+                }
+              }
+            }
+            else {
+              return;
+            }
+          }
+          catch(er){
+            console.log(er);
+            return next(er);
+          }
+        }
+
+        // Calling the above recursion function with ParentNode Id for new and old
+        createChildNodes(oldNodeId, newNodeId);
+
+        // Returning the response below
+        return next(null, "A Copy of Karta has been created..");
       }
     }
     catch(err){
       console.log(err);
-      next(err);
+      return next(err);
     }
   }
 
