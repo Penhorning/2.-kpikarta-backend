@@ -256,12 +256,10 @@ module.exports = function (Kartanode) {
 /* =============================REMOTE HOOKS=========================================================== */
   // Include childrens when fetching nodes by kartaId
   Kartanode.observe("access", (ctx, next) => {
-    if (!ctx.query.include) ctx.query.include = "children";
-    // ctx.query = {
-    //   where : {
-    //     $or: [ { "is_deleted": { $exists: false }} , { "is_deleted": false }]
-    //   },
-    // };
+    if(!ctx.query.include){
+      ctx.query.include = "children";
+      ctx.query.where.is_deleted = false;
+    }
     next();
   });
 
