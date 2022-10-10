@@ -93,6 +93,33 @@
         "verb": "post"
       }
     },
+    "getKartas": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "kartas",
+        "type": "karta"
+      },
+      "http": {
+        "path": "/get-kartas",
+        "verb": "post"
+      }
+    },
     "sharedKartas": {
       "accepts": [
         {
@@ -116,7 +143,7 @@
         "type": "karta"
       },
       "http": {
-        "path": "/sharedKartas",
+        "path": "/shared-kartas",
         "verb": "post"
       }
     },
