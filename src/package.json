@@ -35,7 +35,6 @@
     "passport-google-oauth": "^2.0.0",
     "passport-linkedin-oauth2": "^2.0.0",
     "path": "^0.12.7",
-    "qrcode": "^1.5.0",
     "serve-favicon": "^2.0.1",
     "speakeasy": "^2.0.0",
     "strong-error-handler": "^4.0.0"

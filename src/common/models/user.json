@@ -39,23 +39,11 @@
       "type": "boolean",
       "default": false
     },
+    "_2faEnabled": {
+      "type": "boolean",
+      "default": false
+    },
     "currentPlan": {
-      "type": "string",
-      "default": ""
-    },
-    "mfaEnabled": {
-      "type": "boolean",
-      "default": false
-    },
-    "mfaVerified": {
-      "type": "boolean",
-      "default": false
-    },
-    "mfaSecret": {
-      "type": "string",
-      "default": ""
-    },
-    "mfaQRCode": {
       "type": "string",
       "default": ""
     },
@@ -260,72 +248,18 @@
         "path": "/assign-plan"
       }
     },
-    "generateMFAQRCode": {
+    "check2FAConfig": {
       "accepts": [],
       "returns": {
-        "arg": "qrcode",
-        "type": "string"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/generateMFAQRCode"
-      }
-    },
-    "enableMFA": {
-      "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "enabled",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/enableMFA"
-      }
-    },
-    "verifyMFACode": {
-      "accepts": [
-        {
-          "arg": "code",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "verified",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/verifyMFAToken"
-      }
-    },
-    "resetMFAConfig": {
-      "accepts": [],
-      "returns": {
-        "arg": "reset",
-        "type": "boolean"
-      },
-      "http": {
-        "verb": "put",
-        "path": "/resetMFA"
-      }
-    },
-    "checkMFAConfig": {
-      "accepts": [],
-      "returns": {
-        "arg": "mfa",
+        "arg": "data",
         "type": "object"
       },
       "http": {
         "verb": "post",
-        "path": "/checkMFAConfig"
+        "path": "/check2FAConfig"
       }
     },
-    "toggleMFA": {
+    "toggle2FA": {
       "accepts": [
         {
           "arg": "type",
@@ -338,7 +272,7 @@
       },
       "http": {
         "verb": "put",
-        "path": "/toggleMFA"
+        "path": "/toggle2FA"
       }
     },
     "userLogin": {

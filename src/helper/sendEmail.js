@@ -5,7 +5,6 @@
 // const ejs = require('ejs');
 // const { RoleManager } = require('../../helper');
 // const speakeasy = require('speakeasy');
-// const QRCode = require('qrcode');
 // const moment = require('moment');
 
 // exports.sendMail = (params, callback) => {
