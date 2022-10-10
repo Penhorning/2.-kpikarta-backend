@@ -18,17 +18,16 @@ module.exports = function (app) {
                 if (err) return console.log('> error while fetching company details');
                 user.companyLogo = company.__data.logo ? company.__data.logo : "";
                 user.profilePic = req.user.profilePic ? req.user.profilePic : "";
-                user.mfaEnabled = req.user.mfaEnabled ? req.user.mfaEnabled : false;
-                user.mfaVerified = req.user.mfaVerified ? req.user.mfaVerified : false;
+                user.twoFactorEnabled = req.user.twoFactorEnabled ? req.user.twoFactorEnabled : false;
                 user.mobileVerified = req.user.mobileVerified ? req.user.mobileVerified : false;
-                if (!req.user.mfaEnabled && req.user.mobileVerified) {
+                if (req.user.twoFactorEnabled && req.user.mobileVerified) {
                     let mobileVerificationCode = keygen.number({length: 6});
                     req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
                       let twilio_data = {
                         type: 'sms',
                         to: req.user.mobile.e164Number,
                         from: "+16063667831",
-                        body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+                        body: `${mobileVerificationCode} is your code for KPI Karta Login.`
                       }
                       req.app.models.Twilio.send(twilio_data, function (err, data) {
                         console.log('> sending code to mobile number:', req.user.mobile.e164Number);
@@ -41,7 +40,7 @@ module.exports = function (app) {
                       });
                     });
                 }
-                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&mfaEnabled=${user.mfaEnabled}&mfaVerified=${user.mfaVerified}&mobileVerified=${user.mobileVerified}`);
+                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&twoFactorEnabled=${user.twoFactorEnabled}&mobileVerified=${user.mobileVerified}`);
             });
         } else {
             req.user.updateAttributes({emailVerified: true}, (err) => {

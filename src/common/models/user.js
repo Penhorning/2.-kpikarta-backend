@@ -7,19 +7,17 @@ const keygen = require('keygenerator');
 const generator = require('generate-password');
 const ejs = require('ejs');
 const { RoleManager } = require('../../helper');
-const speakeasy = require('speakeasy');
-const QRCode = require('qrcode');
 const moment = require('moment');
 
 module.exports = function(User) {
   // Send SMS
-  const sendSMS = (user, mobileVerificationCode) => {
+  const sendSMS = (user, message) => {
     try {
       let smsOptions = {
         type: 'sms',
         to: user.mobile.e164Number,
         from: "+16063667831",
-        body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
+        body: message
       };
       User.app.models.Twilio.send(smsOptions, (err, data) => {
         console.log('> sending code to mobile number:', user.mobile.e164Number);
@@ -282,90 +280,28 @@ module.exports = function(User) {
       next(err, this.app.currentUser);
     });
   };
-  // Generate MFA Qr code
-  User.generateMFAQRCode = function(next) {
-    if (this.app.currentUser.mfaQRCode) {
-      return next(null, this.app.currentUser.mfaQRCode);
-    }
-    var secret = speakeasy.generateSecret({length: 6, name: this.app.get('name') + ' | ' + this.app.currentUser.fullName});
-    QRCode.toDataURL(secret.otpauth_url, function(err, mfaQRCode) {
-      User.app.currentUser.updateAttributes({ "mfaSecret": secret.base32, mfaQRCode }, (err) => {
-        next(err, mfaQRCode);
-      });
-    });
-  };
-  // Enable MFA
-  User.enableMFA = function(code, next) {
-    if (this.app.currentUser.mfaEnabled) {
-      let error = new Error("MFA is already configured for this account");
-      error.status = 400;
-      return next(error);
-    }
-    var verified = speakeasy.totp.verify({
-      secret: this.app.currentUser.mfaSecret,
-      encoding: 'base32',
-      token: code,
-      window: 2
-    });
-    if (verified) {
-      this.app.currentUser.updateAttributes({ "mfaVerified": true, "mfaEnabled": true }, err => {
-        next(err, true);
-      });
-    } else {
-      let error = new Error("Invalid Code");
-      error.status = 400;
-      return next(error);
-    }
-  };  
-  // Verify MFA code (Used while login)
-  User.verifyMFACode = function(code, next) {
-    if (!this.app.currentUser.mfaEnabled) {
-      let error = new Error("Multi factor authentication is disabled. Please enable it first");
-      error.status = 400;
-      return next(error);
-    }
-    var verified = speakeasy.totp.verify({
-      secret: this.app.currentUser.mfaSecret,
-      encoding: 'base32',
-      token: code,
-      window: 2
-    });
-    if (verified) next(null, verified);
-    else {
-      let error = new Error("Invalid Code");
-      error.status = 400;
-      return next(error);
-    }
-  };
-  // Reset MFA
-  User.resetMFAConfig = function(next) {
-    this.app.currentUser.updateAttributes({ "mfaSecret": "", "mfaQRCode": "", "mfaVerified": false, "mfaEnabled": false }, (err) => {
-      next(err, true);
-    });
-  };
-  // Check MFA config
-  User.checkMFAConfig = function(next) {
-    let mfa = {
-      secret: this.app.currentUser.mfaSecret,
-      qrCode: this.app.currentUser.mfaQRCode,
-      verified: this.app.currentUser.mfaVerified,
-      enabled: this.app.currentUser.mfaEnabled
+  // Check 2FA config
+  User.check2FAConfig = function(next) {
+    let data = {
+      mobile: this.app.currentUser.mobile,
+      _2faEnabled: this.app.currentUser._2faEnabled,
+      mobileVerified: this.app.currentUser.mobileVerified
     };
-    next(null, mfa);
+    next(null, data);
   };
-  // Enable/Disable MFA
-  User.toggleMFA = function(type, next) {
+  // Enable/Disable 2FA
+  User.toggle2FA = function(type, next) {
 
-    if (type && this.app.currentUser.mfaQRCode && this.app.currentUser.mfaSecret && this.app.currentUser.mfaVerified) {
-      this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
+    if (type && this.app.currentUser.mobile && this.app.currentUser.mobileVerified) {
+      this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
         next(err, type);
       });
     } else if (!type) {
-      this.app.currentUser.updateAttributes({ "mfaEnabled": type }, (err)=>{
+      this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
         next(err, type);
       });
     } else {
-      let error = new Error("You cannot enable MFA, before setup");
+      let error = new Error("You cannot enable Two Factor Authorization, before mobile verification");
       error.status = 400;
       next(error);
     }
@@ -485,8 +421,6 @@ module.exports = function(User) {
               console.log('> sending email to: ', user.email);
               if (err) console.log('> error while sending code to email', user.email);
             });
-            // Send sms
-            sendSMS(user, mobileVerificationCode);
           });
         }
       });
@@ -525,11 +459,11 @@ module.exports = function(User) {
             });
           });
         } else {
-          // User is verified, checking for mfa enabled or not
-          if ((!user.mfaEnabled || !user.mfaVerified) && user.mobileVerified) {
+          // User is verified, checking for twoFactor enabled or not
+          if (user.mobile && user._2faEnabled && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({length: 6});
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
-              sendSMS(user, mobileVerificationCode);
+              sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
             });
           }
           // Get company name
