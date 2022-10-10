@@ -224,7 +224,7 @@ module.exports = function(Karta) {
 
 /* =============================REMOTE HOOKS=========================================================== */
   Karta.observe("access", (ctx, next) => {
-      ctx.query.where = { or : [{ is_deleted : false }, { is_deleted : { $exists: false } }] };
+      ctx.query.where = { is_deleted : false };
       next();
   });
     // Karta.afterRemote('create', function(context, karta,  next) {
