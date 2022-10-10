@@ -142,7 +142,7 @@ module.exports = function(Karta) {
       if(kartaData){
         // Creating new Karta with old details
         let newObj = {
-          name: kartaData.name ? kartaData.name : null,
+          name: kartaData.name ? kartaData.name + ' - Copy' : null,
           userId: kartaData.userId ? kartaData.userId : null,
           sharedTo: kartaData.sharedTo ? kartaData.sharedTo : null,
           status: kartaData.status ? kartaData.status : null,
