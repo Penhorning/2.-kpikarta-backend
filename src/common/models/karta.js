@@ -223,10 +223,6 @@ module.exports = function(Karta) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
-  Karta.observe("access", (ctx, next) => {
-      ctx.query.where = { is_deleted : false };
-      next();
-  });
     // Karta.afterRemote('create', function(context, karta,  next) {
     //     // Find role
     //     Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
