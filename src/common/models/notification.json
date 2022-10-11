@@ -38,5 +38,33 @@
     }
   },
   "acls": [],
-  "methods": {}
+  "methods": {
+    "getNotifications": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "notifications",
+        "type": "notification"
+      },
+      "http": {
+        "path": "/get-notifications",
+        "verb": "post"
+      }
+    }
+  }
 }
