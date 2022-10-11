@@ -194,7 +194,7 @@ module.exports = function(Karta) {
       if (kartaData) {
         // Creating new Karta with old details
         let newObj = {
-          name: kartaData.name ? kartaData.name : null,
+          name: kartaData.name ? kartaData.name + ' - Copy' : null,
           userId: kartaData.userId ? kartaData.userId : null,
           status: kartaData.status ? kartaData.status : null,
           type: kartaData.type ? kartaData.type : null
