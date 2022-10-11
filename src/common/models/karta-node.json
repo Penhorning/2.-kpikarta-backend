@@ -147,28 +147,6 @@
     }
   ],
   "methods": {
-    "share": {
-      "accepts": [
-        {
-          "arg": "nodeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userIds",
-          "type": "array",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/share",
-        "verb": "post"
-      }
-    },
     "kpiCreators": {
       "accepts": [
         {

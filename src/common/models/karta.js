@@ -189,12 +189,12 @@ module.exports = function(Karta) {
   Karta.kartaCopy = async (kartaId, next) => {
     try {
       // Finding Karta details which will be copied
-      let kartaData = await Karta.findOne({ where: {_id: kartaId } });
+      let kartaData = await Karta.findOne({ where: { "_id": kartaId } });
 
       if(kartaData){
         // Creating new Karta with old details
         let newObj = {
-          name: kartaData.name ? kartaData.name + ' - Copy' : null,
+          name: kartaData.name ? kartaData.name + " - Copy" : null,
           userId: kartaData.userId ? kartaData.userId : null,
           sharedTo: kartaData.sharedTo ? kartaData.sharedTo : null,
           status: kartaData.status ? kartaData.status : null,
@@ -211,7 +211,7 @@ module.exports = function(Karta) {
         let newNodeId = null;
 
         // Finding parent node with kartaId
-        let NodeData = await Karta.app.models.karta_node.findOne({ where: {'kartaId': oldKartaId } });
+        let NodeData = await Karta.app.models.karta_node.findOne({ where: { "kartaId" : oldKartaId } });
         oldNodeId = NodeData.id;
 
         // Creating new Parent Node with old data

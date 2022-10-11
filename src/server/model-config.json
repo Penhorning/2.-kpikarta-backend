@@ -116,5 +116,9 @@
   "notification": {
     "dataSource": "db",
     "public": true
+  },
+  "karta-history": {
+    "dataSource": "db",
+    "public": true
   }
 }
