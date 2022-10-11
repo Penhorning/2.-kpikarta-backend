@@ -189,16 +189,15 @@ module.exports = function(Karta) {
   Karta.kartaCopy = async (kartaId, next) => {
     try {
       // Finding Karta details which will be copied
-      let kartaData = await Karta.findOne({ where: {_id: kartaId } });
+      let kartaData = await Karta.findOne({ where: { "_id": kartaId } });
 
-      if(kartaData){
+      if (kartaData) {
         // Creating new Karta with old details
         let newObj = {
           name: kartaData.name ? kartaData.name : null,
           userId: kartaData.userId ? kartaData.userId : null,
-          sharedTo: kartaData.sharedTo ? kartaData.sharedTo : null,
           status: kartaData.status ? kartaData.status : null,
-          type: kartaData.type ? kartaData.type : null,
+          type: kartaData.type ? kartaData.type : null
         }
 
         // New Carta details accessed in newKarta variable
@@ -257,7 +256,7 @@ module.exports = function(Karta) {
           }
           catch(er){
             console.log(er);
-            return next(er);
+            // return next(er);
           }
         }
 
@@ -265,12 +264,12 @@ module.exports = function(Karta) {
         createChildNodes(oldNodeId, newNodeId);
 
         // Returning the response below
-        return next(null, "A Copy of Karta has been created..");
+        // return next(null, "A Copy of Karta has been created..");
       }
     }
     catch(err){
       console.log(err);
-      return next(err);
+      // return next(err);
     }
   }
 
