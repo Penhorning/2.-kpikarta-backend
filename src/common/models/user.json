@@ -1,0 +1,438 @@
+{
+  "name": "user",
+  "base": "User",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "fullName": {
+      "type": "string",
+      "required": false
+    },
+    "password": {
+      "type": "string",
+      "required": false
+    },
+    "profilePic": {
+      "type": "string",
+      "required": false
+    },
+    "emailVerificationCode": {
+      "type": "string"
+    },
+    "mobile": {
+      "type": "object",
+      "required": false
+    },
+    "mobileVerificationCode": {
+      "type": "string"
+    },
+    "mobileVerified": {
+      "type": "boolean",
+      "default": false
+    },
+    "_2faEnabled": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentPlan": {
+      "type": "string",
+      "default": ""
+    },
+    "street": {
+      "type": "string"
+    },
+    "city": {
+      "type": "string"
+    },
+    "state": {
+      "type": "string"
+    },
+    "postal_code": {
+      "type": "string"
+    },
+    "country": {
+      "type": "string"
+    },
+    "active": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "validations": [],
+  "relations": {
+    "identities": {
+      "type": "hasMany",
+      "model": "userIdentity",
+      "foreignKey": "userId"
+    },
+    "company": {
+      "type": "hasOne",
+      "model": "company",
+      "foreignKey": "userId"
+    },
+    "credentials": {
+      "type": "hasMany",
+      "model": "userCredential",
+      "foreignKey": "userId"
+    },
+    "userdetails": {
+      "type": "hasOne",
+      "model": "userdetails",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "useraddress": {
+      "type": "hasOne",
+      "model": "useraddress",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "kartas": {
+      "type": "hasMany",
+      "model": "karta",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "suggestion": {
+      "type": "hasOne",
+      "model": "suggestion",
+      "foreignKey": ""
+    },
+    "roles": {
+      "type": "hasMany",
+      "model": "Role",
+      "foreignKey": "principalId",
+      "through": "RoleMapping"
+    }
+  },
+  "acls": [
+    {
+      "accessType": "*",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    },
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
+      "property": "adminLogin"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
+      "property": "userLogin"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
+      "property": "forgotPasswordAdmin"
+    },
+    {
+      "accessType": "EXECUTE",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW",
+      "property": "forgotPasswordUser"
+    }
+  ],
+  "methods": {
+    "sendEmailCode": {
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send-email-code"
+      }
+    },
+    "verifyEmail": {
+      "accepts": [
+        {
+          "arg": "code",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify-email"
+      }
+    },
+    "sendMobileCode": {
+      "accepts": [
+        {
+          "arg": "type",
+          "type": "string"
+        },
+        {
+          "arg": "mobile",
+          "type": "object"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send-mobile-code"
+      }
+    },
+    "verifyMobile": {
+      "accepts": [
+        {
+          "arg": "code",
+          "type": "string"
+        },
+        {
+          "arg": "mobile",
+          "type": "object"
+        }
+      ],
+      "returns": {
+        "arg": "verified",
+        "type": "boolean",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify-mobile"
+      }
+    },
+    "selectPlan": {
+      "accepts": [
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/assign-plan"
+      }
+    },
+    "check2FAConfig": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/check2FAConfig"
+      }
+    },
+    "toggle2FA": {
+      "accepts": [
+        {
+          "arg": "type",
+          "type": "boolean"
+        }
+      ],
+      "returns": {
+        "arg": "type",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/toggle2FA"
+      }
+    },
+    "userLogin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "password",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "accessToken",
+        "type": "AccessToken",
+        "root": true
+      },
+      "http": {
+        "path": "/login/user",
+        "verb": "post"
+      }
+    },
+    "adminLogin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "password",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "accessToken",
+        "type": "AccessToken",
+        "root": true
+      },
+      "http": {
+        "path": "/login/admin",
+        "verb": "post"
+      }
+    },
+    "forgotPasswordAdmin": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/reset/admin"
+      }
+    },
+    "forgotPasswordUser": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/forgot-password/user"
+      }
+    },
+    "getAll": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "search_query",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "start",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "end",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "users",
+        "type": "user"
+      },
+      "http": {
+        "path": "/get-all",
+        "verb": "post"
+      }
+    },
+    "getCount": {
+      "returns": {
+        "arg": "count",
+        "type": "number"
+      },
+      "http": {
+        "path": "/count",
+        "verb": "post"
+      }
+    },
+    "blockUser": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/block"
+      }
+    },
+    "unblockUser": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/unblock"
+      }
+    }
+  }
+}

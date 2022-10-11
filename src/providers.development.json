@@ -1,0 +1,42 @@
+{
+    "facebook-login": {
+      "provider": "facebook",
+      "module": "passport-facebook",
+      "profileFields": ["gender", "link", "locale", "name", "displayName", "timezone", "verified", "email", "updated_time"],
+      "clientID": "536668294658429",
+      "clientSecret": "333746ba5ee48ba68cc4698b4915dee3",
+      "callbackURL": "https://dev-api.kpikarta.com/auth/facebook/callback",
+      "authPath": "/auth/facebook",
+      "callbackPath": "/auth/facebook/callback",
+      "successRedirect": "/auth/account",
+      "failureRedirect": "https://dev-app.kpikarta.com/login",
+      "scope": ["email", "public_profile"]
+    },
+    "google-login": {
+      "provider": "google",
+      "module": "passport-google-oauth",
+      "strategy": "OAuth2Strategy",
+      "clientID": "417890911926-2giqdli6uotp0j4tr2vtdphe0kasdvq4.apps.googleusercontent.com",
+      "clientSecret": "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",
+      "callbackURL": "/auth/google/callback",
+      "authPath": "/auth/google",
+      "callbackPath": "/auth/google/callback",
+      "successRedirect": "/auth/account",
+      "failureRedirect": "https://dev-app.kpikarta.com/login",
+      "scope": ["email", "profile"],
+      "failureFlash": true
+    },
+    "linkedin-login": {
+      "provider": "linkedin",
+      "module": "passport-linkedin-oauth2",
+      "profileFields": ["gender", "link", "locale", "name", "timezone", "verified", "email", "updated_time"],
+      "clientID": "86fkcmj3vuk0e6",
+      "clientSecret": "OJrUO0S8yWccLeyR",
+      "callbackURL": "/auth/linkedin/callback",
+      "authPath": "/auth/linkedin",
+      "callbackPath": "/auth/linkedin/callback",
+      "successRedirect": "/auth/account",
+      "failureRedirect": "https://dev-app.kpikarta.com/login",
+      "scope": ["r_emailaddress", "r_liteprofile"]
+    }
+  }

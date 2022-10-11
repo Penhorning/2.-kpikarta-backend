@@ -6,7 +6,9 @@
     "compression": {},
     "helmet#xssFilter": {},
     "helmet#frameguard": {
-      "params": { "action": "deny" }
+      "params": {
+        "action": "deny"
+      }
     },
     "helmet#hsts": {
       "params": {
@@ -22,14 +24,20 @@
     },
     "cors": {
       "params": {
-        "origin": true,
+        "origin": "*",
         "credentials": true,
         "maxAge": 86400
       }
     }
   },
   "session": {},
-  "auth": {},
+  "auth": {
+    "loopback#token": {
+      "params": {
+        "currentUserLiteral": "me"
+      }
+    }
+  },
   "parse": {},
   "routes": {
     "loopback#rest": {
@@ -38,7 +46,16 @@
       ]
     }
   },
-  "files": {},
+  "files": {
+    "loopback#static": [
+      {
+        "params": "$!../client"
+      },
+      {
+        "params": "$!../storage"
+      }
+    ]
+  },
   "final": {
     "loopback#urlNotFound": {}
   },
