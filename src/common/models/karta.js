@@ -17,7 +17,7 @@ module.exports = function(Karta) {
         data.push({ email: emails[i] });
       }
 
-      Karta.update({ "_id": karta.id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+      Karta.update({ "_id": karta._id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
         if (err) console.log('> error while updating the karta sharedTo property ', err);
         else {
           next(null, "Karta shared successfully!");
@@ -31,7 +31,7 @@ module.exports = function(Karta) {
                 notificationData.push({
                   title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
                   type: "karta_shared",
-                  contentId: karta.id,
+                  contentId: karta._id,
                   userId: item.id
                 });
               });
@@ -41,7 +41,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               emails = emails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta.id}`;
+              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
               // Send email to users
               emails.forEach(email => {
                 ejs.renderFile(path.resolve('templates/share-karta.ejs'),
@@ -221,7 +221,7 @@ module.exports = function(Karta) {
           text_color: NodeData.text_color,
           weightage: NodeData.weightage,
           kartaId: newKartaId,
-          phaseId: NodeData.phaseId,
+          phaseId: NodeData.phaseId
         };
 
         let newParentNode = await Karta.app.models.karta_node.create(newNodeObj);
@@ -250,26 +250,19 @@ module.exports = function(Karta) {
                 }
               }
             }
-            else {
-              return;
-            }
+            else return;
           }
-          catch(er){
+          catch(er) {
             console.log(er);
-            // return next(er);
           }
         }
 
         // Calling the above recursion function with ParentNode Id for new and old
         createChildNodes(oldNodeId, newNodeId);
-
-        // Returning the response below
-        // return next(null, "A Copy of Karta has been created..");
       }
     }
-    catch(err){
+    catch(err) {
       console.log(err);
-      // return next(err);
     }
   }
 
