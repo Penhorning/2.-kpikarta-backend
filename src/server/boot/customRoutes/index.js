@@ -18,9 +18,9 @@ module.exports = function (app) {
                 if (err) return console.log('> error while fetching company details');
                 user.companyLogo = company.__data.logo ? company.__data.logo : "";
                 user.profilePic = req.user.profilePic ? req.user.profilePic : "";
-                user.twoFactorEnabled = req.user.twoFactorEnabled ? req.user.twoFactorEnabled : false;
+                user._2faEnabled = req.user._2faEnabled ? req.user._2faEnabled : false;
                 user.mobileVerified = req.user.mobileVerified ? req.user.mobileVerified : false;
-                if (req.user.twoFactorEnabled && req.user.mobileVerified) {
+                if (req.user._2faEnabled && req.user.mobileVerified) {
                     let mobileVerificationCode = keygen.number({length: 6});
                     req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
                       let twilio_data = {
@@ -40,7 +40,7 @@ module.exports = function (app) {
                       });
                     });
                 }
-                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&twoFactorEnabled=${user.twoFactorEnabled}&mobileVerified=${user.mobileVerified}`);
+                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&_2faEnabled=${user._2faEnabled}&mobileVerified=${user.mobileVerified}`);
             });
         } else {
             req.user.updateAttributes({emailVerified: true}, (err) => {
