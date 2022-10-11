@@ -267,21 +267,29 @@ module.exports = function(Karta) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
-    // Karta.afterRemote('create', function(context, karta,  next) {
-    //     // Find role
-    //     Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
-    //         if (err) {
-    //             console.log('> error while finding karta phase', err);
-    //             return next(err);
-    //         } else {
-    //             // Add default root node
-    //             Karta.app.models.karta_node.create({ "name": karta.name, "kartaId": karta.id, "phaseId": phase.id }, {}, err => {
-    //                 if (err) {
-    //                     console.log('> error while creating karta node', err);
-    //                     return next(err);
-    //                 } else next();
-    //             });
-    //         }
-    //     });
-    // });
+    Karta.afterRemote('create', function(context, karta,  next) {
+        // Create Version
+
+        Karta.app.models.karta_version.create({ "name" : "1.0.0" }, {} , (err, result) => {
+          if (err) {
+              console.log('> error while creating karta version', err);
+              return next(err);
+          } else next();
+        });
+
+        // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
+        //     if (err) {
+        //         console.log('> error while finding karta phase', err);
+        //         return next(err);
+        //     } else {
+        //         // Add default root node
+        //         Karta.app.models.karta_node.create({ "name": karta.name, "kartaId": karta.id, "phaseId": phase.id }, {}, err => {
+        //             if (err) {
+        //                 console.log('> error while creating karta node', err);
+        //                 return next(err);
+        //             } else next();
+        //         });
+        //     }
+        // });
+    });
 };

@@ -27,9 +27,6 @@
     "due_date": {
       "type": "date"
     },
-    "version": {
-      "type": "number"
-    },
     "notification_type": {
       "type": "string"
     },
@@ -101,6 +98,14 @@
       "type": "belongsTo",
       "model": "karta",
       "foreignKey": "kartaId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
       "options": {
         "nestRemoting": true
       }

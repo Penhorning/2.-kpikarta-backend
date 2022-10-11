@@ -1,11 +1,11 @@
 {
-  "name": "karta-history",
+  "name": "karta_history",
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
     "validateUpsert": true,
     "mongodb": {
-      "collection": "karta-history",
+      "collection": "karta_history",
       "allowExtendedOperators": true
     }
   },
@@ -33,7 +33,11 @@
       "type": "string",
       "required": true
     },
-    "version": {
+    "user_id": {
+      "type": "string",
+      "required": true
+    },
+    "version_id": {
       "type": "string",
       "required": true
     }
