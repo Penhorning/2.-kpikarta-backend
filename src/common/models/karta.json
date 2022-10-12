@@ -101,6 +101,11 @@
           "required": true
         },
         {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
           "arg": "page",
           "type": "number",
           "required": false
@@ -126,6 +131,11 @@
           "arg": "email",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
         },
         {
           "arg": "page",
