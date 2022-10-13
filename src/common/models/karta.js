@@ -71,11 +71,26 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getKartas = (userId, page, limit, next) => {
+  Karta.getKartas = (userId, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
+    let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+
     userId = Karta.getDataSource().ObjectID(userId);
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
 
     Karta.getDataSource().connector.connect(function (err, db) {
       const KartaCollection = db.collection('karta');
@@ -86,6 +101,7 @@ module.exports = function(Karta) {
         {
           $sort: { "createdAt" : -1 }
         },
+        SEARCH_MATCH,
         {
           $lookup: {
             from: "user",
@@ -122,9 +138,24 @@ module.exports = function(Karta) {
   }
 
   // Get shared kartas
-  Karta.sharedKartas = (email, page, limit, next) => {
+  Karta.sharedKartas = (email, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
+
+    let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
 
     Karta.getDataSource().connector.connect(function (err, db) {
       const KartaCollection = db.collection('karta');
@@ -135,6 +166,7 @@ module.exports = function(Karta) {
         {
           $sort: { "createdAt" : -1 }
         },
+        SEARCH_MATCH,
         {
           $lookup: {
             from: "user",
