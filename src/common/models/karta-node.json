@@ -27,9 +27,6 @@
     "due_date": {
       "type": "date"
     },
-    "version": {
-      "type": "number"
-    },
     "notification_type": {
       "type": "string"
     },
@@ -42,8 +39,17 @@
     "text_color": {
       "type": "string"
     },
-    "type": {
-      "type": "string"
+    "node_type": {
+      "type": {
+        "metrics": "boolean",
+        "fields": [
+          {
+            "fieldName": "string",
+            "fieldValue": "number"
+          }
+        ],
+        "formula": "string"
+      }
     },
     "start_date": {
       "type": "string"
@@ -105,6 +111,14 @@
         "nestRemoting": true
       }
     },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
     "karta_phase": {
       "type": "hasOne",
       "model": "karta_phase",
@@ -147,28 +161,6 @@
     }
   ],
   "methods": {
-    "share": {
-      "accepts": [
-        {
-          "arg": "nodeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userIds",
-          "type": "array",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/share",
-        "verb": "post"
-      }
-    },
     "kpiCreators": {
       "accepts": [
         {
