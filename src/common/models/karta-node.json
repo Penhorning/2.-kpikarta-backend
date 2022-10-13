@@ -39,8 +39,17 @@
     "text_color": {
       "type": "string"
     },
-    "type": {
-      "type": "string"
+    "node_type": {
+      "type": {
+        "metrics": "boolean",
+        "fields": [
+          {
+            "fieldName": "string",
+            "fieldValue": "number"
+          }
+        ],
+        "formula": "string"
+      }
     },
     "start_date": {
       "type": "string"
