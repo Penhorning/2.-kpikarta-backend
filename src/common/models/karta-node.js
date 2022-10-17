@@ -89,27 +89,39 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
-    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    userId = Kartanode.getDataSource().ObjectID(userId);
+    let completedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
-    Kartanode.count({completedQuery}, (err, result) => {
+    Kartanode.count(completedQuery, (err, result) => {
+      if (err) {
+        console.log('> error while fetching Completed nodes', err);
+        let error = err;
+        error.status = 500;
+        return next(error);
+      }
       Kartanode.count(inCompletedQuery, (err2, result2) => {
-        Kartanode.count({ "contributorId": Kartanode.getDataSource().ObjectID(userId) }, (err2, result3) => {
+        if (err2) {
+          console.log('> error while fetching Incompleted nodes', err);
+          let error = err2;
+          error.status = 500;
+          return next(error);
+        }
+        Kartanode.count({ "contributorId": userId }, (err3, result3) => {
+          if (err3) {
+            console.log('> error while fetching Inprogress nodes', err);
+            let error = err3;
+            error.status = 500;
+            return next(error);
+          }
           let data = {
             "All": result3 || 0,
             "InProgress": result2 || 0,
             "Completed": result || 0
           }
-          next(err2, data);
+          next(null, data);
         });
       });
-    });
-  }
-
-  // Get all nodes by kartaId
-  Kartanode.getAllNodes = (kartaId, next) => {
-    Kartanode.find({ where: { kartaId, "kartaDetailId": kartaId } }, (err, result) => {
-      next(err, result);
     });
   }
 
@@ -202,13 +214,10 @@ module.exports = function (Kartanode) {
       const kartaNodeCollection = db.collection('karta_node');
       kartaNodeCollection.aggregate([
         {
-          "is_deleted": false
-        },
-        {
           $match: query
         },
         {
-          $match: { "target.0.value": { $gt: 0 } }
+          $match: { "target.0.value": { $gt: 0 }, "is_deleted": false }
         },
         {
           $match: status_query

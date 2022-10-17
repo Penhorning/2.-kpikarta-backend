@@ -195,23 +195,6 @@
         "verb": "post"
       }
     },
-    "getAllNodes": {
-      "accepts": [
-        {
-          "arg": "kartaId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "nodes",
-        "type": "karta_node"
-      },
-      "http": {
-        "path": "/getAllNodes",
-        "verb": "post"
-      }
-    },
     "kpiNodes": {
       "accepts": [
         {
