@@ -89,8 +89,8 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
-    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
+    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count({completedQuery}, (err, result) => {
       Kartanode.count(inCompletedQuery, (err2, result2) => {
@@ -138,9 +138,9 @@ module.exports = function (Kartanode) {
     let status_query = {};
     if (statusType) {
       if (statusType === "completed") {
-        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false } ] }
+        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       } else if (statusType === "in_progress") {
-        status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false } ] }
+        status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       }
     }
     // Filter nodes by last updated date ranges
@@ -201,6 +201,9 @@ module.exports = function (Kartanode) {
     Kartanode.getDataSource().connector.connect(function (err, db) {
       const kartaNodeCollection = db.collection('karta_node');
       kartaNodeCollection.aggregate([
+        {
+          "is_deleted": false
+        },
         {
           $match: query
         },
