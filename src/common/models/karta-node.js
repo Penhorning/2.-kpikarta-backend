@@ -106,8 +106,15 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Get all nodes by kartaId
+  Kartanode.getAllNodes = (kartaId, next) => {
+    Kartanode.find({ where: { kartaId, "kartaDetailId": kartaId } }, (err, result) => {
+      next(err, result);
+    });
+  }
+
   // Get kpi nodes by contributorId
-  Kartanode.kpiNodes = (page, limit, searchQuery, userId, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
+  Kartanode.kpiNodes = (page, limit, searchQuery, userId, statusType, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -127,6 +134,15 @@ module.exports = function (Kartanode) {
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
     else query = { "contributorId": Kartanode.getDataSource().ObjectID(userId) };
 
+    // Filter nodes by completed, in-progress and all
+    let status_query = {};
+    if (statusType) {
+      if (statusType === "completed") {
+        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false } ] }
+      } else if (statusType === "in_progress") {
+        status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false } ] }
+      }
+    }
     // Filter nodes by last updated date ranges
     if (startUpdatedDate && endUpdatedDate) {
       query.updatedAt = {
@@ -187,6 +203,12 @@ module.exports = function (Kartanode) {
       kartaNodeCollection.aggregate([
         {
           $match: query
+        },
+        {
+          $match: { "target.0.value": { $gt: 0 } }
+        },
+        {
+          $match: status_query
         },
         {
           $match: percentage_query
