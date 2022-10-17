@@ -226,7 +226,7 @@ module.exports = function(Karta) {
       if (kartaData) {
         // Creating new Karta with old details
         let newObj = {
-          name: kartaData.name ? kartaData.name + ' - Copy' : null,
+          name: kartaData.name ? kartaData.name + " - Copy" : null,
           userId: kartaData.userId ? kartaData.userId : null,
           status: kartaData.status ? kartaData.status : null,
           type: kartaData.type ? kartaData.type : null
@@ -242,7 +242,7 @@ module.exports = function(Karta) {
         let newNodeId = null;
 
         // Finding parent node with kartaId
-        let NodeData = await Karta.app.models.karta_node.findOne({ where: {'kartaId': oldKartaId } });
+        let NodeData = await Karta.app.models.karta_node.findOne({ where: { "kartaId" : oldKartaId } });
         oldNodeId = NodeData.id;
 
         // Creating new Parent Node with old data
@@ -299,21 +299,29 @@ module.exports = function(Karta) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
-    // Karta.afterRemote('create', function(context, karta,  next) {
-    //     // Find role
-    //     Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
-    //         if (err) {
-    //             console.log('> error while finding karta phase', err);
-    //             return next(err);
-    //         } else {
-    //             // Add default root node
-    //             Karta.app.models.karta_node.create({ "name": karta.name, "kartaId": karta.id, "phaseId": phase.id }, {}, err => {
-    //                 if (err) {
-    //                     console.log('> error while creating karta node', err);
-    //                     return next(err);
-    //                 } else next();
-    //             });
-    //         }
-    //     });
-    // });
+    Karta.afterRemote('create', function(context, karta,  next) {
+        // Create Version
+
+        Karta.app.models.karta_version.create({ "name" : "1.0.0" }, {} , (err, result) => {
+          if (err) {
+              console.log('> error while creating karta version', err);
+              return next(err);
+          } else next();
+        });
+
+        // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
+        //     if (err) {
+        //         console.log('> error while finding karta phase', err);
+        //         return next(err);
+        //     } else {
+        //         // Add default root node
+        //         Karta.app.models.karta_node.create({ "name": karta.name, "kartaId": karta.id, "phaseId": phase.id }, {}, err => {
+        //             if (err) {
+        //                 console.log('> error while creating karta node', err);
+        //                 return next(err);
+        //             } else next();
+        //         });
+        //     }
+        // });
+    });
 };

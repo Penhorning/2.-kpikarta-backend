@@ -116,5 +116,13 @@
   "notification": {
     "dataSource": "db",
     "public": true
+  },
+  "karta_history": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_version": {
+    "dataSource": "db",
+    "public": true
   }
 }
