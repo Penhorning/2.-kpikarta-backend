@@ -8,66 +8,98 @@ module.exports = function(Karta) {
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
 
-    if (emails.length > 0) {
-      // Remove duplicate emails
-      emails = [...new Set(emails)];
-      // Prepare data for updating in the sharedTo field
-      let data = [];
-      for (let i = 0; i < emails.length; i++) {
-        data.push({ email: emails[i] });
-      }
+    // Fetch data for karta which will be updated
+    Karta.findOne({ where: { "_id": karta._id } }, (err, res) => {
+      if (err) console.log('> error while finding karta..!!', err);
+      else {
+        // Check if any email has already been shared to the karta or not
+        let kartaData = res;
+        let duplicateFlag = false;
+        let alreadySharedList = kartaData.sharedTo.map(x => x.email);
+        emails = emails.filter(email => {
+          if(alreadySharedList.includes(email)){
+            duplicateFlag = true;
+            return null;
+          }
+          else return email;
+        });
 
-      Karta.update({ "_id": karta._id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
-        if (err) console.log('> error while updating the karta sharedTo property ', err);
-        else {
-          next(null, "Karta shared successfully!");
-          // Find existing users in the system
-          Karta.app.models.user.find({ where: { "email": { inq: emails } } }, (err, users) => {
-            if (err) console.log('> error while finding users with emails', err);
+        if (emails.length > 0) {
+          // Remove duplicate emails
+          emails = [...new Set(emails)];
+          // Prepare data for updating in the sharedTo field
+          let data = [];
+          for (let i = 0; i < emails.length; i++) {
+            data.push({ email: emails[i] });
+          }
+    
+          Karta.update({ "_id": karta._id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+            if (err) console.log('> error while updating the karta sharedTo property ', err);
             else {
-              // Prepare notification collection data
-              let notificationData = [];
-              users.forEach(item => {
-                notificationData.push({
-                  title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
-                  type: "karta_shared",
-                  contentId: karta._id,
-                  userId: item.id
-                });
-              });
-              // Insert data in notification collection
-              Karta.app.models.notification.create(notificationData, (err, result) => {
-                if (err) console.log('> error while inserting data in notification collection', err);
-              });
-              // Separate emails that are not existing in the system
-              emails = emails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
-              // Send email to users
-              emails.forEach(email => {
-                ejs.renderFile(path.resolve('templates/share-karta.ejs'),
-                { user: Karta.app.currentUser, kartaLink }, {}, function(err, html) {
-                  Karta.app.models.Email.send({
-                    to: email,
-                    from: Karta.app.dataSources.email.settings.transports[0].auth.user,
-                    subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
-                    html
-                  }, function(err) {
-                    console.log('> sending karta sharing email to:', email);
-                    if (err) {
-                      console.log('> error while sending karta sharing email', err);
-                    }
+              if(duplicateFlag){
+                let error = new Error("Karta shared successfully after removing duplicates!");
+                error.status = 400;
+                next(error);
+              }
+              else {
+                next(null, "Karta shared successfully!");
+              }
+              // Find existing users in the system
+              Karta.app.models.user.find({ where: { "email": { inq: emails } } }, (err, users) => {
+                if (err) console.log('> error while finding users with emails', err);
+                else {
+                  // Prepare notification collection data
+                  let notificationData = [];
+                  users.forEach(item => {
+                    notificationData.push({
+                      title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
+                      type: "karta_shared",
+                      contentId: karta._id,
+                      userId: item.id
+                    });
                   });
-                });
+                  // Insert data in notification collection
+                  Karta.app.models.notification.create(notificationData, (err, result) => {
+                    if (err) console.log('> error while inserting data in notification collection', err);
+                  });
+                  // Separate emails that are not existing in the system
+                  emails = emails.filter(email => !(users.some(item => item.email === email)));
+                  let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
+                  // Send email to users
+                  emails.forEach(email => {
+                    ejs.renderFile(path.resolve('templates/share-karta.ejs'),
+                    { user: Karta.app.currentUser, kartaLink }, {}, function(err, html) {
+                      Karta.app.models.Email.send({
+                        to: email,
+                        from: Karta.app.dataSources.email.settings.transports[0].auth.user,
+                        subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
+                        html
+                      }, function(err) {
+                        console.log('> sending karta sharing email to:', email);
+                        if (err) {
+                          console.log('> error while sending karta sharing email', err);
+                        }
+                      });
+                    });
+                  });
+                }
               });
             }
           });
+        } else {
+          if(duplicateFlag){
+            let error = new Error("Can't share a karta twice to the same user..!!");
+            error.status = 400;
+            next(error);
+          }
+          else {
+            let error = new Error("Please send an email array");
+            error.status = 400;
+            next(error);
+          }
         }
-      });
-    } else {
-      let error = new Error("Please send an email array");
-      error.status = 400;
-      next(error);
-    }
+      }
+    });
   }
 
   // Get all kartas
