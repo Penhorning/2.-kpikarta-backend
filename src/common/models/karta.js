@@ -37,9 +37,10 @@ module.exports = function(Karta) {
             if (err) console.log('> error while updating the karta sharedTo property ', err);
             else {
               if(duplicateFlag){
-                let error = new Error("Karta shared successfully after removing duplicates!");
-                error.status = 400;
-                next(error);
+                // let error = new Error("Karta shared successfully after removing duplicates!");
+                // error.status = 400;
+                // next(error);
+                next(null, "Karta shared successfully after removing duplicates!");
               }
               else {
                 next(null, "Karta shared successfully!");
