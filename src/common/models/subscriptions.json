@@ -1,0 +1,72 @@
+{
+  "name": "subscriptions",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "subscriptions",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "amount": {
+      "type": "number",
+      "required": true
+    },
+    "currency": {
+      "type": "string",
+      "required": true
+    },
+    "interval": {
+      "type": "string",
+      "required": true
+    },
+    "interval_count": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "validations": [],
+  "relations": {},
+  "acls": [],
+  "methods": {
+    "createPlan": {
+      "accepts": [
+        {
+          "arg": "plan_name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-plan",
+        "verb": "post"
+      }
+    }
+  }
+}
