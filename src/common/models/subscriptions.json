@@ -80,7 +80,7 @@
         },
         {
           "arg": "duration",
-          "type": "string",
+          "type": "number",
           "required": true
         },
         {

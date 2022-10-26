@@ -12,7 +12,7 @@ module.exports = function (Subscriptions) {
       const plan = await create_plan({
         amount,
         currency: "usd",
-        interval: duration, // day, week, month, year
+        duration,
         productId: product.id,
         planName: planName,
       });
