@@ -48,6 +48,10 @@
       "type": "string",
       "required": true
     },
+    "user_id": {
+      "type": "string",
+      "required": true
+    },
     "status": {
       "type": "boolean",
       "default": true
@@ -60,7 +64,7 @@
     "createPlan": {
       "accepts": [
         {
-          "arg": "plan_name",
+          "arg": "planName",
           "type": "string",
           "required": true
         },
@@ -78,6 +82,11 @@
           "arg": "duration",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {
@@ -87,6 +96,48 @@
       "http": {
         "path": "/create-plan",
         "verb": "post"
+      }
+    },
+    "updatePlan": {
+      "accepts": [
+        {
+          "arg": "planId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "planName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "duration",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/update-plan",
+        "verb": "put"
       }
     },
     "makeSubcription": {
