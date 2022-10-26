@@ -25,15 +25,26 @@
       "type": "number",
       "required": true
     },
+    "description": {
+      "type": "string"
+    },
     "currency": {
       "type": "string",
       "required": true
     },
-    "interval": {
+    "duration": {
       "type": "string",
       "required": true
     },
     "interval_count": {
+      "type": "string",
+      "required": true
+    },
+    "plan_id": {
+      "type": "string",
+      "required": true
+    },
+    "product_id": {
       "type": "string",
       "required": true
     },
@@ -57,6 +68,16 @@
           "arg": "amount",
           "type": "number",
           "required": true
+        },
+        {
+          "arg": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "duration",
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {
@@ -65,6 +86,18 @@
       },
       "http": {
         "path": "/create-plan",
+        "verb": "post"
+      }
+    },
+    "makeSubcription": {
+      "accepts": [
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/make-subcription",
         "verb": "post"
       }
     }
