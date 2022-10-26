@@ -23,7 +23,18 @@ exports.get_product_by_id = async (params) => {
     }
 }
 
-// CREATE A PRODUCT PLAN (PRODUCT PRICING)
+// UPDATE PRODUCT PLAN
+exports.update_product = async (params) => {
+    try {
+        const response = await stripe.products.update(params.productId, { name: params.name, description: params.description });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// CREATE A PLAN PLAN (PRODUCT PRICING)
 exports.create_plan = async (params) => {
     try {
         const response = await stripe.plans.create({
@@ -47,6 +58,24 @@ exports.get_plan_by_id = async (params) => {
     try {
         // PLANID is referred to PRICEID
         const response = await stripe.plans.retrieve( params.planId ); 
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// UPDATE A PRODUCT PLAN (PRODUCT PRICING)
+exports.update_plan = async (params) => {
+    try {
+        const response = await stripe.plans.update(
+            params.planId, {
+                amount: params.amount * 100,
+                interval: params.interval, // MONTH
+                metadata: {
+                    name: params.planName,
+                }
+            });
         return response;
     } catch (err) {
         console.log(err);
