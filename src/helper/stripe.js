@@ -40,7 +40,8 @@ exports.create_plan = async (params) => {
         const response = await stripe.plans.create({
             amount: params.amount * 100,
             currency: params.currency,
-            interval: params.interval, // MONTH
+            interval: "day", // MONTH
+            interval_count: params.duration, // MONTH
             product: params.productId,
             metadata: {
                 name: params.planName,
