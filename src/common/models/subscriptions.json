@@ -111,17 +111,7 @@
           "required": true
         },
         {
-          "arg": "amount",
-          "type": "number",
-          "required": true
-        },
-        {
           "arg": "description",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "duration",
           "type": "string",
           "required": true
         },
@@ -133,10 +123,32 @@
       ],
       "returns": {
         "arg": "data",
-        "type": "object"
+        "type": "string"
       },
       "http": {
         "path": "/update-plan",
+        "verb": "put"
+      }
+    },
+    "changePlanStatus": {
+      "accepts": [
+        {
+          "arg": "planId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "status",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/change-plan-status",
         "verb": "put"
       }
     },
