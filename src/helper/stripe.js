@@ -70,11 +70,23 @@ exports.update_plan = async (params) => {
     try {
         const response = await stripe.plans.update(
             params.planId, {
-                amount: params.amount * 100,
-                interval: params.interval, // MONTH
                 metadata: {
                     name: params.planName,
                 }
+            });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// UPDATE PLAN STATUS (PRODUCT PRICING)
+exports.update_plan_status = async (params) => {
+    try {
+        const response = await stripe.plans.update(
+            params.planId, {
+                active: params.status
             });
         return response;
     } catch (err) {
