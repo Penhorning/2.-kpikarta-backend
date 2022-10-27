@@ -37,8 +37,14 @@ module.exports = function(app) {
 
   setupRole({name: 'admin'}, [], function(err) {
     setupRole({name: 'user'}, [], function(err) {
-      if (err) return console.log('[DB] SEED user -> FAILED');
-      console.log('[DB] SEED SETUP -> READY');
+      setupRole({name: 'company_admin'}, [], function(err) {
+        setupRole({name: 'department_admin'}, [], function(err) {
+          setupRole({name: 'billing_staff'}, [], function(err) {
+            if (err) return console.log('[DB] SEED user -> FAILED');
+            console.log('[DB] SEED SETUP -> READY');
+          });
+        });
+      });
     });
   });
 };

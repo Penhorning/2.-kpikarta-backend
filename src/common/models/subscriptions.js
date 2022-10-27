@@ -37,29 +37,6 @@ module.exports = function (Subscriptions) {
     }
   };
 
-  Subscriptions.updatePlan = async (planId, planName, description, userId, next) => {
-    // NOTE:- Cant Change a Plan except its Name and Description
-
-    // Get Plan Details
-    const getPlanDetails = await get_plan_by_id({ planId });
-
-    // Update Product
-    const prodDetails = await update_product({ productId: getPlanDetails.product, planName, description });
-
-    // Update Plan
-    const updatedPlan = await update_plan({ planId, planName: planName });
-
-    // Update Plan in database
-    const updatedPlanDetails = await Subscriptions.update({ plan_id: planId, user_id: userId } , {
-      name: updatedPlan.metadata.name,
-      description: prodDetails.description,
-    });
-
-    if(updatedPlanDetails){
-      return "Plan updated successfully..!!";
-    }
-  }
-
   Subscriptions.changePlanStatus = async (planId, status, next) => {
     // Update Plan By ID
     const updatedPlan = await update_plan_status({ planId, status });
@@ -92,4 +69,29 @@ module.exports = function (Subscriptions) {
     console.log(subscription, 'subscription');
     return subscription;
   }
+
+  Subscriptions.beforeRemote('prototype.patchAttributes', async function(context, instance,  next) {
+    // NOTE:- Cant Change a Plan except its Name and Description
+    const req = context.req;
+
+    // Get Plan Details
+    const getPlanDetails = await get_plan_by_id({ planId: req.body.planId });
+
+    // Update Product
+    const prodDetails = await update_product({ productId: getPlanDetails.product, planName: req.body.planName, description: req.body.description });
+
+    // Update Plan
+    const updatedPlan = await update_plan({ planId: req.body.planId, planName: req.body.planName });
+
+    // Update Plan in database
+    const updatedPlanDetails = await Subscriptions.update({ plan_id: req.body.planId, user_id: req.body.userId } , {
+      name: updatedPlan.metadata.name,
+      description: prodDetails.description,
+    });
+
+    if(updatedPlanDetails){
+      return "Plan updated successfully..!!";
+    }
+
+  });
 };
