@@ -28,22 +28,35 @@
     "event_value": {
       "type": "string",
       "required": true
-    },
-    "content_id": {
-      "type": "string",
-      "required": true
-    },
-    "user_id": {
-      "type": "string",
-      "required": true
-    },
-    "version_id": {
-      "type": "string",
-      "required": true
     }
   },
   "validations": [],
-  "relations": {},
+  "relations": {
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_node": {
+      "type": "belongsTo",
+      "model": "karta_node",
+      "foreignKey": "kartaNodeId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
   "acls": [],
   "methods": {}
 }
