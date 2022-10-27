@@ -62,6 +62,12 @@
     "country": {
       "type": "string"
     },
+    "roleId": {
+      "type": "string"
+    },
+    "licenseId": {
+      "type": "string"
+    },
     "active": {
       "type": "boolean",
       "default": true
@@ -78,6 +84,19 @@
       "type": "hasOne",
       "model": "company",
       "foreignKey": "userId"
+    },
+    "license": {
+      "type": "hasOne",
+      "model": "subscriptions",
+      "foreignKey": "userId"
+    },
+    "department": {
+      "type": "hasOne",
+      "model": "department",
+      "foreignKey": "",
+      "options": {
+        "nestRemoting": true
+      }
     },
     "credentials": {
       "type": "hasMany",
@@ -432,6 +451,17 @@
       "http": {
         "verb": "put",
         "path": "/unblock"
+      }
+    },
+    "getRoles": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "verb": "get",
+        "path": "/get-roles"
       }
     }
   }
