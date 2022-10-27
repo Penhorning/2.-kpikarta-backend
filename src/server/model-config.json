@@ -124,5 +124,9 @@
   "karta_version": {
     "dataSource": "db",
     "public": true
+  },
+  "subscriptions": {
+    "dataSource": "db",
+    "public": true
   }
 }

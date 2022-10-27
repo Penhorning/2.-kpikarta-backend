@@ -1,0 +1,136 @@
+{
+  "name": "subscriptions",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "subscriptions",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "required": true
+    },
+    "amount": {
+      "type": "number",
+      "required": true
+    },
+    "description": {
+      "type": "string"
+    },
+    "currency": {
+      "type": "string",
+      "required": true
+    },
+    "duration": {
+      "type": "string",
+      "required": true
+    },
+    "interval_count": {
+      "type": "string",
+      "required": true
+    },
+    "plan_id": {
+      "type": "string",
+      "required": true
+    },
+    "product_id": {
+      "type": "string",
+      "required": true
+    },
+    "user_id": {
+      "type": "string",
+      "required": true
+    },
+    "status": {
+      "type": "boolean",
+      "default": true
+    }
+  },
+  "validations": [],
+  "relations": {},
+  "acls": [],
+  "methods": {
+    "createPlan": {
+      "accepts": [
+        {
+          "arg": "planName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "description",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "duration",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-plan",
+        "verb": "post"
+      }
+    },
+    "changePlanStatus": {
+      "accepts": [
+        {
+          "arg": "planId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "status",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/change-plan-status",
+        "verb": "put"
+      }
+    },
+    "makeSubcription": {
+      "accepts": [
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/make-subcription",
+        "verb": "post"
+      }
+    }
+  }
+}
