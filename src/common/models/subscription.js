@@ -2,8 +2,8 @@
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 const { create_product, create_plan, get_plan_by_id, update_product, update_plan, update_plan_status } = require("../../helper/stripe");
 
-module.exports = function (Subscriptions) {
-  Subscriptions.createPlan = async (planName, amount, description, duration, userId, next) => {
+module.exports = function (Subscription) {
+  Subscription.createPlan = async (planName, amount, description, duration, userId, next) => {
     try {
       // Creating a Product on Plan Creation
       const product = await create_product({name: planName, description});
@@ -18,7 +18,7 @@ module.exports = function (Subscriptions) {
       });
 
       // // Saving a Subscription Plan in database
-      const planData = await Subscriptions.create({
+      const planData = await Subscription.create({
         name: plan.metadata.name,
         amount: amount,
         description: product.description,
@@ -37,19 +37,19 @@ module.exports = function (Subscriptions) {
     }
   };
 
-  Subscriptions.changePlanStatus = async (planId, status, next) => {
+  Subscription.changePlanStatus = async (planId, status, next) => {
     // Update Plan By ID
     const updatedPlan = await update_plan_status({ planId, status });
 
     // Update Plan Status in Databae
-    const updatedPlanInDb = await Subscriptions.update({ plan_id: planId }, { status });
+    const updatedPlanInDb = await Subscription.update({ plan_id: planId }, { status });
 
     if(updatedPlanInDb){
       return "Status changed successfully..!!";
     }
   }
 
-  Subscriptions.saveCards = async (customerId) => {
+  Subscription.saveCards = async (customerId) => {
     //Create a Card
     const card = await stripe.customers.createSource(
       'cus_4QFHdAzXHKCFfn',
@@ -57,9 +57,9 @@ module.exports = function (Subscriptions) {
     );
   }
 
-  Subscriptions.makeSubcription = async (customerId) => {
+  Subscription.makeSubcription = async (customerId) => {
     // Create a Subscription
-    const subscription = await stripe.subscriptions.create({
+    const subscription = await stripe.Subscription.create({
       customer: 'cus_MdrG2B6720sNNl',
       items: [
         {price: 'price_1LvEOZSGltNYnTVR4WeitFWe'},
@@ -70,7 +70,7 @@ module.exports = function (Subscriptions) {
     return subscription;
   }
 
-  Subscriptions.beforeRemote('prototype.patchAttributes', async function(context, instance,  next) {
+  Subscription.beforeRemote('prototype.patchAttributes', async function(context, instance,  next) {
     // NOTE:- Cant Change a Plan except its Name and Description
     const req = context.req;
 
@@ -84,7 +84,7 @@ module.exports = function (Subscriptions) {
     const updatedPlan = await update_plan({ planId: req.body.planId, planName: req.body.planName });
 
     // Update Plan in database
-    const updatedPlanDetails = await Subscriptions.update({ plan_id: req.body.planId, user_id: req.body.userId } , {
+    const updatedPlanDetails = await Subscription.update({ plan_id: req.body.planId, user_id: req.body.userId } , {
       name: updatedPlan.metadata.name,
       description: prodDetails.description,
     });

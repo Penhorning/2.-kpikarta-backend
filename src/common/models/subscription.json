@@ -1,11 +1,11 @@
 {
-  "name": "subscriptions",
+  "name": "subscription",
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
     "validateUpsert": true,
     "mongodb": {
-      "collection": "subscriptions",
+      "collection": "subscription",
       "allowExtendedOperators": true
     }
   },
