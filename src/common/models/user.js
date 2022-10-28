@@ -146,6 +146,9 @@ module.exports = function(User) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
       if (err) return next(err);
       if (user) {
+        // If User Role is equal to Role then reset password || if role Not Admin equals to any User Role except admin then also reset password otherwise Not Allowed 
+        console.log(user.roles(), 'roles1');
+        console.log(user.roles, 'roles2');
         let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
         if (isValidRole) {
           User.resetPassword({email}, next);
@@ -166,7 +169,7 @@ module.exports = function(User) {
   };
 
   User.forgotPasswordUser = (email, next) => {
-    forgotWithRole(email, next, 'user');
+    forgotWithRole(email, next, 'not_admin');
   };
 
   function loginWithRole(email, password, next, role) {
@@ -321,6 +324,19 @@ module.exports = function(User) {
     });
   };
 
+  // Get Roles
+  User.getRoles = function(next) {
+    User.app.models.Role.find({}, (err, roles) => {
+      if (err) {
+        console.log('> error while getting roles', err);
+        return next(err);
+      }
+
+      let allRoles = roles.filter(x => x.name !== 'admin');
+      return next(null, allRoles);
+    });
+  }
+
 /* =============================REMOTE HOOKS=========================================================== */
   User.on('resetPasswordRequest', function(info) {
     var resetLink = `${process.env.WEB_URL}/reset-password?access_token=${info.accessToken.id}`;
@@ -339,8 +355,9 @@ module.exports = function(User) {
   });
 
   User.afterRemote('create', (context, user, next) => {
+    const req = context.req;
     // Find role
-    User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+    User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
       if (err) {
         console.log('> error while finding role', err);
         return next(err);
@@ -348,12 +365,34 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Set company name
-        User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
-          if (err) {
-            console.log('> error while creating company', err);
-            return next(err);
-          }
-        });
+        if(req.body.type == 'invite'){
+          User.findById(req.body.creatorId, (err, creatorData) => {
+            if (err) {
+              console.log('> error while getting creator data', err);
+              return next(err);
+            }
+            User.update({ "_id": user.id},  { companyId: creatorData.companyId, companyName: creatorData.companyName }, (err, result) => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } 
+            });
+          })
+        }
+        else {
+          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, comp) => {
+            if (err) {
+              console.log('> error while creating company', err);
+              return next(err);
+            }
+            User.update({ "_id": user.id},  { companyId: comp.id}, (err, result) => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } 
+            });
+          });
+        }
         // Create token
         user.accessTokens.create((err, token) => {
           // user.__data.token = token;
@@ -372,9 +411,8 @@ module.exports = function(User) {
           next();
         });
 
-        const req = context.req;
-        if (req.body.type == "admin") {
-          // Send email and password to new users
+        // Send email and password to new users
+        if (req.body.type == "admin" || req.body.type == "invite") {
           let password = generator.generate({
             length: 8,
             numbers: true,
@@ -485,7 +523,7 @@ module.exports = function(User) {
     const req = context.req;
 
     if (req.body.type == "social_user") {
-      User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+      User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
         RoleManager.assignRoles(User.app, [role.id], user.id, () => {
           // Set company name
           User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, err => {
