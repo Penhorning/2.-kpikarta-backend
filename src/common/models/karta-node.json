@@ -27,12 +27,6 @@
     "due_date": {
       "type": "date"
     },
-    "version": {
-      "type": "number"
-    },
-    "notification_type": {
-      "type": "string"
-    },
     "font_style": {
       "type": "string"
     },
@@ -42,8 +36,17 @@
     "text_color": {
       "type": "string"
     },
-    "type": {
-      "type": "string"
+    "node_type": {
+      "type": {
+        "metrics": "boolean",
+        "fields": [
+          {
+            "fieldName": "string",
+            "fieldValue": "number"
+          }
+        ],
+        "formula": "string"
+      }
     },
     "start_date": {
       "type": "string"
@@ -58,11 +61,15 @@
       "type": "date"
     },
     "weightage": {
-      "type": "number"
+      "type": "number",
+      "default": 0
     },
     "is_deleted": {
       "type": "boolean",
       "default": false
+    },
+    "kpi_calc_period": {
+      "type": "string"
     },
     "target": {
       "type": [
@@ -76,7 +83,16 @@
     "achieved_value": {
       "type": "number"
     },
-    "kpi_calc_period": {
+    "is_achieved_modified": {
+      "type": "boolean"
+    },
+    "threshold_value": {
+      "type": "number"
+    },
+    "alert_type": {
+      "type": "string"
+    },
+    "alert_frequency": {
       "type": "string"
     },
     "sharedTo": {
@@ -105,6 +121,14 @@
         "nestRemoting": true
       }
     },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
     "karta_phase": {
       "type": "hasOne",
       "model": "karta_phase",
@@ -117,6 +141,14 @@
       "type": "hasOne",
       "model": "user",
       "foreignKey": "contributorId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "notify_user": {
+      "type": "hasOne",
+      "model": "user",
+      "foreignKey": "notifyUserId",
       "options": {
         "nestRemoting": true
       }
@@ -147,28 +179,6 @@
     }
   ],
   "methods": {
-    "share": {
-      "accepts": [
-        {
-          "arg": "nodeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userIds",
-          "type": "array",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/share",
-        "verb": "post"
-      }
-    },
     "kpiCreators": {
       "accepts": [
         {
@@ -224,6 +234,11 @@
           "arg": "userId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "statusType",
+          "type": "string",
+          "required": false
         },
         {
           "arg": "kartaCreatorIds",

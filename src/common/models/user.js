@@ -42,7 +42,7 @@ module.exports = function(User) {
               $expr: {
                 $and: [
                   { $eq: ["$principalId", "$$user_id"] },
-                  { $eq: ["$roleId", roleId] }
+                  { $ne: ["$roleId", roleId] }
                 ]
               }
             }
@@ -57,10 +57,166 @@ module.exports = function(User) {
       path: "$role"
     }
   }
+  // Subscription lookup
+  const SUBSCRIPTION_LOOKUP = {
+    $lookup: {
+      from: 'subscription',
+      localField: 'subscriptionId',
+      foreignField: '_id',
+      as: 'subscription'
+    },
+  }
+  const UNWIND_SUBSCRIPTION = {
+    $unwind: {
+      path: "$subscription"
+    }
+  }
+  // Department lookup
+  const DEPARTMENT_LOOKUP = {
+    $lookup: {
+      from: 'department',
+      localField: 'departmentId',
+      foreignField: '_id',
+      as: 'department'
+    },
+  }
+  const UNWIND_DEPARTMENT = {
+    $unwind: {
+      path: "$department",
+      preserveNullAndEmptyArrays: true
+    }
+  }
 
 
 
 /* =============================CUSTOM METHODS=========================================================== */
+
+  // Add user
+  User.invite = (data, next) => {
+    const { fullName, email, mobile, roleId, subscriptionId, departmentId, creatorId } = data;
+
+    const password = generator.generate({
+      length: 8,
+      numbers: true,
+      symbols: true,
+      strict: true
+    });
+    
+    // Create user
+    User.create({ fullName, email, password, mobile, subscriptionId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+      if (err) {
+        console.log('> error while creating user', err);
+        return next(err);
+      } else {
+        RoleManager.assignRoles(User.app, [roleId], user.id, () => {
+          // Find creator's company id and assign it to the new user
+          User.findById(creatorId, (err, creator) => {
+            if (err) {
+              console.log('> error while getting creator data', err);
+              return next(err);
+            }
+            User.update({ "_id": user.id },  { "companyId": creator.companyId }, err => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } else {
+                next(null, "User invited successfully!");
+                // Send email and password to user
+                user.updateAttributes({ password }, {}, err => {
+                  ejs.renderFile(path.resolve('templates/welcome.ejs'),
+                    { user, name: User.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
+                      User.app.models.Email.send({
+                        to: user.email,
+                        from: User.app.dataSources.email.settings.transports[0].auth.user,
+                        subject: `Welcome to | ${User.app.get('name')}`,
+                        html
+                      }, function(err) {
+                        console.log('> sending welcome email to admin side user:', user.email);
+                        if (err) {
+                          console.log('> error while sending welcome email to admin side user', err);
+                        }
+                      });
+                  });
+                });
+              }
+            });
+          });
+        });
+      }
+    });
+  }
+
+  // Get all invites by company id
+  User.getAllInvites = (userId, page, limit, search_query, start, end, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    User.findById(userId, (err, user) => {
+      if (err) return next(err);
+      else {
+        let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+        let query = { "companyId": user.companyId };
+
+        if (start && end) {
+          query.createdAt = {
+              $gte: moment(start).toDate(),
+              $lte: moment(end).toDate()
+          }
+        }
+
+        const SEARCH_MATCH = {
+          $match: {
+            $or: [
+              {
+                'fullName': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              },
+              {
+                'email': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              },
+              {
+                'mobile.internationalNumber': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              }
+            ]
+          }
+        }
+        User.getDataSource().connector.connect(function(err, db) {
+          const userCollection = db.collection('user');
+          userCollection.aggregate([
+            { 
+              $match: query
+            },
+            {
+              $sort: { "createdAt": -1 }
+            },
+            SUBSCRIPTION_LOOKUP,
+            UNWIND_SUBSCRIPTION,
+            DEPARTMENT_LOOKUP,
+            UNWIND_DEPARTMENT,
+            SEARCH_MATCH,
+            {
+              $facet: {
+                metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+                data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+              }
+            }
+          ]).toArray((err, result) => {
+            if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+            next(err, result);
+          });
+        });
+      }
+    });
+  };
+
   // Get all user count
   User.getCount = function(next) {
     User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
@@ -115,7 +271,7 @@ module.exports = function(User) {
       }
     }
     // Find user role
-    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: {"name": "admin"} }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
@@ -135,7 +291,7 @@ module.exports = function(User) {
             }
           }
         ]).toArray((err, result) => {
-          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
           next(err, result);
         });
       });
@@ -146,6 +302,9 @@ module.exports = function(User) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
       if (err) return next(err);
       if (user) {
+        // If User Role is equal to Role then reset password || if role Not Admin equals to any User Role except admin then also reset password otherwise Not Allowed 
+        console.log(user.roles(), 'roles1');
+        console.log(user.roles, 'roles2');
         let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
         if (isValidRole) {
           User.resetPassword({email}, next);
@@ -166,16 +325,18 @@ module.exports = function(User) {
   };
 
   User.forgotPasswordUser = (email, next) => {
-    forgotWithRole(email, next, 'user');
+    forgotWithRole(email, next, 'not_admin');
   };
 
   function loginWithRole(email, password, next, role) {
     User.login({ email, password }, 'user', (err, token) => {
       if (err) return next(err);
-      token.user((_e, user)=>{
-        user.roles((e, roles)=>{
-          roles = roles.map(r=>r.name);
+      token.user((_e, user) => {
+        user.roles((e, roles) => {
+          roles = roles.map(r => r.name);
           if (roles.indexOf(role) > -1) {
+            next(null, token);
+          } else if (role === 'not_admin' && roles[0] !== 'admin') {
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -192,7 +353,7 @@ module.exports = function(User) {
   };
 
   User.userLogin = (email, password, next) => {
-    loginWithRole(email, password, next, 'user');
+    loginWithRole(email, password, next, 'not_admin');
   };
 
   User.verifyEmail = function(otp, next) {
@@ -321,6 +482,19 @@ module.exports = function(User) {
     });
   };
 
+  // Get Roles
+  User.getRoles = function(next) {
+    User.app.models.Role.find({}, (err, roles) => {
+      if (err) {
+        console.log('> error while getting roles', err);
+        return next(err);
+      }
+
+      let allRoles = roles.filter(x => x.name !== 'admin');
+      return next(null, allRoles);
+    });
+  }
+
 /* =============================REMOTE HOOKS=========================================================== */
   User.on('resetPasswordRequest', function(info) {
     var resetLink = `${process.env.WEB_URL}/reset-password?access_token=${info.accessToken.id}`;
@@ -339,20 +513,27 @@ module.exports = function(User) {
   });
 
   User.afterRemote('create', (context, user, next) => {
+    const req = context.req;
     // Find role
-    User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+    User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
       if (err) {
         console.log('> error while finding role', err);
         return next(err);
       }
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-        // Set company name
-        User.app.models.company.create({ "name": context.req.body.companyName, "userId": user.id }, {}, err => {
+        // Create company and assign it's id to the user
+        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, companyData) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
           }
+          User.update({ "_id": user.id},  { "companyId": companyData.id}, err => {
+            if (err) {
+              console.log('> error while updating user', err);
+              return next(err);
+            } 
+          });
         });
         // Create token
         user.accessTokens.create((err, token) => {
@@ -366,15 +547,14 @@ module.exports = function(User) {
             id: user.id,
             fullName: user.fullName,
             email: user.email,
-            companyName: user.companyName
+            cardId: ""  // temp card id
           }
           context.result = data;
           next();
         });
 
-        const req = context.req;
-        if (req.body.type == "admin") {
-          // Send email and password to new users
+        // Send email and password to new users
+        if (req.body.addedBy == "admin") {
           let password = generator.generate({
             length: 8,
             numbers: true,
@@ -400,8 +580,7 @@ module.exports = function(User) {
         } else {
           // Generate verification code and update in db
           let emailVerificationCode = keygen.number({length: 6});
-          let mobileVerificationCode = keygen.number({length: 6});
-          user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
+          user.updateAttributes({ emailVerificationCode }, {}, err => {
             if (err) {
               console.log('> error while update attributes', err);
               return next(err);
@@ -439,7 +618,8 @@ module.exports = function(User) {
         }
         // If email is not verified
         else if (!user.emailVerified) {
-          let emailVerificationCode = keygen.number({length: 6});
+          next();
+          let emailVerificationCode = keygen.number({ length: 6 });
           user.updateAttributes({ emailVerificationCode }, {}, err => {
             ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
             { user, emailVerificationCode }, {}, (err, html) => {
@@ -454,25 +634,25 @@ module.exports = function(User) {
                   console.log('> error while sending verification code email', err);
                   return next(err);
                 }
-                next();
               });
             });
           });
-        } else {
-          // User is verified, checking for twoFactor enabled or not
+        }
+        // User is verified, checking for twoFactor enabled or not
+        else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({length: 6});
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
             });
           }
-          // Get company name
-          user.company((err, company) => {
+          // Get company details
+          User.app.models.company.findById(user.companyId.toString(), (err, company) => {
             if (err) {
               console.log('> error while fetching company details', err);
               return next(err);
             }
-            context.result.companyLogo = company.__data.logo ? company.__data.logo : "";
+            context.result.company = company;
             next();
           });
         }
@@ -485,7 +665,7 @@ module.exports = function(User) {
     const req = context.req;
 
     if (req.body.type == "social_user") {
-      User.app.models.Role.findOne({ where:{ "name": "user" } }, (err, role) => {
+      User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
         RoleManager.assignRoles(User.app, [role.id], user.id, () => {
           // Set company name
           User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, err => {

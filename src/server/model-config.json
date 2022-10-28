@@ -53,14 +53,6 @@
     "dataSource": "db",
     "public": true
   },
-  "userdetails": {
-    "dataSource": "db",
-    "public": true
-  },
-  "usernotification": {
-    "dataSource": "db",
-    "public": true
-  },
   "karta": {
     "dataSource": "db",
     "public": true
@@ -114,6 +106,18 @@
     "public": true
   },
   "notification": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_history": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_version": {
+    "dataSource": "db",
+    "public": true
+  },
+  "subscription": {
     "dataSource": "db",
     "public": true
   }

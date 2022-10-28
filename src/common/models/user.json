@@ -15,11 +15,10 @@
   "properties": {
     "fullName": {
       "type": "string",
-      "required": false
+      "required": true
     },
     "password": {
-      "type": "string",
-      "required": false
+      "type": "string"
     },
     "profilePic": {
       "type": "string",
@@ -43,10 +42,6 @@
       "type": "boolean",
       "default": false
     },
-    "currentPlan": {
-      "type": "string",
-      "default": ""
-    },
     "street": {
       "type": "string"
     },
@@ -60,6 +55,9 @@
       "type": "string"
     },
     "country": {
+      "type": "string"
+    },
+    "addedBy": {
       "type": "string"
     },
     "active": {
@@ -77,28 +75,33 @@
     "company": {
       "type": "hasOne",
       "model": "company",
-      "foreignKey": "userId"
+      "foreignKey": "companyId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "creator": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "creatorId"
+    },
+    "subscription": {
+      "type": "hasOne",
+      "model": "subscription",
+      "foreignKey": "subscriptionId"
+    },
+    "department": {
+      "type": "hasOne",
+      "model": "department",
+      "foreignKey": "departmentId",
+      "options": {
+        "nestRemoting": true
+      }
     },
     "credentials": {
       "type": "hasMany",
       "model": "userCredential",
       "foreignKey": "userId"
-    },
-    "userdetails": {
-      "type": "hasOne",
-      "model": "userdetails",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
-    },
-    "useraddress": {
-      "type": "hasOne",
-      "model": "useraddress",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
     },
     "kartas": {
       "type": "hasMany",
@@ -355,6 +358,65 @@
         "path": "/forgot-password/user"
       }
     },
+    "invite": {
+      "accepts": [
+        {
+          "arg": "data",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/invite"
+      }
+    },
+    "getAllInvites": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "search_query",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "start",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "end",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/get-all-invites"
+      }
+    },
     "getAll": {
       "accepts": [
         {
@@ -432,6 +494,17 @@
       "http": {
         "verb": "put",
         "path": "/unblock"
+      }
+    },
+    "getRoles": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "verb": "get",
+        "path": "/get-roles"
       }
     }
   }

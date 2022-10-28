@@ -1,0 +1,62 @@
+{
+  "name": "karta_history",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta_history",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "event": {
+      "type": "string",
+      "required": true
+    },
+    "event_key": {
+      "type": "string",
+      "required": true
+    },
+    "event_value": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "validations": [],
+  "relations": {
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_node": {
+      "type": "belongsTo",
+      "model": "karta_node",
+      "foreignKey": "kartaNodeId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [],
+  "methods": {}
+}

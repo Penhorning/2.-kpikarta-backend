@@ -89,25 +89,44 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    let completedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
-    let inCompletedQuery = { "contributorId": Kartanode.getDataSource().ObjectID(userId), $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] }, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] };
+    userId = Kartanode.getDataSource().ObjectID(userId);
+    let completedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
-    Kartanode.count({completedQuery}, (err, result) => {
+    Kartanode.count(completedQuery, (err, result) => {
+      if (err) {
+        console.log('> error while fetching Completed nodes', err);
+        let error = err;
+        error.status = 500;
+        return next(error);
+      }
       Kartanode.count(inCompletedQuery, (err2, result2) => {
-        Kartanode.count({ "contributorId": Kartanode.getDataSource().ObjectID(userId) }, (err2, result3) => {
+        if (err2) {
+          console.log('> error while fetching Incompleted nodes', err);
+          let error = err2;
+          error.status = 500;
+          return next(error);
+        }
+        Kartanode.count({ "contributorId": userId }, (err3, result3) => {
+          if (err3) {
+            console.log('> error while fetching Inprogress nodes', err);
+            let error = err3;
+            error.status = 500;
+            return next(error);
+          }
           let data = {
             "All": result3 || 0,
             "InProgress": result2 || 0,
             "Completed": result || 0
           }
-          next(err2, data);
+          next(null, data);
         });
       });
     });
   }
 
   // Get kpi nodes by contributorId
-  Kartanode.kpiNodes = (page, limit, searchQuery, userId, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
+  Kartanode.kpiNodes = (page, limit, searchQuery, userId, statusType, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -127,6 +146,15 @@ module.exports = function (Kartanode) {
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
     else query = { "contributorId": Kartanode.getDataSource().ObjectID(userId) };
 
+    // Filter nodes by completed, in-progress and all
+    let status_query = {};
+    if (statusType) {
+      if (statusType === "completed") {
+        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
+      } else if (statusType === "in_progress") {
+        status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
+      }
+    }
     // Filter nodes by last updated date ranges
     if (startUpdatedDate && endUpdatedDate) {
       query.updatedAt = {
@@ -187,6 +215,12 @@ module.exports = function (Kartanode) {
       kartaNodeCollection.aggregate([
         {
           $match: query
+        },
+        {
+          $match: { "target.0.value": { $gt: 0 }, "is_deleted": false }
+        },
+        {
+          $match: status_query
         },
         {
           $match: percentage_query
