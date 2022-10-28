@@ -15,11 +15,10 @@
   "properties": {
     "fullName": {
       "type": "string",
-      "required": false
+      "required": true
     },
     "password": {
-      "type": "string",
-      "required": false
+      "type": "string"
     },
     "profilePic": {
       "type": "string",
@@ -43,10 +42,6 @@
       "type": "boolean",
       "default": false
     },
-    "currentPlan": {
-      "type": "string",
-      "default": ""
-    },
     "street": {
       "type": "string"
     },
@@ -62,10 +57,7 @@
     "country": {
       "type": "string"
     },
-    "roleId": {
-      "type": "string"
-    },
-    "licenseId": {
+    "addedBy": {
       "type": "string"
     },
     "active": {
@@ -83,17 +75,25 @@
     "company": {
       "type": "hasOne",
       "model": "company",
-      "foreignKey": "userId"
+      "foreignKey": "companyId",
+      "options": {
+        "nestRemoting": true
+      }
     },
-    "license": {
+    "creator": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "creatorId"
+    },
+    "subscription": {
       "type": "hasOne",
-      "model": "subscriptions",
-      "foreignKey": "userId"
+      "model": "subscription",
+      "foreignKey": "subscriptionId"
     },
     "department": {
       "type": "hasOne",
       "model": "department",
-      "foreignKey": "",
+      "foreignKey": "departmentId",
       "options": {
         "nestRemoting": true
       }
@@ -102,22 +102,6 @@
       "type": "hasMany",
       "model": "userCredential",
       "foreignKey": "userId"
-    },
-    "userdetails": {
-      "type": "hasOne",
-      "model": "userdetails",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
-    },
-    "useraddress": {
-      "type": "hasOne",
-      "model": "useraddress",
-      "foreignKey": "",
-      "options": {
-        "nestRemoting": true
-      }
     },
     "kartas": {
       "type": "hasMany",
@@ -372,6 +356,23 @@
       "http": {
         "verb": "post",
         "path": "/forgot-password/user"
+      }
+    },
+    "invite": {
+      "accepts": [
+        {
+          "arg": "data",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/invite"
       }
     },
     "getAll": {

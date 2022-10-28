@@ -27,9 +27,6 @@
     "due_date": {
       "type": "date"
     },
-    "notification_type": {
-      "type": "string"
-    },
     "font_style": {
       "type": "string"
     },
@@ -64,11 +61,15 @@
       "type": "date"
     },
     "weightage": {
-      "type": "number"
+      "type": "number",
+      "default": 0
     },
     "is_deleted": {
       "type": "boolean",
       "default": false
+    },
+    "kpi_calc_period": {
+      "type": "string"
     },
     "target": {
       "type": [
@@ -82,7 +83,16 @@
     "achieved_value": {
       "type": "number"
     },
-    "kpi_calc_period": {
+    "is_achieved_modified": {
+      "type": "boolean"
+    },
+    "threshold_value": {
+      "type": "number"
+    },
+    "alert_type": {
+      "type": "string"
+    },
+    "alert_frequency": {
       "type": "string"
     },
     "sharedTo": {
@@ -131,6 +141,14 @@
       "type": "hasOne",
       "model": "user",
       "foreignKey": "contributorId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "notify_user": {
+      "type": "hasOne",
+      "model": "user",
+      "foreignKey": "notifyUserId",
       "options": {
         "nestRemoting": true
       }

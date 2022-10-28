@@ -61,6 +61,61 @@ module.exports = function(User) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
+
+  // Add user
+  User.invite = (data, next) => {
+    const { fullName, email, mobile, roleId, subscriptionId, departmentId, creatorId } = data;
+
+    const password = generator.generate({
+      length: 8,
+      numbers: true,
+      symbols: true,
+      strict: true
+    });
+    
+    // Create user
+    User.create({ fullName, email, password, mobile, subscriptionId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+      if (err) {
+        console.log('> error while creating user', err);
+        return next(err);
+      } else {
+        RoleManager.assignRoles(User.app, [roleId], user.id, () => {
+          // Find creator's company id and assign it to the new user
+          User.findById(creatorId, (err, creator) => {
+            if (err) {
+              console.log('> error while getting creator data', err);
+              return next(err);
+            }
+            User.update({ "_id": user.id },  { "companyId": creator.companyId }, err => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } else {
+                next(null, "User invited successfully!");
+                // Send email and password to user
+                user.updateAttributes({ password }, {}, err => {
+                  ejs.renderFile(path.resolve('templates/welcome.ejs'),
+                    { user, name: User.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
+                      User.app.models.Email.send({
+                        to: user.email,
+                        from: User.app.dataSources.email.settings.transports[0].auth.user,
+                        subject: `Welcome to | ${User.app.get('name')}`,
+                        html
+                      }, function(err) {
+                        console.log('> sending welcome email to admin side user:', user.email);
+                        if (err) {
+                          console.log('> error while sending welcome email to admin side user', err);
+                        }
+                      });
+                  });
+                });
+              }
+            });
+          });
+        });
+      }
+    });
+  }
   // Get all user count
   User.getCount = function(next) {
     User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
@@ -175,10 +230,12 @@ module.exports = function(User) {
   function loginWithRole(email, password, next, role) {
     User.login({ email, password }, 'user', (err, token) => {
       if (err) return next(err);
-      token.user((_e, user)=>{
-        user.roles((e, roles)=>{
-          roles = roles.map(r=>r.name);
+      token.user((_e, user) => {
+        user.roles((e, roles) => {
+          roles = roles.map(r => r.name);
           if (roles.indexOf(role) > -1) {
+            next(null, token);
+          } else if (role === 'not_admin' && roles[0] !== 'admin') {
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -195,7 +252,7 @@ module.exports = function(User) {
   };
 
   User.userLogin = (email, password, next) => {
-    loginWithRole(email, password, next, 'user');
+    loginWithRole(email, password, next, 'not_admin');
   };
 
   User.verifyEmail = function(otp, next) {
@@ -364,35 +421,19 @@ module.exports = function(User) {
       }
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-        // Set company name
-        if(req.body.type == 'invite'){
-          User.findById(req.body.creatorId, (err, creatorData) => {
+        // Create company and assign it's id to the user
+        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, companyData) => {
+          if (err) {
+            console.log('> error while creating company', err);
+            return next(err);
+          }
+          User.update({ "_id": user.id},  { "companyId": companyData.id}, err => {
             if (err) {
-              console.log('> error while getting creator data', err);
+              console.log('> error while updating user', err);
               return next(err);
-            }
-            User.update({ "_id": user.id},  { companyId: creatorData.companyId, companyName: creatorData.companyName }, (err, result) => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              } 
-            });
-          })
-        }
-        else {
-          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, comp) => {
-            if (err) {
-              console.log('> error while creating company', err);
-              return next(err);
-            }
-            User.update({ "_id": user.id},  { companyId: comp.id}, (err, result) => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              } 
-            });
+            } 
           });
-        }
+        });
         // Create token
         user.accessTokens.create((err, token) => {
           // user.__data.token = token;
@@ -405,14 +446,14 @@ module.exports = function(User) {
             id: user.id,
             fullName: user.fullName,
             email: user.email,
-            companyName: user.companyName
+            cardId: ""  // temp card id
           }
           context.result = data;
           next();
         });
 
         // Send email and password to new users
-        if (req.body.type == "admin" || req.body.type == "invite") {
+        if (req.body.addedBy == "admin") {
           let password = generator.generate({
             length: 8,
             numbers: true,
@@ -438,8 +479,7 @@ module.exports = function(User) {
         } else {
           // Generate verification code and update in db
           let emailVerificationCode = keygen.number({length: 6});
-          let mobileVerificationCode = keygen.number({length: 6});
-          user.updateAttributes({ emailVerificationCode, mobileVerificationCode }, {}, err => {
+          user.updateAttributes({ emailVerificationCode }, {}, err => {
             if (err) {
               console.log('> error while update attributes', err);
               return next(err);
@@ -477,7 +517,8 @@ module.exports = function(User) {
         }
         // If email is not verified
         else if (!user.emailVerified) {
-          let emailVerificationCode = keygen.number({length: 6});
+          next();
+          let emailVerificationCode = keygen.number({ length: 6 });
           user.updateAttributes({ emailVerificationCode }, {}, err => {
             ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
             { user, emailVerificationCode }, {}, (err, html) => {
@@ -492,25 +533,25 @@ module.exports = function(User) {
                   console.log('> error while sending verification code email', err);
                   return next(err);
                 }
-                next();
               });
             });
           });
-        } else {
-          // User is verified, checking for twoFactor enabled or not
+        }
+        // User is verified, checking for twoFactor enabled or not
+        else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({length: 6});
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
             });
           }
-          // Get company name
-          user.company((err, company) => {
+          // Get company details
+          User.app.models.company.findById(user.companyId.toString(), (err, company) => {
             if (err) {
               console.log('> error while fetching company details', err);
               return next(err);
             }
-            context.result.companyLogo = company.__data.logo ? company.__data.logo : "";
+            context.result.company = company;
             next();
           });
         }
