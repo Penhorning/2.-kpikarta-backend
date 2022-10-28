@@ -42,7 +42,7 @@ module.exports = function(User) {
               $expr: {
                 $and: [
                   { $eq: ["$principalId", "$$user_id"] },
-                  { $eq: ["$roleId", roleId] }
+                  { $ne: ["$roleId", roleId] }
                 ]
               }
             }
@@ -55,6 +55,35 @@ module.exports = function(User) {
   const UNWIND_ROLE = {
     $unwind: {
       path: "$role"
+    }
+  }
+  // Subscription lookup
+  const SUBSCRIPTION_LOOKUP = {
+    $lookup: {
+      from: 'subscription',
+      localField: 'subscriptionId',
+      foreignField: '_id',
+      as: 'subscription'
+    },
+  }
+  const UNWIND_SUBSCRIPTION = {
+    $unwind: {
+      path: "$subscription"
+    }
+  }
+  // Department lookup
+  const DEPARTMENT_LOOKUP = {
+    $lookup: {
+      from: 'department',
+      localField: 'departmentId',
+      foreignField: '_id',
+      as: 'department'
+    },
+  }
+  const UNWIND_DEPARTMENT = {
+    $unwind: {
+      path: "$department",
+      preserveNullAndEmptyArrays: true
     }
   }
 
@@ -116,6 +145,78 @@ module.exports = function(User) {
       }
     });
   }
+
+  // Get all invites by company id
+  User.getAllInvites = (userId, page, limit, search_query, start, end, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    User.findById(userId, (err, user) => {
+      if (err) return next(err);
+      else {
+        let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+        let query = { "companyId": user.companyId };
+
+        if (start && end) {
+          query.createdAt = {
+              $gte: moment(start).toDate(),
+              $lte: moment(end).toDate()
+          }
+        }
+
+        const SEARCH_MATCH = {
+          $match: {
+            $or: [
+              {
+                'fullName': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              },
+              {
+                'email': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              },
+              {
+                'mobile.internationalNumber': {
+                  $regex: searchQuery,
+                  $options: 'i'
+                }
+              }
+            ]
+          }
+        }
+        User.getDataSource().connector.connect(function(err, db) {
+          const userCollection = db.collection('user');
+          userCollection.aggregate([
+            { 
+              $match: query
+            },
+            {
+              $sort: { "createdAt": -1 }
+            },
+            SUBSCRIPTION_LOOKUP,
+            UNWIND_SUBSCRIPTION,
+            DEPARTMENT_LOOKUP,
+            UNWIND_DEPARTMENT,
+            SEARCH_MATCH,
+            {
+              $facet: {
+                metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+                data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+              }
+            }
+          ]).toArray((err, result) => {
+            if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+            next(err, result);
+          });
+        });
+      }
+    });
+  };
+
   // Get all user count
   User.getCount = function(next) {
     User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
@@ -170,7 +271,7 @@ module.exports = function(User) {
       }
     }
     // Find user role
-    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: {"name": "admin"} }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
@@ -190,7 +291,7 @@ module.exports = function(User) {
             }
           }
         ]).toArray((err, result) => {
-          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
           next(err, result);
         });
       });
