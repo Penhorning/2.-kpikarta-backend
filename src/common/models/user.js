@@ -91,7 +91,32 @@ module.exports = function(User) {
 
 /* =============================CUSTOM METHODS=========================================================== */
 
-  // Add user
+  // Add admin user
+  User.addAdmin = (fullName, email, password, next) => {
+    User.create({ fullName, email, password }, {}, (err, user) => {
+      if (err) {
+        console.log('> error while creating admin', err);
+        return next(err);
+      }
+      // Find role
+      User.app.models.Role.findOne({ where:{ "name": "admin" } }, (err, role) => {
+        if (err) {
+          console.log('> error while finding role', err);
+          return next(err);
+        }
+        // Assign role
+        RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+          if (err) {
+            console.log('> error while assigning role', err);
+            return next(err);
+          }
+          next();
+        });
+      });
+    });
+  }
+
+  // Add user via invite
   User.invite = (data, next) => {
     const { fullName, email, mobile, roleId, subscriptionId, departmentId, creatorId } = data;
 
@@ -219,7 +244,7 @@ module.exports = function(User) {
 
   // Get all user count
   User.getCount = function(next) {
-    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: { "name": "admin" } }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
@@ -302,17 +327,18 @@ module.exports = function(User) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
       if (err) return next(err);
       if (user) {
-        // If User Role is equal to Role then reset password || if role Not Admin equals to any User Role except admin then also reset password otherwise Not Allowed 
-        console.log(user.roles(), 'roles1');
-        console.log(user.roles, 'roles2');
-        let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
-        if (isValidRole) {
-          User.resetPassword({email}, next);
-        } else {
-          let error = new Error("You are not allowed to Reset Password here");
-          error.status = 400;
-          next(error);
-        }
+        user.roles((e, roles) => {
+          roles = roles.map(r => r.name);
+          if (roles.indexOf(role) > -1) {
+            User.resetPassword({email}, next);
+          } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            User.resetPassword({email}, next);
+          } else {
+            let error = new Error("You are not allowed to reset password here");
+            error.status = 400;
+            next(error);
+          }
+        });
       } else {
         let error = new Error("User does not exists");
         error.status = 400;
