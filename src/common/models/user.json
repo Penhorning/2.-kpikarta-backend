@@ -73,7 +73,7 @@
       "foreignKey": "userId"
     },
     "company": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "company",
       "foreignKey": "companyId",
       "options": {
@@ -91,7 +91,7 @@
       "foreignKey": "subscriptionId"
     },
     "department": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "department",
       "foreignKey": "departmentId",
       "options": {
