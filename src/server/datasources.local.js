@@ -1,7 +1,7 @@
 module.exports = {
   'db': {
     'host': 'localhost',
-    'database': 'kpikarta-development',
+    'database': 'kpikarta',
     'name': 'db',
     'connector': 'mongodb',
   },

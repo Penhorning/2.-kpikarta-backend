@@ -9,6 +9,10 @@
     "name": {
       "type": "string",
       "required": true
+    },
+    "kartaId": {
+      "type": "string",
+      "required": true
     }
   },
   "validations": [],

@@ -121,7 +121,7 @@
         "nestRemoting": true
       }
     },
-    "karta_version": {
+    "version": {
       "type": "hasOne",
       "model": "karta_version",
       "foreignKey": "versionId",
@@ -129,8 +129,8 @@
         "nestRemoting": true
       }
     },
-    "karta_phase": {
-      "type": "hasOne",
+    "phase": {
+      "type": "belongsTo",
       "model": "karta_phase",
       "foreignKey": "phaseId",
       "options": {
