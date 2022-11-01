@@ -60,6 +60,14 @@
       "options": {
         "nestRemoting": true
       }
+    },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
     }
   },
   "acls": [

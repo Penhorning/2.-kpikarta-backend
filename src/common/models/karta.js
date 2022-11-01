@@ -328,11 +328,18 @@ module.exports = function(Karta) {
     Karta.afterRemote('create', function(context, karta,  next) {
         // Create Version
 
-        Karta.app.models.karta_version.create({ "name" : "1.0.0" }, {} , (err, result) => {
+        Karta.app.models.karta_version.create({ "name" : "1.0.0", "kartaId": karta.id }, {} , (err, result) => {
           if (err) {
               console.log('> error while creating karta version', err);
               return next(err);
-          } else next();
+          } else {
+            Karta.update({ "id" : karta.id }, { "versionId" : result.id }, (err, data) => {
+                  if (err) {
+                      console.log('> error while updating newly crated karta', err);
+                      return next(err);
+                  } else next();
+            });
+          };
         });
 
         // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
