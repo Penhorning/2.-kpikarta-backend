@@ -420,7 +420,7 @@
           "required": false
         },
         {
-          "arg": "search_query",
+          "arg": "searchQuery",
           "type": "string",
           "required": false
         },
@@ -436,7 +436,7 @@
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "users",
         "type": "string"
       },
       "http": {
@@ -457,7 +457,7 @@
           "required": false
         },
         {
-          "arg": "search_query",
+          "arg": "searchQuery",
           "type": "string",
           "required": false
         },

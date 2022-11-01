@@ -101,7 +101,7 @@ module.exports = function(Karta) {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
     userId = Karta.getDataSource().ObjectID(userId);
 
@@ -168,7 +168,7 @@ module.exports = function(Karta) {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
     const SEARCH_MATCH = {
       $match: {

@@ -172,14 +172,14 @@ module.exports = function(User) {
   }
 
   // Get all invites by company id
-  User.getAllInvites = (userId, page, limit, search_query, start, end, next) => {
+  User.getAllInvites = (userId, page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     User.findById(userId, (err, user) => {
       if (err) return next(err);
       else {
-        let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+        searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         let query = { "companyId": user.companyId };
 
         if (start && end) {
@@ -257,11 +257,11 @@ module.exports = function(User) {
     });
   };
   // Get all users
-  User.getAll = (page, limit, search_query, start, end, next) => {
+  User.getAll = (page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
     let query = {};
 
     if (start && end) {
