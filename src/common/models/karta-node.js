@@ -130,7 +130,7 @@ module.exports = function (Kartanode) {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    let search_query = searchQuery ? searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
     let query;
 
     // Filter nodes by creator's id
@@ -291,7 +291,7 @@ module.exports = function (Kartanode) {
   // Include childrens when fetching nodes by kartaId
   Kartanode.observe("access", (ctx, next) => {
     if(!ctx.query.include){
-      ctx.query.include = "children";
+      ctx.query.include = ["children", "phase"];
       ctx.query.where.is_deleted = false;
     }
     next();

@@ -91,7 +91,32 @@ module.exports = function(User) {
 
 /* =============================CUSTOM METHODS=========================================================== */
 
-  // Add user
+  // Add admin user
+  User.addAdmin = (fullName, email, password, next) => {
+    User.create({ fullName, email, password }, {}, (err, user) => {
+      if (err) {
+        console.log('> error while creating admin', err);
+        return next(err);
+      }
+      // Find role
+      User.app.models.Role.findOne({ where:{ "name": "admin" } }, (err, role) => {
+        if (err) {
+          console.log('> error while finding role', err);
+          return next(err);
+        }
+        // Assign role
+        RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+          if (err) {
+            console.log('> error while assigning role', err);
+            return next(err);
+          }
+          next();
+        });
+      });
+    });
+  }
+
+  // Add user via invite
   User.invite = (data, next) => {
     const { fullName, email, mobile, roleId, subscriptionId, departmentId, creatorId } = data;
 
@@ -147,14 +172,14 @@ module.exports = function(User) {
   }
 
   // Get all invites by company id
-  User.getAllInvites = (userId, page, limit, search_query, start, end, next) => {
+  User.getAllInvites = (userId, page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     User.findById(userId, (err, user) => {
       if (err) return next(err);
       else {
-        let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+        searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         let query = { "companyId": user.companyId };
 
         if (start && end) {
@@ -219,7 +244,7 @@ module.exports = function(User) {
 
   // Get all user count
   User.getCount = function(next) {
-    User.app.models.Role.findOne({ where: {"name": "user"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: { "name": "admin" } }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
@@ -232,11 +257,11 @@ module.exports = function(User) {
     });
   };
   // Get all users
-  User.getAll = (page, limit, search_query, start, end, next) => {
+  User.getAll = (page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
-    let searchQuery = search_query ? search_query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
     let query = {};
 
     if (start && end) {
@@ -302,17 +327,18 @@ module.exports = function(User) {
     User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
       if (err) return next(err);
       if (user) {
-        // If User Role is equal to Role then reset password || if role Not Admin equals to any User Role except admin then also reset password otherwise Not Allowed 
-        console.log(user.roles(), 'roles1');
-        console.log(user.roles, 'roles2');
-        let isValidRole = user.roles().map(r => r.name).indexOf(role) > -1;
-        if (isValidRole) {
-          User.resetPassword({email}, next);
-        } else {
-          let error = new Error("You are not allowed to Reset Password here");
-          error.status = 400;
-          next(error);
-        }
+        user.roles((e, roles) => {
+          roles = roles.map(r => r.name);
+          if (roles.indexOf(role) > -1) {
+            User.resetPassword({email}, next);
+          } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            User.resetPassword({email}, next);
+          } else {
+            let error = new Error("You are not allowed to reset password here");
+            error.status = 400;
+            next(error);
+          }
+        });
       } else {
         let error = new Error("User does not exists");
         error.status = 400;

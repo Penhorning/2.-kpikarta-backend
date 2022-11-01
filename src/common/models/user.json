@@ -358,6 +358,33 @@
         "path": "/forgot-password/user"
       }
     },
+    "addAdmin": {
+      "accepts": [
+        {
+          "arg": "fullName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "password",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/add-admin"
+      }
+    },
     "invite": {
       "accepts": [
         {
@@ -393,7 +420,7 @@
           "required": false
         },
         {
-          "arg": "search_query",
+          "arg": "searchQuery",
           "type": "string",
           "required": false
         },
@@ -409,7 +436,7 @@
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "users",
         "type": "string"
       },
       "http": {
@@ -430,7 +457,7 @@
           "required": false
         },
         {
-          "arg": "search_query",
+          "arg": "searchQuery",
           "type": "string",
           "required": false
         },
