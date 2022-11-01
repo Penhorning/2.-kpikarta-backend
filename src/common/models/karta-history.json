@@ -26,8 +26,7 @@
       "required": true
     },
     "event_value": {
-      "type": "string",
-      "required": true
+      "type": "string"
     }
   },
   "validations": [],
@@ -58,5 +57,43 @@
     }
   },
   "acls": [],
-  "methods": {}
+  "methods": {
+    "createKartaHistory": {
+      "accepts": [
+        {
+          "arg": "event",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "eventValue",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "kartaNodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-karta-history",
+        "verb": "post"
+      }
+    }
+  }
 }
