@@ -549,12 +549,12 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Create company and assign it's id to the user
-        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, companyData) => {
+        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
           }
-          User.update({ "_id": user.id},  { "companyId": companyData.id}, err => {
+          User.update({ "_id": user.id},  { "companyId": company.id}, err => {
             if (err) {
               console.log('> error while updating user', err);
               return next(err);
@@ -693,12 +693,18 @@ module.exports = function(User) {
     if (req.body.type == "social_user") {
       User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
         RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-          // Set company name
-          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, err => {
+          // Create company and assign it's id to the user
+          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
             if (err) {
-              console.log('> error while creating company data', err);
+              console.log('> error while creating company', err);
               return next(err);
             }
+            User.update({ "_id": user.id},  { "companyId": company.id}, err => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } 
+            });
           });
           // Send welcome email to social users
           let password = generator.generate({

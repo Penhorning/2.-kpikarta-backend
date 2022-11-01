@@ -6,31 +6,34 @@ module.exports = function (app) {
     // Success redirect url for social login
     app.get("/auth/account", (req, res) => {
 
-        let user = {
-            userId: req.signedCookies.userId,
-            accessToken: req.signedCookies.access_token,
-            name: req.user.fullName,
-            email: req.user.email
+        const { user, signedCookies } = req;
+
+        let user_data = {
+            userId: signedCookies.userId,
+            accessToken: signedCookies.access_token,
+            name: user.fullName,
+            email: user.email
         }
 
-        if (req.user.emailVerified) {
-            req.user.company((err, company) => {
+        if (user.emailVerified) {
+            // Get company details
+            req.app.models.company.findById(user.companyId.toString(), (err, company) => {
                 if (err) return console.log('> error while fetching company details');
-                user.companyLogo = company.__data.logo ? company.__data.logo : "";
-                user.profilePic = req.user.profilePic ? req.user.profilePic : "";
-                user._2faEnabled = req.user._2faEnabled ? req.user._2faEnabled : false;
-                user.mobileVerified = req.user.mobileVerified ? req.user.mobileVerified : false;
-                if (req.user._2faEnabled && req.user.mobileVerified) {
+                user_data.companyLogo = company.logo ? company.logo : "";
+                user_data.profilePic = user.profilePic ? user.profilePic : "";
+                user_data._2faEnabled = user._2faEnabled ? user._2faEnabled : false;
+                user_data.mobileVerified = user.mobileVerified ? user.mobileVerified : false;
+                if (user._2faEnabled && user.mobileVerified) {
                     let mobileVerificationCode = keygen.number({length: 6});
                     req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
                       let twilio_data = {
                         type: 'sms',
-                        to: req.user.mobile.e164Number,
+                        to: user.mobile.e164Number,
                         from: "+16063667831",
                         body: `${mobileVerificationCode} is your code for KPI Karta Login.`
                       }
                       req.app.models.Twilio.send(twilio_data, function (err, data) {
-                        console.log('> sending code to mobile number:', req.user.mobile.e164Number);
+                        console.log('> sending code to mobile number:', user.mobile.e164Number);
                         // if (err) {
                         //     console.log('> error while sending code to mobile number', err);
                         //     let error = err;
@@ -40,11 +43,11 @@ module.exports = function (app) {
                       });
                     });
                 }
-                res.redirect(`${process.env.WEB_URL}/login?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}&profilePic=${user.profilePic}&companyLogo=${user.companyLogo}&_2faEnabled=${user._2faEnabled}&mobileVerified=${user.mobileVerified}`);
+                res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
             });
         } else {
             req.user.updateAttributes({emailVerified: true}, (err) => {
-            res.redirect(`${process.env.WEB_URL}/sign-up?name=${user.name}&email=${user.email}&userId=${user.userId}&access_token=${user.accessToken}`);
+            res.redirect(`${process.env.WEB_URL}/sign-up?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}`);
         });
         }
     });
