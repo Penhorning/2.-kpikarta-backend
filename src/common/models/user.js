@@ -29,7 +29,7 @@ module.exports = function(User) {
   }
 
   // QUERY VARIABLES
-  const ROLE_LOOKUP = (roleId) => {
+  const ROLE_MAP_LOOKUP = (roleId) => {
     return {
       $lookup: {
         from: "RoleMapping",
@@ -48,27 +48,41 @@ module.exports = function(User) {
             }
           }
         ],
-        as: "role"
+        as: "RoleMap"
       }
     }
   }
-  const UNWIND_ROLE = {
+  const UNWIND_ROLE_MAP = {
     $unwind: {
-      path: "$role"
+      path: "$RoleMap"
     }
   }
-  // Subscription lookup
-  const SUBSCRIPTION_LOOKUP = {
+  // Role lookup
+  const ROLE_LOOKUP = {
     $lookup: {
-      from: 'subscription',
-      localField: 'subscriptionId',
+      from: 'Role',
+      localField: 'roleId',
       foreignField: '_id',
-      as: 'subscription'
+      as: 'Role'
     },
   }
-  const UNWIND_SUBSCRIPTION = {
+  const UNWIND_ROLE = {
     $unwind: {
-      path: "$subscription"
+      path: "$Role"
+    }
+  }
+  // License lookup
+  const LICENSE_LOOKUP = {
+    $lookup: {
+      from: 'license',
+      localField: 'licenseId',
+      foreignField: '_id',
+      as: 'license'
+    },
+  }
+  const UNWIND_LICENSE = {
+    $unwind: {
+      path: "$license"
     }
   }
   // Department lookup
@@ -118,7 +132,7 @@ module.exports = function(User) {
 
   // Add user via invite
   User.invite = (data, next) => {
-    const { fullName, email, mobile, roleId, subscriptionId, departmentId, creatorId } = data;
+    const { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
 
     const password = generator.generate({
       length: 8,
@@ -128,7 +142,7 @@ module.exports = function(User) {
     });
     
     // Create user
-    User.create({ fullName, email, password, mobile, subscriptionId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -180,7 +194,8 @@ module.exports = function(User) {
       if (err) return next(err);
       else {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-        let query = { "companyId": user.companyId };
+        userId = User.getDataSource().ObjectID(userId);
+        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
 
         if (start && end) {
           query.createdAt = {
@@ -222,8 +237,10 @@ module.exports = function(User) {
             {
               $sort: { "createdAt": -1 }
             },
-            SUBSCRIPTION_LOOKUP,
-            UNWIND_SUBSCRIPTION,
+            LICENSE_LOOKUP,
+            UNWIND_LICENSE,
+            ROLE_LOOKUP,
+            UNWIND_ROLE,
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
@@ -248,8 +265,8 @@ module.exports = function(User) {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
-          ROLE_LOOKUP(role.id),
-          UNWIND_ROLE
+          ROLE_MAP_LOOKUP(role.id),
+          UNWIND_ROLE_MAP
         ]).toArray((err, result) => {
           next(err, result.length);
         });
@@ -306,8 +323,8 @@ module.exports = function(User) {
           {
             $sort: { "createdAt": -1 }
           },
-          ROLE_LOOKUP(role.id),
-          UNWIND_ROLE,
+          ROLE_MAP_LOOKUP(role.id),
+          UNWIND_ROLE_MAP,
           SEARCH_MATCH,
           {
             $facet: {
@@ -738,6 +755,11 @@ module.exports = function(User) {
             });
           });
         });
+      });
+    } else if (req.body.type === "invited_user") {
+      let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
+      RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
+        next();
       });
     } else {
       if (req.body.oldImage) {
