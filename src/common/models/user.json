@@ -72,6 +72,22 @@
       "model": "userIdentity",
       "foreignKey": "userId"
     },
+    "role": {
+      "type": "belongsTo",
+      "model": "role",
+      "foreignKey": "roleId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "license": {
+      "type": "belongsTo",
+      "model": "license",
+      "foreignKey": "licenseId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
     "company": {
       "type": "belongsTo",
       "model": "company",

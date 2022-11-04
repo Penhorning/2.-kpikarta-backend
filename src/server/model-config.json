@@ -120,5 +120,9 @@
   "subscription": {
     "dataSource": "db",
     "public": true
+  },
+  "license": {
+    "dataSource": "db",
+    "public": true
   }
 }
