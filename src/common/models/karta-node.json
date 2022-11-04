@@ -19,7 +19,7 @@
   "properties": {
     "name": {
       "type": "string",
-      "required": true
+      "default": "Child"
     },
     "assigned_date": {
       "type": "date"
@@ -28,13 +28,16 @@
       "type": "date"
     },
     "font_style": {
-      "type": "string"
+      "type": "string",
+      "default": "sans-serif"
     },
     "alignment": {
-      "type": "string"
+      "type": "string",
+      "default": "center"
     },
     "text_color": {
-      "type": "string"
+      "type": "string",
+      "default": "#000000"
     },
     "node_type": {
       "type": {
@@ -49,10 +52,11 @@
       }
     },
     "start_date": {
-      "type": "string"
+      "type": "date"
     },
     "days_to_calculate": {
-      "type": "string"
+      "type": "string",
+      "default": "all"
     },
     "fiscal_year_start_date": {
       "type": "date"

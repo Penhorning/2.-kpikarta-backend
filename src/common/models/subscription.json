@@ -121,8 +121,7 @@
       }
     },
     "makeSubcription": {
-      "accepts": [
-      ],
+      "accepts": [],
       "returns": {
         "arg": "message",
         "type": "string"
