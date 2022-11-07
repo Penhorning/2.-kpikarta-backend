@@ -21,11 +21,27 @@
       "type": "string",
       "required": true
     },
-    "event_key": {
+    "event_options": {
+      "type": "object",
+      "required": true
+    },
+    "kartaNodeId": {
       "type": "string",
       "required": true
     },
-    "event_value": {
+    "versionId": {
+      "type": "string",
+      "required": true
+    },
+    "userId": {
+      "type": "string",
+      "required": true
+    },
+    "kartaId": {
+      "type": "string",
+      "required": true
+    },
+    "parentNodeId": {
       "type": "string"
     }
   },
@@ -43,6 +59,14 @@
       "type": "hasOne",
       "model": "karta_version",
       "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
       "options": {
         "nestRemoting": true
       }
@@ -84,6 +108,15 @@
           "arg": "userId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "parentNodeId",
+          "type": "string"
         }
       ],
       "returns": {
@@ -92,6 +125,28 @@
       },
       "http": {
         "path": "/create-karta-history",
+        "verb": "post"
+      }
+    },
+    "versionControlChange": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/version-control",
         "verb": "post"
       }
     }
