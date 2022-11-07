@@ -42,7 +42,11 @@
         }
       ]
     },
-    "copyValue": {
+    "selfCopyCount": {
+      "type": "number",
+      "default": 0
+    },
+    "sharedCopyCount": {
       "type": "number",
       "default": 0
     }
@@ -190,6 +194,11 @@
       "accepts": [
         {
           "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
           "type": "string",
           "required": true
         }

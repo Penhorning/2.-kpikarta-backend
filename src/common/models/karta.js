@@ -244,22 +244,22 @@ module.exports = function(Karta) {
     })
   }
 
-  Karta.kartaCopy = async (kartaId, next) => {
+  Karta.kartaCopy = async (kartaId, userId, next) => {
     try {
       // Finding Karta details which will be copied
       let kartaData = await Karta.findOne({ where: { "_id": kartaId } });
 
       if (kartaData) {
+        // New Carta details accessed in newKarta variable
+
         // Creating new Karta with old details
         let newObj = {
-          name: kartaData.name ? kartaData.copyValue == 0 ? kartaData.name + " - Copy" : `${kartaData.name} - Copy (${kartaData.copyValue + 1})` : null,
+          name: kartaData.name ? kartaData.selfCopyCount == 0 ? kartaData.name + " - Copy" : `${kartaData.name} - Copy (${kartaData.selfCopyCount + 1})` : null,
           userId: kartaData.userId ? kartaData.userId : null,
           status: kartaData.status ? kartaData.status : null,
           type: kartaData.type ? kartaData.type : null
         }
-
-        // New Carta details accessed in newKarta variable
-        await Karta.update({ "id": kartaId }, { "copyValue" : kartaData.copyValue + 1 });
+        await Karta.update({ "id": kartaId }, { "selfCopyCount" : kartaData.selfCopyCount + 1 });
         let newKarta = await Karta.create(newObj);
 
         // Initializing values Ids
@@ -334,7 +334,7 @@ module.exports = function(Karta) {
               console.log('> error while creating karta version', err);
               return next(err);
           } else {
-            Karta.update({ "id" : karta.id }, { "versionId" : result.id, copyValue: 0 }, (err, data) => {
+            Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
                   if (err) {
                       console.log('> error while updating newly crated karta', err);
                       return next(err);
