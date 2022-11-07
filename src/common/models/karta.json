@@ -182,7 +182,7 @@
         "verb": "post"
       }
     },
-    "kartaCopy": {
+    "copy": {
       "accepts": [
         {
           "arg": "kartaId",
@@ -195,7 +195,7 @@
         "type": "string"
       },
       "http": {
-        "path": "/copy-shared-karta",
+        "path": "/copy",
         "verb": "post"
       }
     }

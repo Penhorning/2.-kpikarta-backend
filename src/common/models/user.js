@@ -170,9 +170,9 @@ module.exports = function(User) {
                         subject: `Welcome to | ${User.app.get('name')}`,
                         html
                       }, function(err) {
-                        console.log('> sending welcome email to admin side user:', user.email);
+                        console.log('> sending welcome email to invited user:', user.email);
                         if (err) {
-                          console.log('> error while sending welcome email to admin side user', err);
+                          console.log('> error while sending welcome email to invited user', err);
                         }
                       });
                   });
@@ -180,6 +180,49 @@ module.exports = function(User) {
               }
             });
           });
+        });
+      }
+    });
+  }
+
+  // Send credentials
+  User.sendCredentials = (userId, next) => {
+
+    const password = generator.generate({
+      length: 8,
+      numbers: true,
+      symbols: true,
+      strict: true
+    });
+    
+    // Update new password
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        console.log('> error while finding user', err);
+        return next(err);
+      } else {
+        user.updateAttributes({ password }, {}, (err) => {
+          if (err) {
+            console.log('> error while updating new credentials', err);
+            return next(err);
+          } else {
+            next(null, "Credentials sent successully!");
+            // Send email and password to user
+            ejs.renderFile(path.resolve('templates/credential.ejs'),
+                { user, name: User.app.get('name'), password }, {}, function(err, html) {
+                  User.app.models.Email.send({
+                    to: user.email,
+                    from: User.app.dataSources.email.settings.transports[0].auth.user,
+                    subject: `New Credentials | ${User.app.get('name')}`,
+                    html
+                  }, function(err) {
+                    console.log('> sending credentials email to user:', user.email);
+                    if (err) {
+                      console.log('> error while sending credentials email to user', err);
+                    }
+                  });
+              });
+          }
         });
       }
     });
@@ -571,7 +614,7 @@ module.exports = function(User) {
             console.log('> error while creating company', err);
             return next(err);
           }
-          User.update({ "_id": user.id},  { "companyId": company.id}, err => {
+          User.update({ "_id": user.id },  { "companyId": company.id }, err => {
             if (err) {
               console.log('> error while updating user', err);
               return next(err);

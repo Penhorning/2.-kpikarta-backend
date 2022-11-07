@@ -418,6 +418,23 @@
         "path": "/invite"
       }
     },
+    "sendCredentials": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send-credentials"
+      }
+    },
     "getAllInvites": {
       "accepts": [
         {
