@@ -39,7 +39,7 @@ module.exports = function(Kartahistory) {
 
     Kartahistory.versionControlChange = async (versionId, kartaId) => {
         try {
-            await Kartahistory.app.models.karta_node.remove({ kartaId })
+            await Kartahistory.app.models.karta_node.remove({ or: [{ kartaId }, { kartaDetailId: kartaId }] })
             const kartaVersionDetails = await Kartahistory.app.models.karta_version.findOne({ where: { "id": versionId }});
             let versionNumber = kartaVersionDetails.name.split(".")[0];
             versionNumber = Number(versionNumber);
@@ -47,24 +47,26 @@ module.exports = function(Kartahistory) {
             for ( let i = 1; i <= versionNumber; i++ ) {
                 let versionName = i+".0.0";
                 const currentVersionDetails = await Kartahistory.app.models.karta_version.findOne({ where: { "name": versionName }});
-                const kartaHitoryDetails = await Kartahistory.find({ where: { versionId: currentVersionDetails.id, kartaId } });
+                let kartaHitoryDetails = await Kartahistory.find({ where: { versionId: currentVersionDetails.id, kartaId } });
 
                 for( let j = 0; j < kartaHitoryDetails.length; j++ ) {
                     if( kartaHitoryDetails[j].event == "node_created" ) {
-                        // Needs rechecking
                         if( kartaHitoryDetails[j].parentNodeId ) {
                             let newObj = {
                                 ...kartaHitoryDetails[j].event_options.created,
                                 parentId: kartaHitoryDetails[j].parentNodeId
-                            };
-                            let newKartaNode = await Kartahistory.app.models.karta_node.create( newObj );
-                            await Kartahistory.app.models.karta_history.update({ parentNodeId: kartaHitoryDetails[j].kartaNodeId }, { parentNodeId: newKartaNode.id });
-                            await Kartahistory.app.models.karta_history.update({ kartaNodeId: kartaHitoryDetails[j].kartaNodeId }, { kartaNodeId: newKartaNode.id });
+                            }
+                            let newKartaNodeChild = await Kartahistory.app.models.karta_node.create( newObj );
+                            await Kartahistory.app.models.karta_history.update({ parentNodeId: kartaHitoryDetails[j].kartaNodeId, kartaId }, { parentNodeId: newKartaNodeChild.id });
+                            await Kartahistory.app.models.karta_history.update({ kartaNodeId: kartaHitoryDetails[j].kartaNodeId, kartaId }, { kartaNodeId: newKartaNodeChild.id });
+                            await Kartahistory.app.models.karta_history.update({ "id": kartaHitoryDetails[j].id, kartaId }, { event_options: { created: newObj, updated: null, removed: null } });
+                            kartaHitoryDetails = await Kartahistory.find({ where: { versionId: currentVersionDetails.id, kartaId } });
                         }
                         else {
                             let newKartaNode = await Kartahistory.app.models.karta_node.create( kartaHitoryDetails[j].event_options.created );
-                            await Kartahistory.app.models.karta_history.update({ parentNodeId: kartaHitoryDetails[j].kartaNodeId }, { parentNodeId: newKartaNode.id });
-                            await Kartahistory.app.models.karta_history.update({ kartaNodeId: kartaHitoryDetails[j].kartaNodeId }, { kartaNodeId: newKartaNode.id });
+                            await Kartahistory.app.models.karta_history.update({ parentNodeId: kartaHitoryDetails[j].kartaNodeId, kartaId }, { parentNodeId: newKartaNode.id });
+                            await Kartahistory.app.models.karta_history.update({ kartaNodeId: kartaHitoryDetails[j].kartaNodeId, kartaId }, { kartaNodeId: newKartaNode.id });
+                            kartaHitoryDetails = await Kartahistory.find({ where: { versionId: currentVersionDetails.id, kartaId } });
                         }
                     }
                     else if ( kartaHitoryDetails[j].event == "node_updated" ) {
@@ -78,7 +80,9 @@ module.exports = function(Kartahistory) {
                 }
             }
 
-            return {"data": "Adding and Removing Done"};
+            await Kartahistory.app.models.karta.update( { "id": kartaId }, { versionId } );
+
+            return "Version updated successfully..!!";
         }
         catch(err){
             console.log(err);

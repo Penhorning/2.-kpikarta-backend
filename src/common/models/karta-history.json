@@ -142,8 +142,8 @@
         }
       ],
       "returns": {
-        "arg": "data",
-        "type": "object"
+        "arg": "message",
+        "type": "string"
       },
       "http": {
         "path": "/version-control",
