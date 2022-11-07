@@ -41,6 +41,10 @@
           "email": "string"
         }
       ]
+    },
+    "copyValue": {
+      "type": "number",
+      "default": 0
     }
   },
   "validations": [],
