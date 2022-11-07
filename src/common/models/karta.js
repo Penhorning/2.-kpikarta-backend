@@ -7,6 +7,10 @@ module.exports = function(Karta) {
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
+    let kartaId = "";
+    if (karta.hasOwnProperty("id")) kartaId = karta.id;
+    else kartaId = karta._id ;
+    
     if (emails.length > 0) {
       // Remove duplicate emails
       emails = [...new Set(emails)];
@@ -16,7 +20,7 @@ module.exports = function(Karta) {
         data.push({ email: emails[i] });
       }
 
-      Karta.update({ "_id": karta._id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+      Karta.update({ "_id": kartaId  }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
         if (err) console.log('> error while updating the karta sharedTo property ', err);
         else {
           next(null, "Karta shared successfully!");
@@ -30,7 +34,7 @@ module.exports = function(Karta) {
                 notificationData.push({
                   title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
                   type: "karta_shared",
-                  contentId: karta._id,
+                  contentId: kartaId ,
                   userId: item.id
                 });
               });
@@ -40,7 +44,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               emails = emails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
+              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${kartaId }`;
               // Send email to users
               emails.forEach(email => {
                 ejs.renderFile(path.resolve('templates/share-karta.ejs'),

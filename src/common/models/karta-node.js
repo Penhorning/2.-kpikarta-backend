@@ -34,7 +34,7 @@ module.exports = function (Kartanode) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-  // Share karta to multiple users
+  // Share karta node to multiple users
   Kartanode.share = (nodeId, userIds, next) => {
 
     if (userIds.length > 0) {

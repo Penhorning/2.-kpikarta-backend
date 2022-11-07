@@ -130,8 +130,8 @@ module.exports = function(User) {
     });
   }
 
-  // Add user via invite
-  User.invite = (data, next) => {
+  // Add user via invite member
+  User.inviteMember = (data, next) => {
     const { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
 
     const password = generator.generate({
@@ -228,8 +228,8 @@ module.exports = function(User) {
     });
   }
 
-  // Get all invites by company id
-  User.getAllInvites = (userId, page, limit, searchQuery, start, end, next) => {
+  // Get all members by company id
+  User.getAllMembers = (userId, type, page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -238,7 +238,10 @@ module.exports = function(User) {
       else {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         userId = User.getDataSource().ObjectID(userId);
-        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        
+        let query = {};
+        if (type === "all") query = { "companyId": user.companyId }
+        else query = { "companyId": user.companyId, "_id": { $ne: userId } };
 
         if (start && end) {
           query.createdAt = {
@@ -368,6 +371,8 @@ module.exports = function(User) {
           },
           ROLE_MAP_LOOKUP(role.id),
           UNWIND_ROLE_MAP,
+          ROLE_LOOKUP,
+          UNWIND_ROLE,
           SEARCH_MATCH,
           {
             $facet: {
@@ -608,17 +613,25 @@ module.exports = function(User) {
       }
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-        // Create company and assign it's id to the user
+        // Create company
         User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
           }
-          User.update({ "_id": user.id },  { "companyId": company.id }, err => {
+          // Find license
+          User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
             if (err) {
-              console.log('> error while updating user', err);
+              console.log('> error while finding license', err);
               return next(err);
-            } 
+            }
+            // Assign roleId, licenseId and companyId
+            User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+              if (err) {
+                console.log('> error while updating user', err);
+                return next(err);
+              } 
+            });
           });
         });
         // Create token
