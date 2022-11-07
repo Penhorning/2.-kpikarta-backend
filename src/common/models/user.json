@@ -401,7 +401,7 @@
         "path": "/add-admin"
       }
     },
-    "invite": {
+    "inviteMember": {
       "accepts": [
         {
           "arg": "data",
@@ -415,15 +415,37 @@
       },
       "http": {
         "verb": "post",
-        "path": "/invite"
+        "path": "/invite-member"
       }
     },
-    "getAllInvites": {
+    "sendCredentials": {
       "accepts": [
         {
           "arg": "userId",
           "type": "string",
           "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send-credentials"
+      }
+    },
+    "getAllMembers": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "type",
+          "type": "string",
+          "required": false
         },
         {
           "arg": "page",
@@ -452,12 +474,12 @@
         }
       ],
       "returns": {
-        "arg": "users",
+        "arg": "members",
         "type": "string"
       },
       "http": {
         "verb": "post",
-        "path": "/get-all-invites"
+        "path": "/get-all-members"
       }
     },
     "getAll": {

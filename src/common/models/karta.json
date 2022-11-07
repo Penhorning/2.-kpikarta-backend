@@ -41,6 +41,14 @@
           "email": "string"
         }
       ]
+    },
+    "selfCopyCount": {
+      "type": "number",
+      "default": 0
+    },
+    "sharedCopyCount": {
+      "type": "number",
+      "default": 0
     }
   },
   "validations": [],
@@ -182,10 +190,15 @@
         "verb": "post"
       }
     },
-    "kartaCopy": {
+    "copy": {
       "accepts": [
         {
           "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
           "type": "string",
           "required": true
         }
@@ -195,7 +208,7 @@
         "type": "string"
       },
       "http": {
-        "path": "/copy-shared-karta",
+        "path": "/copy",
         "verb": "post"
       }
     }
