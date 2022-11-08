@@ -373,6 +373,8 @@ module.exports = function(User) {
           UNWIND_ROLE_MAP,
           ROLE_LOOKUP,
           UNWIND_ROLE,
+          LICENSE_LOOKUP,
+          UNWIND_LICENSE,
           SEARCH_MATCH,
           {
             $facet: {
