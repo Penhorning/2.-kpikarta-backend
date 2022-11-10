@@ -8,6 +8,10 @@ module.exports = function(Karta) {
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
 
+    let kartaId = "";
+    if (karta.hasOwnProperty("id")) kartaId = karta.id;
+    else kartaId = karta._id ;
+
     // Check if any email has already been shared to the karta or not
     let duplicateFlag = false;
     let alreadySharedList = karta.sharedTo ? karta.sharedTo.map(x => x.email) : [];
@@ -27,7 +31,7 @@ module.exports = function(Karta) {
         data.push({ email: newEmails[i] });
       }
 
-      Karta.update({ "_id": karta.id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+      Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
         if (err) console.log('> error while updating the karta sharedTo property ', err);
         else {
           next(null, "Karta shared successfully!");
