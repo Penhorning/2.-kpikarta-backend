@@ -10,6 +10,15 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 
 module.exports = function(User) {
+  // Generate Password
+  const generatePassword = () => {
+    return generator.generate({
+      length: 8,
+      numbers: true,
+      symbols: "$@$!%*?&",
+      strict: true
+    });
+  }
   // Send SMS
   const sendSMS = (user, message) => {
     try {
@@ -134,12 +143,7 @@ module.exports = function(User) {
   User.inviteMember = (data, next) => {
     const { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
 
-    const password = generator.generate({
-      length: 8,
-      numbers: true,
-      symbols: true,
-      strict: true
-    });
+    const password = generatePassword();
     
     // Create user
     User.create({ fullName, email, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
@@ -188,12 +192,7 @@ module.exports = function(User) {
   // Send credentials
   User.sendCredentials = (userId, next) => {
 
-    const password = generator.generate({
-      length: 8,
-      numbers: true,
-      symbols: true,
-      strict: true
-    });
+    const password = generatePassword();
     
     // Update new password
     User.findOne({ where: { "_id": userId } }, (err, user) => {
@@ -656,12 +655,7 @@ module.exports = function(User) {
 
         // Send email and password to new users
         if (req.body.addedBy == "admin") {
-          let password = generator.generate({
-            length: 8,
-            numbers: true,
-            symbols: true,
-            strict: true
-          });
+          const password = generatePassword();
           user.updateAttributes({ password }, {}, err => {
             ejs.renderFile(path.resolve('templates/welcome.ejs'),
               { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
@@ -768,12 +762,13 @@ module.exports = function(User) {
     if (req.body.type == "social_user") {
       User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
         RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-          // Create company and assign it's id to the user
+          // Create company
           User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
             if (err) {
               console.log('> error while creating company', err);
               return next(err);
             }
+            // Assign companyId
             User.update({ "_id": user.id},  { "companyId": company.id}, err => {
               if (err) {
                 console.log('> error while updating user', err);
@@ -782,13 +777,13 @@ module.exports = function(User) {
             });
           });
           // Send welcome email to social users
-          let password = generator.generate({
-            length: 8,
-            numbers: true,
-            symbols: true,
-            strict: true
-          });
+          const password = generatePassword();
           user.updateAttributes({ password }, {}, (err) => {
+            // Create access token
+            user.accessTokens.create((err, token) => {
+              userInstance.__data.accessToken = token.id;
+              next();
+            });
             if (!user.email.includes("facebook.com")) {
               ejs.renderFile(path.resolve('templates/welcome.ejs'),
               { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
@@ -801,16 +796,10 @@ module.exports = function(User) {
                   console.log('> sending welcome email to social user:', user.email);
                   if (err) {
                     console.log('> error while sending welcome email to social user', err);
-                    return next(err);
                   }
                 });
               });
             }
-            // Create access token
-            user.accessTokens.create((err, token) => {
-              userInstance.__data.accessToken = token.id;
-              next();
-            });
           });
         });
       });
