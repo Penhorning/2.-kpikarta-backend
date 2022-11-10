@@ -49,6 +49,9 @@
     "sharedCopyCount": {
       "type": "number",
       "default": 0
+    },
+    "historyId": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -73,6 +76,14 @@
       "type": "hasOne",
       "model": "karta_version",
       "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_history": {
+      "type": "hasOne",
+      "model": "karta_history",
+      "foreignKey": "historyId",
       "options": {
         "nestRemoting": true
       }
