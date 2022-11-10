@@ -8,6 +8,10 @@ module.exports = function(Karta) {
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
 
+    let kartaId = "";
+    if (karta.hasOwnProperty("id")) kartaId = karta.id;
+    else kartaId = karta._id ;
+
     // Check if any email has already been shared to the karta or not
     let duplicateFlag = false;
     let alreadySharedList = karta.sharedTo ? karta.sharedTo.map(x => x.email) : [];
@@ -27,7 +31,7 @@ module.exports = function(Karta) {
         data.push({ email: newEmails[i] });
       }
 
-      Karta.update({ "_id": karta.id }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+      Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
         if (err) console.log('> error while updating the karta sharedTo property ', err);
         else {
           next(null, "Karta shared successfully!");
@@ -317,23 +321,21 @@ module.exports = function(Karta) {
 
 /* =============================REMOTE HOOKS=========================================================== */
     Karta.afterRemote('create', function(context, karta,  next) {
-        // Create Version
-
-        Karta.app.models.karta_version.create({ "name" : "1.0.0", "kartaId": karta.id }, {} , (err, result) => {
-          if (err) {
-              console.log('> error while creating karta version', err);
+      // Create Version
+      Karta.app.models.karta_version.create({ "name" : "1.0.0", "kartaId": karta.id }, {} , (err, result) => {
+        if (err) {
+          console.log('> error while creating karta version', err);
+          return next(err);
+        } else {
+          Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
+            if (err) {
+              console.log('> error while updating newly crated karta', err);
               return next(err);
-          } else {
-            Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
-                  if (err) {
-                      console.log('> error while updating newly crated karta', err);
-                      return next(err);
-                  } else next();
-            });
-          };
-        });
-
-        // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
+            } else next();
+          });
+        }
+      });
+      // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
         //     if (err) {
         //         console.log('> error while finding karta phase', err);
         //         return next(err);

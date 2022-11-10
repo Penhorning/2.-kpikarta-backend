@@ -33,6 +33,14 @@
       "options": {
         "disableInclude": true
       }
+    },
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
+      "options": {
+        "disableInclude": true
+      }
     }
   },
   "acls": [
@@ -70,6 +78,28 @@
       },
       "http": {
         "path": "/by-user",
+        "verb": "post"
+      }
+    },
+    "getColorsByKarta": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "color_settings",
+        "type": "color_setting"
+      },
+      "http": {
+        "path": "/by-karta",
         "verb": "post"
       }
     }
