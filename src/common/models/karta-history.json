@@ -149,6 +149,28 @@
         "path": "/version-control",
         "verb": "post"
       }
+    },
+    "undoFunctionality": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/undo-control",
+        "verb": "post"
+      }
     }
   }
 }
