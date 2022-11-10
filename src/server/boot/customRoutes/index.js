@@ -69,22 +69,4 @@ module.exports = function (app) {
             res.json(err);
         }
     });
-
-    // Get color settings by userId or global
-    app.post("/api/color-settings-by-user", async (req, res) => {
-        let { userId } = req.body;
-
-        try {
-            let result;
-            let userRresult = await req.app.models.color_setting.findOne({ where: { userId } });
-            if (userRresult) result = userRresult;
-            else {
-                let globalRresult = await req.app.models.color_setting.findOne({ where: { "userId" : { "exists" : false } } });
-                result = globalRresult;
-            }
-            res.json(result);
-        } catch(err) {
-            res.json(err);
-        }
-    });
 };
