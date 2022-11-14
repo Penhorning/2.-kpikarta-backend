@@ -102,13 +102,15 @@ module.exports = function(Kartahistory) {
 
     Kartahistory.undoFunctionality = async ( versionId, kartaId ) => {
         try {
-            // Its going to nothing.. check logic
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
             let tempHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'temp' }}); 
             let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
             let finalHistoryData = tempHistoryData.concat( mainHistoryData );
+            console.log(kartaDetails, 'kartaDetails');
+            console.log(finalHistoryData, 'finalHistoryData');
 
-            let toSetIndex = finalHistoryData.findIndex( x => x.id == kartaDetails.historyId );
+            let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
+            console.log(toSetIndex, 'toSetIndex');
 
             if ( toSetIndex != -1 ) {
                 await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
