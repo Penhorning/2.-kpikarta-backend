@@ -326,6 +326,7 @@ module.exports = function(Karta) {
       }
 
       await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
+      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
 
       return "Karta copy created successfully..!!";
     }
