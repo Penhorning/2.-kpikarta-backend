@@ -106,11 +106,7 @@ module.exports = function(Kartahistory) {
             let tempHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'temp' }}); 
             let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
             let finalHistoryData = tempHistoryData.concat( mainHistoryData );
-            console.log(kartaDetails, 'kartaDetails');
-            console.log(finalHistoryData, 'finalHistoryData');
-
             let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
-            console.log(toSetIndex, 'toSetIndex');
 
             if ( toSetIndex != -1 ) {
                 await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
