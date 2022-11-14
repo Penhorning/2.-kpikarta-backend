@@ -43,6 +43,13 @@
     },
     "parentNodeId": {
       "type": "string"
+    },
+    "historyType": {
+      "type": "string"
+    },
+    "undoCheck": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -117,6 +124,10 @@
         {
           "arg": "parentNodeId",
           "type": "string"
+        },
+        {
+          "arg": "historyType",
+          "type": "string"
         }
       ],
       "returns": {
@@ -164,8 +175,8 @@
         }
       ],
       "returns": {
-        "arg": "message",
-        "type": "string"
+        "arg": "data",
+        "type": "object"
       },
       "http": {
         "path": "/undo-control",
