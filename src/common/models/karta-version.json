@@ -18,5 +18,33 @@
   "validations": [],
   "relations": {},
   "acls": [],
-  "methods": {}
+  "methods": {
+    "createVersion": {
+      "accepts": [
+        {
+          "arg": "name",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-version",
+        "verb": "post"
+      }
+    }
+  }
 }

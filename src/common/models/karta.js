@@ -240,79 +240,95 @@ module.exports = function(Karta) {
 
   Karta.copy = async (kartaId, next) => {
     try {
-      // Finding Karta details which will be copied
-      let kartaData = await Karta.findOne({ where: { "_id": kartaId } });
+       const kartaDetails = await Karta.findOne({ where: { "id": kartaId }});
+       let newObj = {
+        name: kartaDetails.name ? kartaDetails.selfCopyCount == 0 ? kartaDetails.name + " - Copy" : `${kartaDetails.name} - Copy (${kartaDetails.selfCopyCount + 1})` : null,
+        userId: kartaDetails.userId ? kartaDetails.userId : null,
+        status: kartaDetails.status ? kartaDetails.status : null,
+        type: kartaDetails.type ? kartaDetails.type : null
+       }
+       const newKarta = await Karta.create(newObj);
+       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id }});
+       let lastHistoryOfKartaVersion = "";
+       let finalVersionId = "";
 
-      if (kartaData) {
-        // New Carta details accessed in newKarta variable
+       for ( let i = 0; i < versionDetails.length; i++ ) {
+        const currentVersion = versionDetails[i];
+        const newVersion = await Karta.app.models.karta_version.create({ "name" : currentVersion.name, "kartaId": newKarta.id });
 
-        // Creating new Karta with old details
-        let newObj = {
-          name: kartaData.name ? kartaData.selfCopyCount == 0 ? kartaData.name + " - Copy" : `${kartaData.name} - Copy (${kartaData.selfCopyCount + 1})` : null,
-          userId: kartaData.userId ? kartaData.userId : null,
-          status: kartaData.status ? kartaData.status : null,
-          type: kartaData.type ? kartaData.type : null
+        const oldVersionHistory = await Karta.app.models.karta_history.find({ where: { versionId: currentVersion.id, kartaId }});
+
+        for ( let k = 0; k < oldVersionHistory.length; k++ ) {
+          let history_data = {
+            event: oldVersionHistory[k].event,
+            event_options: oldVersionHistory[k].event_options,
+            kartaNodeId: oldVersionHistory[k].kartaNodeId,
+            versionId: newVersion.id,
+            userId: oldVersionHistory[k].userId,
+            kartaId: newKarta.id,
+            historyType: oldVersionHistory[k].historyType,
+          };
+          oldVersionHistory[k].parentNodeId ? history_data["parentNodeId"] = oldVersionHistory[k].parentNodeId : null;
+
+          await Karta.app.models.karta_history.create(history_data);
         }
-        await Karta.update({ "id": kartaId }, { "selfCopyCount" : kartaData.selfCopyCount + 1 });
-        let newKarta = await Karta.create(newObj);
 
-        // Initializing values Ids
-        let oldKartaId = kartaData.id;
-        let newKartaId = newKarta.id;
-        let oldNodeId = null;
-        let newNodeId = null;
+        await Karta.app.models.karta_node.remove({ or: [{ kartaId: newKarta.id }, { kartaDetailId: newKarta.id }] });
 
-        // Finding parent node with kartaId
-        let NodeData = await Karta.app.models.karta_node.findOne({ where: { "kartaId" : oldKartaId } });
-        oldNodeId = NodeData.id;
-
-        // Creating new Parent Node with old data
-        let newNodeObj = {
-          name: NodeData.name,
-          font_style: NodeData.font_style,
-          alignment: NodeData.alignment,
-          text_color: NodeData.text_color,
-          weightage: NodeData.weightage,
-          kartaId: newKartaId,
-          phaseId: NodeData.phaseId
-        };
-
-        let newParentNode = await Karta.app.models.karta_node.create(newNodeObj);
-        newNodeId = newParentNode.id;
-
-        // Recursion function created below to create child nodes of the parent node
-        async function createChildNodes(NodeIdOld, NodeIdNew){
-          try{
-            let ChildNodeData = await Karta.app.models.karta_node.find({ where: {'kartaDetailId': oldKartaId, 'parentId': NodeIdOld } });
-            if(ChildNodeData.length > 0){
-              for(let i = 0; i < ChildNodeData.length; i++){
-                let newChildObj = {
-                  name: ChildNodeData[i].name,
-                  font_style: ChildNodeData[i].font_style,
-                  alignment: ChildNodeData[i].alignment,
-                  text_color: ChildNodeData[i].text_color,
-                  weightage: ChildNodeData[i].weightage,
-                  kartaDetailId: newKartaId,
-                  phaseId: ChildNodeData[i].phaseId,
-                  parentId: NodeIdNew
+        let tempHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id , kartaId: newKarta.id , historyType: 'temp', "undoCheck" : false }}); 
+        let mainHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id , kartaId: newKarta.id , historyType: 'main', "undoCheck" : false }});
+        let finalHistoryData = tempHistoryData.concat(mainHistoryData);
+        
+        for( let j = 0; j < finalHistoryData.length; j++ ) {
+            if( finalHistoryData[j].event == "node_created" ) {
+                if( finalHistoryData[j].parentNodeId ) {
+                    let newObj = {
+                        ...finalHistoryData[j].event_options.created,
+                        parentId: finalHistoryData[j].parentNodeId,
+                        kartaDetailId: newKarta.id,
+                    };
+                    let newKartaNodeChild = await Karta.app.models.karta_node.create( newObj );
+                    await Karta.app.models.karta_history.update({ "parentNodeId": finalHistoryData[j].kartaNodeId, kartaId: newKarta.id, versionId: newVersion.id }, { "parentNodeId": newKartaNodeChild.id });
+                    await Karta.app.models.karta_history.update({ "kartaNodeId": finalHistoryData[j].kartaNodeId, kartaId: newKarta.id, versionId: newVersion.id }, { "kartaNodeId": newKartaNodeChild.id });
+                    await Karta.app.models.karta_history.update({ "id": finalHistoryData[j].id, kartaId: newKarta.id, versionId: newVersion.id }, { event_options: { "created": newObj, "updated": null, "removed": null } });
+                    let tempHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'temp', "undoCheck" : false }}); 
+                    let mainHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'main', "undoCheck" : false }});
+                    finalHistoryData = tempHistoryData.concat(mainHistoryData);
                 }
-  
-                let newChildNode = await Karta.app.models.karta_node.create(newChildObj);
-                if(newChildNode){
-                  createChildNodes(ChildNodeData[i].id, newChildNode.id);
+                else {
+                    let newObj = {
+                      ...finalHistoryData[j].event_options.created,
+                      kartaId: newKarta.id,
+                    };
+                    let newKartaNode = await Karta.app.models.karta_node.create( newObj );
+                    await Karta.app.models.karta_history.update({ "parentNodeId": finalHistoryData[j].kartaNodeId, kartaId: newKarta.id, versionId: newVersion.id }, { parentNodeId: newKartaNode.id });
+                    await Karta.app.models.karta_history.update({ "kartaNodeId": finalHistoryData[j].kartaNodeId, kartaId: newKarta.id, versionId: newVersion.id }, { kartaNodeId: newKartaNode.id });
+                    await Karta.app.models.karta_history.update({ "id": finalHistoryData[j].id, kartaId: newKarta.id, versionId: newVersion.id }, { event_options: { "created": newObj, "updated": null, "removed": null } });
+                    let tempHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'temp', "undoCheck" : false }}); 
+                    let mainHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'main', "undoCheck" : false }});
+                    finalHistoryData = tempHistoryData.concat(mainHistoryData);
                 }
-              }
             }
-            else return;
-          }
-          catch(er) {
-            console.log(er);
-          }
-        }
+            else if ( finalHistoryData[j].event == "node_updated" ) {
+                await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+            }
+            else if ( finalHistoryData[j].event == "node_removed" ) {
+                await Karta.app.models.karta_node.remove( { "id": finalHistoryData[j].kartaNodeId } );
+            }
+            // else if ( finalHistoryData[j].event == "node_update_key_remove" ) {
+            // }
 
-        // Calling the above recursion function with ParentNode Id for new and old
-        createChildNodes(oldNodeId, newNodeId);
+            if( j == finalHistoryData.length - 1 ){
+                lastHistoryOfKartaVersion = finalHistoryData[j].id;
+                finalVersionId = finalHistoryData[j].versionId;
+            }
+        }
       }
+
+      await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
+      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
+
+      return "Karta copy created successfully..!!";
     }
     catch(err) {
       console.log(err);
@@ -320,9 +336,9 @@ module.exports = function(Karta) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
-    Karta.afterRemote('create', function(context, karta,  next) {
+    Karta.afterRemote('create', function(context, karta, next) {
       // Create Version
-      Karta.app.models.karta_version.create({ "name" : "1.0.0", "kartaId": karta.id }, {} , (err, result) => {
+      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (err, result) => {
         if (err) {
           console.log('> error while creating karta version', err);
           return next(err);
@@ -335,19 +351,5 @@ module.exports = function(Karta) {
           });
         }
       });
-      // Karta.app.models.karta_phase.findOne({ where:{ "name": "Goal" } }, (err, phase) => {
-        //     if (err) {
-        //         console.log('> error while finding karta phase', err);
-        //         return next(err);
-        //     } else {
-        //         // Add default root node
-        //         Karta.app.models.karta_node.create({ "name": karta.name, "kartaId": karta.id, "phaseId": phase.id }, {}, err => {
-        //             if (err) {
-        //                 console.log('> error while creating karta node', err);
-        //                 return next(err);
-        //             } else next();
-        //         });
-        //     }
-        // });
     });
 };
