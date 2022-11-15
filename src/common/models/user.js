@@ -451,7 +451,7 @@ module.exports = function(User) {
   User.verifyEmail = function(otp, next) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
-      this.app.currentUser.updateAttributes({emailVerified: true, emailVerificationCode: ''}, (err)=>{
+      this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
         next(err, this.app.currentUser);
       });
     } else {
@@ -631,7 +631,7 @@ module.exports = function(User) {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
-              } 
+              }
             });
           });
         });
