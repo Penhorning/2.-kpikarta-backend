@@ -768,12 +768,19 @@ module.exports = function(User) {
               console.log('> error while creating company', err);
               return next(err);
             }
-            // Assign companyId
-            User.update({ "_id": user.id},  { "companyId": company.id}, err => {
+            // Find license
+            User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
               if (err) {
-                console.log('> error while updating user', err);
+                console.log('> error while finding license', err);
                 return next(err);
-              } 
+              }
+              // Assign roleId, licenseId and companyId
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+                if (err) {
+                  console.log('> error while updating social user', err);
+                  return next(err);
+                } 
+              });
             });
           });
           // Send welcome email to social users
