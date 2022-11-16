@@ -238,9 +238,13 @@ module.exports = function(User) {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         userId = User.getDataSource().ObjectID(userId);
         
-        let query = {};
-        if (type === "all") query = { "companyId": user.companyId }
-        else query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        if (type === "all") query = { "companyId": user.companyId };
+        else if (type === "members") {
+          if (user.departmentId) {
+            query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } };
+          } else query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        }
 
         if (start && end) {
           query.createdAt = {
@@ -727,7 +731,6 @@ module.exports = function(User) {
                 console.log('> sending verification code email to:', user.email);
                 if (err) {
                   console.log('> error while sending verification code email', err);
-                  return next(err);
                 }
               });
             });
