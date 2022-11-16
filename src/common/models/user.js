@@ -146,7 +146,7 @@ module.exports = function(User) {
     const password = generatePassword();
     
     // Create user
-    User.create({ fullName, email, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -451,7 +451,7 @@ module.exports = function(User) {
   User.verifyEmail = function(otp, next) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
-      this.app.currentUser.updateAttributes({emailVerified: true, emailVerificationCode: ''}, (err)=>{
+      this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
         next(err, this.app.currentUser);
       });
     } else {
@@ -631,7 +631,7 @@ module.exports = function(User) {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
-              } 
+              }
             });
           });
         });
@@ -656,7 +656,7 @@ module.exports = function(User) {
         // Send email and password to new users
         if (req.body.addedBy == "admin") {
           const password = generatePassword();
-          user.updateAttributes({ password }, {}, err => {
+          user.updateAttributes({ "emailVerified": true, password }, {}, err => {
             ejs.renderFile(path.resolve('templates/welcome.ejs'),
               { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
                 User.app.models.Email.send({
@@ -768,12 +768,19 @@ module.exports = function(User) {
               console.log('> error while creating company', err);
               return next(err);
             }
-            // Assign companyId
-            User.update({ "_id": user.id},  { "companyId": company.id}, err => {
+            // Find license
+            User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
               if (err) {
-                console.log('> error while updating user', err);
+                console.log('> error while finding license', err);
                 return next(err);
-              } 
+              }
+              // Assign roleId, licenseId and companyId
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+                if (err) {
+                  console.log('> error while updating social user', err);
+                  return next(err);
+                } 
+              });
             });
           });
           // Send welcome email to social users
