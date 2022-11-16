@@ -114,16 +114,16 @@ module.exports = function(Kartahistory) {
     Kartahistory.undoFunctionality = async ( versionId, kartaId ) => {
         try {
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
-            let tempHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'temp' }}); 
             let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
-            let finalHistoryData = tempHistoryData.concat( mainHistoryData );
+            let finalHistoryData = mainHistoryData;
             let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
 
             if ( toSetIndex != -1 ) {
                 await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
+                await Kartahistory.app.models.karta_node.remove({ "id": finalHistoryData[toSetIndex].kartaNodeId });
                 let nextHistoryIndex = toSetIndex - 1;
                 if ( nextHistoryIndex >= 0 ) {
-                    await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id })
+                    await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id });
                     return { "message": "done", "data": finalHistoryData[toSetIndex] };
                 }
                 else {
@@ -132,6 +132,16 @@ module.exports = function(Kartahistory) {
             } else {
                 return { "message": "nothing", "data": null };
             }
+        }
+        catch(err) {
+            console.log(err);
+        }
+    }
+
+    Kartahistory.syncKartaHistory = async (versionId, kartaId) => {
+        try {
+            await Kartahistory.remove({ kartaId, versionId, undoCheck: true });
+            return "Karta history is in sync..!!"
         }
         catch(err) {
             console.log(err);

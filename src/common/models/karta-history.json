@@ -182,6 +182,28 @@
         "path": "/undo-control",
         "verb": "post"
       }
+    },
+    "syncKartaHistory": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/sync-history",
+        "verb": "post"
+      }
     }
   }
 }
