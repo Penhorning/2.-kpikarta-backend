@@ -310,7 +310,19 @@ module.exports = function(Karta) {
                 }
             }
             else if ( finalHistoryData[j].event == "node_updated" ) {
-                await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+                if(finalHistoryData[j].event_options.updated.parentId){
+                  let newObj = {
+                    ...finalHistoryData[j].event_options.updated,
+                    parentId: finalHistoryData[j].parentNodeId,
+                  };
+                  await Karta.app.models.karta_history.update( { "id": finalHistoryData[j].id }, { event_options: { "created": null, "updated": newObj, "removed": null } } );
+                  let tempHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'temp', "undoCheck" : false }}); 
+                  let mainHistoryData = await Karta.app.models.karta_history.find({ where: { versionId: newVersion.id, kartaId: newKarta.id, historyType: 'main', "undoCheck" : false }});
+                  finalHistoryData = tempHistoryData.concat(mainHistoryData);
+                  await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+                } else {
+                  await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+                }
             }
             else if ( finalHistoryData[j].event == "node_removed" ) {
                 await Karta.app.models.karta_node.remove( { "id": finalHistoryData[j].kartaNodeId } );
