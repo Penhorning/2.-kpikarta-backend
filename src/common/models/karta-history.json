@@ -25,6 +25,9 @@
       "type": "object",
       "required": true
     },
+    "old_options": {
+      "type": "object"
+    },
     "kartaNodeId": {
       "type": "string",
       "required": true
@@ -98,6 +101,11 @@
         },
         {
           "arg": "eventValue",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "oldValue",
           "type": "object",
           "required": false
         },
@@ -180,6 +188,28 @@
       },
       "http": {
         "path": "/undo-control",
+        "verb": "post"
+      }
+    },
+    "redoFunctionality": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/redo-control",
         "verb": "post"
       }
     },
