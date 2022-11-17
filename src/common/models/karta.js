@@ -55,7 +55,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
+              let kartaLink = `${process.env.WEB_URL}//karta/edit/${karta._id}`;
               // Send email to users
               newEmails.forEach(email => {
                 ejs.renderFile(path.resolve('templates/share-karta.ejs'),
