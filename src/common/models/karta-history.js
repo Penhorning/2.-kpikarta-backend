@@ -1,7 +1,7 @@
 'use strict';
 
 module.exports = function(Kartahistory) {
-    Kartahistory.createKartaHistory = (event, eventValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, next) => {
+    Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, next) => {
         const event_object = {
             "node_created": "created",
             "node_updated": "updated",
@@ -27,6 +27,7 @@ module.exports = function(Kartahistory) {
 
         event_options_obj[event_object[event]] = eventValue;
         history_data["event_options"] = event_options_obj;
+        oldValue ? history_data["old_options"] = oldValue : null;
 
         Kartahistory.create( history_data, {}, (err, response) => {
             if (err) {
@@ -114,24 +115,76 @@ module.exports = function(Kartahistory) {
     Kartahistory.undoFunctionality = async ( versionId, kartaId ) => {
         try {
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
-            let tempHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'temp' }}); 
             let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
-            let finalHistoryData = tempHistoryData.concat( mainHistoryData );
+            let finalHistoryData = mainHistoryData;
             let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
 
             if ( toSetIndex != -1 ) {
-                await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
-                let nextHistoryIndex = toSetIndex - 1;
-                if ( nextHistoryIndex >= 0 ) {
-                    await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id })
-                    return { "message": "done", "data": finalHistoryData[toSetIndex] };
+                if( finalHistoryData[toSetIndex].event == "node_created" ){
+                    if ( toSetIndex > 0 ) {
+                        await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
+                        await Kartahistory.app.models.karta_node.remove({ "id": finalHistoryData[toSetIndex].kartaNodeId });
+                    }
+                    let nextHistoryIndex = toSetIndex - 1;
+                    if ( nextHistoryIndex >= 0 ) {
+                        await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id });
+                        return { "message": "done", "data": finalHistoryData[toSetIndex] };
+                    }
+                    else {
+                        return { "message": "final", "data": null };
+                    }
                 }
-                else {
+                else if ( finalHistoryData[toSetIndex].event == "node_updated" ) {
+                    await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
+                    let nextHistoryIndex = toSetIndex - 1;
+                    if ( nextHistoryIndex >= 0 ) {
+                        await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id });
+                        return { "message": "done", "data": finalHistoryData[toSetIndex] };
+                    }
+                    else {
+                        return { "message": "final", "data": null };
+                    }
+                }
+            } else {
+                return { "message": "nothing", "data": null };
+            }
+        }
+        catch(err) {
+            console.log(err);
+        }
+    }
+
+    Kartahistory.redoFunctionality = async ( versionId, kartaId ) => {
+        try {
+            let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
+            let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
+            let finalHistoryData = mainHistoryData;
+            let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
+
+            if ( toSetIndex != -1 ) {
+                if ( toSetIndex+1 < finalHistoryData.length ) {
+                    await Kartahistory.update({ "id": finalHistoryData[toSetIndex+1].id }, { "undoCheck" : false });
+                    await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[toSetIndex+1].id });
+                    return { "message": "done", "data": finalHistoryData[toSetIndex+1] };
+                }
+                else if (toSetIndex+1 == finalHistoryData.length){
+                    return { "message": "final", "data": null };
+                } else {
                     return { "message": "final", "data": null };
                 }
             } else {
                 return { "message": "nothing", "data": null };
             }
+        }
+        catch(err) {
+            console.log(err);
+        }
+    }
+
+    Kartahistory.syncKartaHistory = async (versionId, kartaId) => {
+        try {
+            await Kartahistory.remove({ kartaId, versionId, undoCheck: true });
+            return "Karta history is in sync..!!"
         }
         catch(err) {
             console.log(err);
