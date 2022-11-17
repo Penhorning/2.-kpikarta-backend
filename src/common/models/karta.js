@@ -55,7 +55,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit-karta/${karta._id}`;
+              let kartaLink = `${process.env.WEB_URL}//karta/edit/${karta._id}`;
               // Send email to users
               newEmails.forEach(email => {
                 ejs.renderFile(path.resolve('templates/share-karta.ejs'),
@@ -321,7 +321,9 @@ module.exports = function(Karta) {
                   finalHistoryData = tempHistoryData.concat(mainHistoryData);
                   await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                 } else {
-                  await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+                  if(!finalHistoryData[j].event_options.updated.hasOwnProperty("contributorId")){
+                    await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
+                  }
                 }
             }
             else if ( finalHistoryData[j].event == "node_removed" ) {
