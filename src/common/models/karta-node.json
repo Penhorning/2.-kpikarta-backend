@@ -39,6 +39,10 @@
       "type": "string",
       "default": "#000000"
     },
+    "type_value": {
+      "type": "string",
+      "default": "measure"
+    },
     "node_type": {
       "type": {
         "metrics": "boolean",
@@ -335,6 +339,28 @@
       },
       "http": {
         "path": "/delete",
+        "verb": "post"
+      }
+    },
+    "calculationPeriod": {
+      "accepts": [
+        {
+          "arg": "nodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "type",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/calculation-period",
         "verb": "post"
       }
     }

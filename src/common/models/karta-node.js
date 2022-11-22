@@ -32,7 +32,6 @@ module.exports = function (Kartanode) {
     }
   }
 
-
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta node to multiple users
   Kartanode.share = (nodeId, userIds, next) => {
@@ -286,6 +285,107 @@ module.exports = function (Kartanode) {
     })
   }
 
+  Kartanode.calculationPeriod = async (nodeId, type, next) => {
+    try {
+      if ( type == "month-to-date" ) {
+        // Month To Date Calculation
+        const totalDays = moment().daysInMonth();
+        const todayDate = moment().date();
+        const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
+        if ( kartaNodeDetails ) {
+          let element = kartaNodeDetails;
+          let targetValue = element.target[0].value;
+          targetValue = todayDate * (targetValue / totalDays); // target value per day
+          let current_percentage= (element.achieved_value/targetValue) * 100;
+          element.percentage = Math.round(current_percentage);
+          element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
+          return { message: "Percentage calculated..!!", data: element.percentage };
+        }
+        else {
+          return { message: "Karta Node not found..!!", data: null };
+        }
+      }
+      else if ( type == "year-to-date" ) { 
+        // Year To Date Calculation
+        const currentYear = moment().year();
+        const totalDays = moment([currentYear]).isLeapYear() ? 366 : 365;
+        const todayDate = moment().date();
+        const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
+        if ( kartaNodeDetails ) {
+          let element = kartaNodeDetails;
+          let targetValue = element.target.find((item) => item.frequency === 'annually').value;
+          targetValue = todayDate * (targetValue / totalDays);  // target value per day
+          let current_percentage= (element.achieved_value/targetValue) * 100;
+          element.percentage = Math.round(current_percentage);
+          element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
+          return { message: "Percentage calculated..!!", data: element.percentage };
+        }
+        else {
+          return { message: "Karta Node not found..!!", data: null };
+        }
+      }
+      else if ( type == "month-over-month" ) { 
+        // Month Over Month Calculation
+
+        const currentYear = moment().year();
+        const currentMonth = moment().month() + 1;
+        const todayDate = moment().date();
+        const previousMonth = currentMonth == 1 ? currentMonth : currentMonth - 1;
+        const lastMonthLastDate = moment(`${currentYear-previousMonth}`, "YYYY-MM").daysInMonth();
+        
+        let currentMonthQuery = {
+          event: "node_updated",
+          kartaNodeId: nodeId,
+          and: [
+            { "createdAt": { gte: new Date(new Date(`${currentYear}-${currentMonth}-01`).setUTCHours(0,0,0,0)) } },
+            { "createdAt": { lte: new Date(new Date(`${currentYear}-${currentMonth}-${todayDate}`).setUTCHours(23,59,59,999)) } }
+          ]
+        };
+
+        let previousMonthQuery = {
+          event: "node_updated",
+          kartaNodeId: nodeId,
+          and: [
+            { "createdAt": { gte: new Date(new Date(`${currentYear}-${previousMonth}-01`).setUTCHours(0,0,0,0)), } },
+            { "createdAt": { lte: new Date(new Date(`${currentYear}-${previousMonth}-${lastMonthLastDate}`).setUTCHours(23,59,59,999)) } }
+          ]
+        };
+
+        const currentMonthHistoryDetails = await Kartanode.app.models.karta_history.find({ where: currentMonthQuery });
+        let currentMonthData = {};
+
+        const previousMonthhistoryDetails = await Kartanode.app.models.karta_history.find({ where: previousMonthQuery });
+        let previousMonthData = {};
+
+        if ( currentMonthHistoryDetails.length > 0 ) {
+          const sortedHistory = currentMonthHistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
+          currentMonthData = sortedHistory[sortedHistory.length - 1];
+        }
+        else {
+          currentMonthQuery["event"] = "node_created";
+        }
+        
+        return { message: "Karta Node not found..!!", data: null };
+        // --------------- Algorithm-------------
+        // 1. Find current month and previous month
+        // 2. Find latest target value of previous month and current month using history
+        // 3. Find the difference between last month percentage minus current month percentage
+        // 4. return value
+      }
+      else if ( type == "year-over-year" ) { 
+        // Year Over Year Calculation
+
+        // --------------- Algorithm-------------
+        // 1. Find current year and previous month
+        // 2. Find latest target value of previous month and current month using history
+        // 3. Find the difference between last month value minus current month value
+        // 4. return value
+      }
+    }
+    catch(err) {
+      console.log(err);
+    }
+  }
 
 /* =============================REMOTE HOOKS=========================================================== */
   // Include childrens when fetching nodes by kartaId
