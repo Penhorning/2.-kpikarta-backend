@@ -164,3 +164,7 @@ app.middleware('session', session({
   saveUninitialized: true,
   resave: true,
 }));
+
+// Cron jobs
+const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
+sendTargetAlertsCron(app);
