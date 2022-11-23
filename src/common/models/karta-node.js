@@ -325,7 +325,7 @@ module.exports = function (Kartanode) {
         }
       }
       else if ( type == "month-over-month" || type == "year-over-year" ) { 
-        // Month Over Month Calculation
+        // Month Over Month and Year Over Year Calculation
 
         const currentYear = moment().year();
         const currentMonth = moment().month() + 1;
