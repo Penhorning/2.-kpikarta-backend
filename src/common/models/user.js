@@ -10,34 +10,9 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 
 module.exports = function(User) {
-  // Generate Password
-  const generatePassword = () => {
-    return generator.generate({
-      length: 8,
-      numbers: true,
-      symbols: "$@$!%*?&",
-      strict: true
-    });
-  }
-  // Send SMS
-  const sendSMS = (user, message) => {
-    try {
-      let smsOptions = {
-        type: 'sms',
-        to: user.mobile.e164Number,
-        from: "+16063667831",
-        body: message
-      };
-      User.app.models.Twilio.send(smsOptions, (err, data) => {
-        console.log('> sending code to mobile number:', user.mobile.e164Number);
-        if (err) console.log('> error while sending code to mobile number', err);
-      });
-    } catch (error) {
-      console.error("> error in SMS function", error);
-    }
-  }
-
-  // QUERY VARIABLES
+  /* QUERY VARIABLES
+  ----------------*/
+  // Role map lookup
   const ROLE_MAP_LOOKUP = (roleId) => {
     return {
       $lookup: {
@@ -52,6 +27,30 @@ module.exports = function(User) {
                 $and: [
                   { $eq: ["$principalId", "$$user_id"] },
                   { $ne: ["$roleId", roleId] }
+                ]
+              }
+            }
+          }
+        ],
+        as: "RoleMap"
+      }
+    }
+  }
+  // Role map lookup for company admin
+  const ROLE_MAP_LOOKUP_COMPANY_ADMIN = (roleId) => {
+    return {
+      $lookup: {
+        from: "RoleMapping",
+        let: {
+          user_id: "$_id"
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$principalId", "$$user_id"] },
+                  { $eq: ["$roleId", roleId] }
                 ]
               }
             }
@@ -107,6 +106,59 @@ module.exports = function(User) {
     $unwind: {
       path: "$department",
       preserveNullAndEmptyArrays: true
+    }
+  }
+  // Project
+  const PROJECT = {
+    $project: {
+      '_id': 1,
+      'fullName': 1,
+      'email': 1,
+      'emailVerified': 1,
+      'mobile': 1,
+      'mobileVerified': 1,
+      'street': 1,
+      'city': 1,
+      'state': 1,
+      'postal_code': 1,
+      'country': 1,
+      'profilePic': 1,
+      'license': 1,
+      'Role': 1,
+      'department': 1,
+      'active': 1,
+      'updatedAt': 1,
+      'createdAt': 1
+    }
+  }
+  
+  /* General Methods
+  ---------------*/
+  // Generate Password
+  const generatePassword = () => {
+    return generator.generate({
+      length: 8,
+      numbers: true,
+      // symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      symbols: "@$!%*#?&",
+      strict: true
+    });
+  }
+  // Send SMS
+  const sendSMS = (user, message) => {
+    try {
+      let smsOptions = {
+        type: 'sms',
+        to: user.mobile.e164Number,
+        from: "+16063667831",
+        body: message
+      };
+      User.app.models.Twilio.send(smsOptions, (err, data) => {
+        console.log('> sending code to mobile number:', user.mobile.e164Number);
+        if (err) console.log('> error while sending code to mobile number', err);
+      });
+    } catch (error) {
+      console.error("> error in SMS function", error);
     }
   }
 
@@ -239,8 +291,7 @@ module.exports = function(User) {
         userId = User.getDataSource().ObjectID(userId);
         
         let query = { "companyId": user.companyId, "_id": { $ne: userId } };
-        // if (type === "all") query = { "companyId": user.companyId };
-        if (type === "all") query = { };
+        if (type === "all") query = { "companyId": user.companyId };
         else if (type === "members") {
           if (user.departmentId) {
             query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } };
@@ -294,6 +345,7 @@ module.exports = function(User) {
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
+            PROJECT,
             {
               $facet: {
                 metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
@@ -363,7 +415,7 @@ module.exports = function(User) {
       }
     }
     // Find user role
-    User.app.models.Role.findOne({ where: {"name": "admin"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: {"name": "company_admin"} }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
@@ -373,13 +425,14 @@ module.exports = function(User) {
           {
             $sort: { "createdAt": -1 }
           },
-          ROLE_MAP_LOOKUP(role.id),
+          ROLE_MAP_LOOKUP_COMPANY_ADMIN(role.id),
           UNWIND_ROLE_MAP,
           ROLE_LOOKUP,
           UNWIND_ROLE,
           LICENSE_LOOKUP,
           UNWIND_LICENSE,
           SEARCH_MATCH,
+          PROJECT,
           {
             $facet: {
               metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],

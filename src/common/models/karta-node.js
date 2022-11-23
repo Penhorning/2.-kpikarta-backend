@@ -299,10 +299,10 @@ module.exports = function (Kartanode) {
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
-          return { message: "Percentage calculated..!!", data: element.percentage };
+          return { message: "Percentage calculated..!!", percentage: element.percentage };
         }
         else {
-          return { message: "Karta Node not found..!!", data: null };
+          return { message: "Karta Node not found..!!", percentage: null };
         }
       }
       else if ( type == "year-to-date" ) { 
@@ -318,10 +318,10 @@ module.exports = function (Kartanode) {
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
-          return { message: "Percentage calculated..!!", data: element.percentage };
+          return { message: "Percentage calculated..!!", percentage: element.percentage };
         }
         else {
-          return { message: "Karta Node not found..!!", data: null };
+          return { message: "Karta Node not found..!!", percentage: null };
         }
       }
       else if ( type == "month-over-month" || type == "year-over-year" ) { 

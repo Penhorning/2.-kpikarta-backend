@@ -54,6 +54,7 @@
         ],
         "formula": "string"
       }
+
     },
     "start_date": {
       "type": "date"
@@ -94,14 +95,14 @@
     "is_achieved_modified": {
       "type": "boolean"
     },
-    "threshold_value": {
-      "type": "number"
-    },
     "alert_type": {
       "type": "string"
     },
     "alert_frequency": {
       "type": "string"
+    },
+    "last_alert_sent_on": {
+      "type": "date"
     },
     "sharedTo": {
       "type": [
@@ -146,7 +147,7 @@
       }
     },
     "contributor": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "user",
       "foreignKey": "contributorId",
       "options": {
@@ -154,7 +155,7 @@
       }
     },
     "notify_user": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "user",
       "foreignKey": "notifyUserId",
       "options": {
@@ -187,28 +188,6 @@
     }
   ],
   "methods": {
-    "share": {
-      "accepts": [
-        {
-          "arg": "nodeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userIds",
-          "type": "array",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/share",
-        "verb": "post"
-      }
-    },
     "kpiCreators": {
       "accepts": [
         {
