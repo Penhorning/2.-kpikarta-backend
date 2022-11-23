@@ -139,7 +139,8 @@ module.exports = function(User) {
     return generator.generate({
       length: 8,
       numbers: true,
-      symbols: "$@$!%*?&",
+      // symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      symbols: "@$!%*#?&",
       strict: true
     });
   }
@@ -290,8 +291,7 @@ module.exports = function(User) {
         userId = User.getDataSource().ObjectID(userId);
         
         let query = { "companyId": user.companyId, "_id": { $ne: userId } };
-        // if (type === "all") query = { "companyId": user.companyId };
-        if (type === "all") query = { };
+        if (type === "all") query = { "companyId": user.companyId };
         else if (type === "members") {
           if (user.departmentId) {
             query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } };

@@ -26,8 +26,8 @@ const models = [
         }
     }
 ]
-exports.sendTargetAlertsCron = async (app) => {
 
+exports.sendTargetAlertsCron = async (app) => {
     // Date variables
     const todayDate = moment().date();
     const currentYear = moment().year();
@@ -94,60 +94,67 @@ exports.sendTargetAlertsCron = async (app) => {
             const todayTargetValue = todayDate * (item.target[0].value / 90);
             const percentage = (item.achieved_value/todayTargetValue) * 100;
             sendAlert({ percentage, thresholdValue, todayTargetValue }, item);
-        } else if (item.target[0].frequency === 'yearly') {
+        } else if (item.target[0].frequency === 'annually') {
             const todayTargetValue = dayOfYear * (item.target[0].value / daysInYear);
             const percentage = (item.achieved_value/todayTargetValue) * 100;
             sendAlert({ percentage, thresholdValue, todayTargetValue }, item);
         }
     }
-    try {
-        let todayDate = moment().tz("Asia/Kolkata").toDate();
-        todayDate= moment(todayDate).format("YYYY-MM-DD[T]" + "00:00:00");
-        const previousDate = moment(todayDate).subtract(1, 'days').format("YYYY-MM-DD[T]" + "00:00:00");
-
-        // FIND THE KPI NODES WHOSE ALERT_TYPE OR ALERT_FREQUENCY IS BLANK
-        const onlyNotificationQuery = {
-            "target.0.value": { gt: 0 },
-            "contributorId": { exists: true },
-            "is_deleted": false,
-            "due_date": { gte: previousDate, lt: todayDate },
-            "notifyUserId": { exists: true },
-            "is_achieved_modified": false,
-            or: [ { "alert_frequency": "" }, { "alert_type": "" } ]
-        }
-        const onlyNotificationNodes = await app.models.KartaNode.find({ where: onlyNotificationQuery, include: models });
-        
-        if (onlyNotificationNodes.length > 0) {
-            console.log(`==========>>>>> ${onlyNotificationNodes.length} KPI Nodes (Only Notification) found at ${new Date()}`);
-            // Prepare notification collection data
-            let notificationData = [];
-            onlyNotificationNodes.forEach(item => {
-                notificationData.push({
-                title: `${item.contributor().fullName} has not completely fill the ${item.name}'s achieved value in ${item.karta_detail().name}`,
-                type: "kpi_node_alert",
-                contentId: item.kartaDetailId,
-                userId: item.notifyUserId
+    /* Find KPI node's which is lapsed, send it to node_alert table */
+    // running once at 04:00 EDT & 08:00 UTC & 13:30 IST
+    cron.schedule('30 13 * * *', async() => {
+        try {
+            let todayDate = moment().tz("Asia/Kolkata").toDate();
+            todayDate= moment(todayDate).format("YYYY-MM-DD[T]" + "00:00:00");
+            const previousDate = moment(todayDate).subtract(1, 'days').format("YYYY-MM-DD[T]" + "00:00:00");
+    
+            // FIND THE KPI NODES WHOSE ALERT_TYPE OR ALERT_FREQUENCY IS BLANK
+            const onlyNotificationQuery = {
+                "target.0.value": { gt: 0 },
+                "contributorId": { exists: true },
+                "is_deleted": false,
+                "due_date": { gte: previousDate, lt: todayDate },
+                "notifyUserId": { exists: true },
+                "is_achieved_modified": false,
+                or: [ { "alert_frequency": "" }, { "alert_type": "" } ]
+            }
+            const onlyNotificationNodes = await app.models.KartaNode.find({ where: onlyNotificationQuery, include: models });
+            
+            if (onlyNotificationNodes.length > 0) {
+                console.log(`==========>>>>> ${onlyNotificationNodes.length} KPI Nodes (Only Notification) found at ${new Date()}`);
+                // Prepare notification collection data
+                let notificationData = [];
+                onlyNotificationNodes.forEach(item => {
+                    notificationData.push({
+                    title: `${item.contributor().fullName} has not completely fill the ${item.name}'s achieved value in ${item.karta_detail().name}`,
+                    type: "kpi_node_alert",
+                    contentId: item.kartaDetailId,
+                    userId: item.notifyUserId
+                    });
                 });
-            });
-            await app.models.notification.create(notificationData);
-        }
-
-        // FIND THE KPI NODES WHOSE ALERT_TYPE AND ALERT_FREQUENCY IS EXIST
-        const notificationQuery = {
-            "start_date": { lt: todayDate },
-            "contributorId": { exists: true },
-            "is_deleted": false,
-            // "is_achieved_modified": true,
-            "alert_frequency": { exists: true, neq: "" }
-        }
-        const notificationNodes = await app.models.KartaNode.find({ where: notificationQuery, include: models });
-
-        if (notificationNodes.length > 0) {
-            console.log(`==========>>>>> ${notificationNodes.length} KPI Nodes (Notification) found at ${new Date()}`);
-
-            notificationNodes.forEach(async item => {
-                if (item.hasOwnProperty("last_alert_sent_on")) {
-                    const difference = getDifference(item["last_alert_sent_on"], moment());
+                await app.models.notification.create(notificationData);
+            }
+    
+            // FIND THE KPI NODES WHOSE ALERT_TYPE AND ALERT_FREQUENCY IS EXIST
+            const notificationQuery = {
+                "start_date": { lt: todayDate },
+                "contributorId": { exists: true },
+                "is_deleted": false,
+                // "is_achieved_modified": true,
+                "alert_frequency": { exists: true, neq: "" }
+            }
+            const notificationNodes = await app.models.KartaNode.find({ where: notificationQuery, include: models });
+    
+            if (notificationNodes.length > 0) {
+                console.log(`==========>>>>> ${notificationNodes.length} KPI Nodes (Notification) found at ${new Date()}`);
+    
+                notificationNodes.forEach(async item => {
+                    let startDate = item["start_date"];
+                    if (item.hasOwnProperty("last_alert_sent_on")) {
+                        startDate = item["last_alert_sent_on"];
+                    }
+                    const difference = getDifference(startDate, moment());
+                    
                     switch (item["alert_frequency"]) {
                         case "weekly":
                             if (difference >= 7) checkTargetFrequency(item);
@@ -162,16 +169,11 @@ exports.sendTargetAlertsCron = async (app) => {
                             if (difference >= daysInYear) checkTargetFrequency(item);
                             break;
                     }
-                } else checkTargetFrequency(item);
-            });
+                });
+            }
+        } catch (err) {
+            console.log(`==========>>>>> IN FINDING THE LAPSED KPI NODES CRON (${new Date()}) = Someting went wrong `, err);
         }
-    } catch (err) {
-        console.log(`==========>>>>> IN FINDING THE LAPSED KPI NODES CRON (${new Date()}) = Someting went wrong `, err);
-    }
-    /* Find KPI node's which is lapsed, send it to node_alert table */
-    // running once at 04:00 EDT & 08:00 UTC & 13:30 IST
-    cron.schedule('35 15 * * *', async() => {
-
     },
     {
         timezone: "Asia/Kolkata"
