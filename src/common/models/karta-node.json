@@ -54,7 +54,6 @@
         ],
         "formula": "string"
       }
-
     },
     "start_date": {
       "type": "date"
