@@ -287,6 +287,11 @@ module.exports = function (Kartanode) {
 
   Kartanode.calculationPeriod = async (nodeId, type, next) => {
     try {
+
+      function findTarget(type) {
+        return element.target.find((item) => item.frequency === type);
+      }
+
       if ( type == "month-to-date" ) {
         // Month To Date Calculation
         const totalDays = moment().daysInMonth();
@@ -294,8 +299,14 @@ module.exports = function (Kartanode) {
         const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
         if ( kartaNodeDetails ) {
           let element = kartaNodeDetails;
-          let targetValue = element.target[0].value;
-          targetValue = todayDate * (targetValue / totalDays); // target value per day
+          let targetValue;
+          if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+          else if (findTarget('annually')) targetValue = findTarget('annually').value * 12;
+          else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 3;
+          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 4;
+
+          // target value per day
+          targetValue = todayDate * (targetValue / totalDays);
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
@@ -313,8 +324,14 @@ module.exports = function (Kartanode) {
         const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
         if ( kartaNodeDetails ) {
           let element = kartaNodeDetails;
-          let targetValue = element.target.find((item) => item.frequency === 'annually').value;
-          targetValue = todayDate * (targetValue / totalDays);  // target value per day
+          let targetValue;
+          if (findTarget('annually')) targetValue = findTarget('annually').value;
+          else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
+          else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
+          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 52;
+
+          // target value per day
+          targetValue = todayDate * (targetValue / totalDays);
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
@@ -325,7 +342,7 @@ module.exports = function (Kartanode) {
         }
       }
       else if ( type == "month-over-month" || type == "year-over-year" ) { 
-        // Month Over Month Calculation
+        // Month Over Month and Year Over Year Calculation
 
         const currentYear = moment().year();
         const currentMonth = moment().month() + 1;

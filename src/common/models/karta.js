@@ -2,6 +2,7 @@
 
 const path = require('path');
 const ejs = require('ejs');
+const moment = require('moment');
 
 module.exports = function(Karta) {
 /* =============================CUSTOM METHODS=========================================================== */
@@ -222,7 +223,7 @@ module.exports = function(Karta) {
     });
   }
 
-// Soft delete Karta
+  // Soft delete Karta
   Karta.softDelete = (kartaId, next) => {
     Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
@@ -238,6 +239,7 @@ module.exports = function(Karta) {
     })
   }
 
+  // Create Karta Copy
   Karta.copy = async (kartaId, next) => {
     try {
        const kartaDetails = await Karta.findOne({ where: { "id": kartaId }});
@@ -343,6 +345,31 @@ module.exports = function(Karta) {
       await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
 
       return "Karta copy created successfully..!!";
+    }
+    catch(err) {
+      console.log(err);
+    }
+  }
+
+  // View Previous month karta
+  Karta.viewKartaDetails = async (type, number, kartaId, next) => {
+    try {
+      // quarter, month, week
+      const searchQuery = { kartaId };
+
+      if ( type == "quarter" ) {
+        searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
+      } else if ( type == "month" ) {
+        searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
+      } else if ( type == "week" ) { }
+
+      // Finding version of that karta
+      const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery } );
+
+      // Finding history details of that karta
+      const historyDetails = await Karta.app.models.karta_history.find({ where: searchQuery } );
+
+      return {};
     }
     catch(err) {
       console.log(err);
