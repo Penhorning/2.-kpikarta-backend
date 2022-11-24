@@ -355,31 +355,19 @@ module.exports = function(Karta) {
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
       // quarter, month, week
-
-      // Finding version of that karta
-      const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId } } );
+      const searchQuery = { kartaId };
 
       if ( type == "quarter" ) {
-        // Finding history details of that karta
-        const historyQuery = {
-          kartaId,
-          and: [
-            { "createdAt": { gte: moment().quarter(number).startOf('quarter') } },
-            { "createdAt": { lte: moment().quarter(number).endOf('quarter') } }
-          ]
-        }
-
-        const historyDetails = await Karta.app.models.karta_history.find({ where: historyQuery } );
+        searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
       } else if ( type == "month" ) {
-        // Finding history details of that karta
-        const historyQuery = {
-          kartaId,
-          "createdAt": { lte: moment().month(number-1).endOf('month') }
-        }
+        searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
+      } else if ( type == "week" ) { }
 
-        const historyDetails = await Karta.app.models.karta_history.find({ where: historyQuery } );
-        console.log(historyDetails);
-      }
+      // Finding version of that karta
+      const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery } );
+
+      // Finding history details of that karta
+      const historyDetails = await Karta.app.models.karta_history.find({ where: searchQuery } );
 
       return {};
     }
