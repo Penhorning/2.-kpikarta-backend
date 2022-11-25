@@ -12,6 +12,9 @@ const moment = require('moment');
 module.exports = function(User) {
   /* QUERY VARIABLES
   ----------------*/
+  const FIND_ONLY_NOT_DELETED_USERS = {
+    $match: { $or: [ { "is_deleted" : { $exists: false } }, { "is_deleted" : false } ] }
+  }
   // Role map lookup
   const ROLE_MAP_LOOKUP = (roleId) => {
     return {
@@ -335,6 +338,7 @@ module.exports = function(User) {
             { 
               $match: query
             },
+            FIND_ONLY_NOT_DELETED_USERS,
             {
               $sort: { "createdAt": -1 }
             },
@@ -367,6 +371,7 @@ module.exports = function(User) {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
+          FIND_ONLY_NOT_DELETED_USERS,
           ROLE_MAP_LOOKUP(role.id),
           UNWIND_ROLE_MAP
         ]).toArray((err, result) => {
@@ -422,6 +427,7 @@ module.exports = function(User) {
           { 
             $match: query
           },
+          FIND_ONLY_NOT_DELETED_USERS,
           {
             $sort: { "createdAt": -1 }
           },
@@ -619,16 +625,32 @@ module.exports = function(User) {
   };
 
   // Block user
-  User.blockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : false }, (err)=>{
+  User.block = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+      next(err, true);
+    });
+  };
+  // Unblock user
+  User.unblock = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
       next(err, true);
     });
   };
 
-  // Unblock user
-  User.unblockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : true }, (err)=>{
-      next(err, true);
+  // Delete user
+  User.delete = function(userId, next) {
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        let error = new Error("User not found!");
+        error.status = 404;
+        next(error);
+      } else {
+        user.is_deleted = true;
+        user.active = false;
+        user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
+        user.save();
+        next(null, true);
+      }
     });
   };
 
