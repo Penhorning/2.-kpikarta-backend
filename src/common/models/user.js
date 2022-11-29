@@ -133,7 +133,8 @@ module.exports = function(User) {
   }
   const UNWIND_EMPLOYEE_DEPARTMENT = {
     $unwind: {
-      path: "$company.department"
+      path: "$company.department",
+      preserveNullAndEmptyArrays: true
     }
   }
   // Employee range lookup
@@ -159,7 +160,8 @@ module.exports = function(User) {
   }
   const UNWIND_EMPLOYEE_RANGE = {
     $unwind: {
-      path: "$company.employee_range"
+      path: "$company.employee_range",
+      preserveNullAndEmptyArrays: true
     }
   }
   // Department lookup
