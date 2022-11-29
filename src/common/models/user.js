@@ -110,6 +110,58 @@ module.exports = function(User) {
       path: "$company"
     }
   }
+  // Employee department lookup
+  const EMPLOYEE_DEPARTMENT_LOOKUP = {
+    $lookup: {
+        from: "department",
+        let: {
+            department_id: "$company.departmentId"
+        },
+        pipeline: [
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ["$_id", "$$department_id"] }
+                        ]
+                    }
+                }
+            }
+        ],
+        as: "company.department"
+    }
+  }
+  const UNWIND_EMPLOYEE_DEPARTMENT = {
+    $unwind: {
+      path: "$company.department"
+    }
+  }
+  // Employee range lookup
+  const EMPLOYEE_RANGE_LOOKUP = {
+    $lookup: {
+        from: "employee_range",
+        let: {
+            range_id: "$company.employeeRangeId"
+        },
+        pipeline: [
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ["$_id", "$$range_id"] }
+                        ]
+                    }
+                }
+            }
+        ],
+        as: "company.employee_range"
+    }
+  }
+  const UNWIND_EMPLOYEE_RANGE = {
+    $unwind: {
+      path: "$company.employee_range"
+    }
+  }
   // Department lookup
   const DEPARTMENT_LOOKUP = {
     $lookup: {
@@ -454,6 +506,10 @@ module.exports = function(User) {
           UNWIND_LICENSE,
           COMPANY_LOOKUP,
           UNWIND_COMPANY,
+          EMPLOYEE_DEPARTMENT_LOOKUP,
+          UNWIND_EMPLOYEE_DEPARTMENT,
+          EMPLOYEE_RANGE_LOOKUP,
+          UNWIND_EMPLOYEE_RANGE,
           SEARCH_MATCH,
           PROJECT,
           {
