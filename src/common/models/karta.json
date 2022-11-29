@@ -120,7 +120,7 @@
         "verb": "post"
       }
     },
-    "getKartas": {
+    "getAll": {
       "accepts": [
         {
           "arg": "userId",
@@ -148,11 +148,11 @@
         "type": "karta"
       },
       "http": {
-        "path": "/get-kartas",
+        "path": "/get-all",
         "verb": "post"
       }
     },
-    "sharedKartas": {
+    "getSharedAll": {
       "accepts": [
         {
           "arg": "email",
@@ -180,11 +180,11 @@
         "type": "karta"
       },
       "http": {
-        "path": "/shared-kartas",
+        "path": "/shared-all",
         "verb": "post"
       }
     },
-    "softDelete": {
+    "delete": {
       "accepts": [
         {
           "arg": "kartaId",

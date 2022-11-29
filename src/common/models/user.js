@@ -96,6 +96,20 @@ module.exports = function(User) {
       path: "$license"
     }
   }
+  // Company lookup
+  const COMPANY_LOOKUP = {
+    $lookup: {
+      from: 'company',
+      localField: 'companyId',
+      foreignField: '_id',
+      as: 'company'
+    },
+  }
+  const UNWIND_COMPANY = {
+    $unwind: {
+      path: "$company"
+    }
+  }
   // Department lookup
   const DEPARTMENT_LOOKUP = {
     $lookup: {
@@ -128,6 +142,7 @@ module.exports = function(User) {
       'profilePic': 1,
       'license': 1,
       'Role': 1,
+      'company': 1,
       'department': 1,
       'active': 1,
       'updatedAt': 1,
@@ -437,6 +452,8 @@ module.exports = function(User) {
           UNWIND_ROLE,
           LICENSE_LOOKUP,
           UNWIND_LICENSE,
+          COMPANY_LOOKUP,
+          UNWIND_COMPANY,
           SEARCH_MATCH,
           PROJECT,
           {

@@ -92,7 +92,7 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getKartas = (userId, searchQuery, page, limit, next) => {
+  Karta.getAll = (userId, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -158,8 +158,8 @@ module.exports = function(Karta) {
     });
   }
 
-  // Get shared kartas
-  Karta.sharedKartas = (email, searchQuery, page, limit, next) => {
+  // Get all shared kartas
+  Karta.getSharedAll = (email, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -223,8 +223,8 @@ module.exports = function(Karta) {
     });
   }
 
-  // Soft delete Karta
-  Karta.softDelete = (kartaId, next) => {
+  // Delete
+  Karta.delete = (kartaId, next) => {
     Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
         console.log('error while soft deleting karta', err);
