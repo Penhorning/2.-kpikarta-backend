@@ -239,6 +239,11 @@
           "arg": "kartaId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "kartaData",
+          "type": "object",
+          "required": true
         }
       ],
       "returns": {
