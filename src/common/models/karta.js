@@ -365,7 +365,11 @@ module.exports = function(Karta) {
         searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
       } else if ( type == "month" ) {
         searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
-      } else if ( type == "week" ) { }
+      } else if ( type == "week" ) {
+        // Need more research on this
+        var weekOfMonth = moment().isoWeek() - moment().subtract('days', 29 - 1).isoWeek() + 1;
+        console.log(moment().isoWeek(48).startOf('week'), 'weekOfMonth');
+      }
 
       // Finding version which was created before the requested time
       const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery });
@@ -382,8 +386,23 @@ module.exports = function(Karta) {
             if ( x.event == "node_created" || x.event == "node_removed" ) {
               return x;
             } else {
-              // Need to work for node updated part below
-              return x;
+              let newObj = {};
+              let flagCheck = false;
+              Object.keys(x.old_options).forEach(key => {
+                newObj[key] = x.old_options[key];
+              });
+
+              Object.keys(lastHistoryObject.old_options).forEach(key => {
+                if ( newObj.hasOwnProperty(key) && newObj[key] == lastHistoryObject.old_options[key] ) {
+                  flagCheck = true;
+                } else {
+                  flagCheck = false;
+                }
+              });
+
+              if( flagCheck ){
+                return x;
+              }
             }
           }
         });
@@ -395,13 +414,14 @@ module.exports = function(Karta) {
         let kartaNode = kartaData.node;
         for ( let i = filteredHistory.length - 1; i >= 0; i-- ) {
           let currentHistoryObj = filteredHistory[i];
+          // console.log(currentHistoryObj, 'currentHistoryObj', i);
           if ( currentHistoryObj.event == "node_created" ) {
             function updateData(data) {
-              if ( JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
+              if ( data && JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
                 return true;
               }
               else {
-                  if ( data.children && data.children.length > 0 ) {
+                  if ( data && data.children && data.children.length > 0 ) {
                     for(let j = 0; j < data.children.length; j++) {
                       let value = updateData(data.children[j]);
                       if (value) {
@@ -415,30 +435,35 @@ module.exports = function(Karta) {
             updateData(kartaNode);
           } else if ( currentHistoryObj.event == "node_updated" ) {
             function updateData(data) {
-              if ( JSON.stringify( data.id ) == JSON.stringify( currentHistoryObj.kartaNodeId ) ) {
+              if ( data && JSON.stringify( data.id ) == JSON.stringify( currentHistoryObj.kartaNodeId ) ) {
                 Object.keys(currentHistoryObj.old_options).map(x => {
                   data[x] = currentHistoryObj.old_options[x];
                 });
               }
               else {
-                  if ( data.children && data.children.length > 0 ) {
+                  if ( data && data.children && data.children.length > 0 ) {
                     for( let j = 0; j < data.children.length; j++ ) {
                       updateData(data.children[j]);
+                      break;
                     }
                   }
               }
             }
             updateData(kartaNode);
           } else if ( currentHistoryObj.event == "node_removed" ) {
-            // Need to check this functionaliy
             function updateData(data) {
-              if ( data.parentId && JSON.stringify(data.parentId) == JSON.stringify(currentHistoryObj.parentNodeId) ) {
-                return data.children && data.children.length > 0 ? data.children.push(currentHistoryObj.event_options.removed) : data['children'] = [currentHistoryObj.event_options.removed];
+              if (JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.parentNodeId) ) {
+                let tempNode = {
+                  ...currentHistoryObj.event_options.removed,
+                  id: currentHistoryObj.kartaNodeId
+                };
+                return data.children && data.children.length > 0 ? data.children.push(tempNode) : data['children'] = [tempNode];
               }
               else {
-                  if ( data.children && data.children.length > 0 ) {
+                  if ( data && data.children && data.children.length > 0 ) {
                     for(let j = 0; j < data.children.length; j++) {
                       updateData(data.children[j]);
+                      break;
                     }
                   }
               }
@@ -446,6 +471,19 @@ module.exports = function(Karta) {
             updateData(kartaNode);
           }
         }
+
+        // Remove null from children arrays
+        function nullRemover( data ) {
+          if( data.children ) {
+            data.children = data.children.filter( x => x!== null );
+            if ( data.children.length > 0 ) {
+              for(let i = 0; i < data.children.length; i++) {
+                nullRemover(data.children[i]);
+              }
+            }
+          } else return;
+        }
+        nullRemover(kartaNode);
 
         return { message: "Karta data found..!!", date: kartaNode };
       } else {
