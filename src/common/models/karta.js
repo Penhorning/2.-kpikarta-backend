@@ -2,6 +2,7 @@
 
 const path = require('path');
 const ejs = require('ejs');
+const moment = require('moment');
 
 module.exports = function(Karta) {
 /* =============================CUSTOM METHODS=========================================================== */
@@ -91,7 +92,7 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getKartas = (userId, searchQuery, page, limit, next) => {
+  Karta.getAll = (userId, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -157,8 +158,8 @@ module.exports = function(Karta) {
     });
   }
 
-  // Get shared kartas
-  Karta.sharedKartas = (email, searchQuery, page, limit, next) => {
+  // Get all shared kartas
+  Karta.getSharedAll = (email, searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -222,8 +223,8 @@ module.exports = function(Karta) {
     });
   }
 
-// Soft delete Karta
-  Karta.softDelete = (kartaId, next) => {
+  // Delete
+  Karta.delete = (kartaId, next) => {
     Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
         console.log('error while soft deleting karta', err);
@@ -238,6 +239,7 @@ module.exports = function(Karta) {
     })
   }
 
+  // Create Karta Copy
   Karta.copy = async (kartaId, next) => {
     try {
        const kartaDetails = await Karta.findOne({ where: { "id": kartaId }});
@@ -321,7 +323,7 @@ module.exports = function(Karta) {
                   finalHistoryData = tempHistoryData.concat(mainHistoryData);
                   await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                 } else {
-                  if(!finalHistoryData[j].event_options.updated.hasOwnProperty("contributorId")){
+                  if(!finalHistoryData[j].event_options.updated.hasOwnProperty("contributorId") && !finalHistoryData[j].event_options.updated.hasOwnProperty("achieved_value")){
                     await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                   }
                 }
@@ -343,6 +345,112 @@ module.exports = function(Karta) {
       await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
 
       return "Karta copy created successfully..!!";
+    }
+    catch(err) {
+      console.log(err);
+    }
+  }
+
+  // View Previous month karta
+  Karta.viewKartaDetails = async (type, number, kartaId, kartaData, next) => {
+    try {
+      // Find the latest Karta version history ----
+      const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+      const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaDetails.versionId } });
+
+      // Find the requested Karta version history ----
+      // Search Query
+      const searchQuery = { kartaId };
+      if ( type == "quarter" ) {
+        searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
+      } else if ( type == "month" ) {
+        searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
+      } else if ( type == "week" ) { }
+
+      // Finding version which was created before the requested time
+      const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery });
+      if ( versionDetails.length > 0 ) {
+        const requestedVersion = versionDetails[versionDetails.length - 1];
+
+        // Finding requested karta history before the requested time 
+        const requestedVersionHistory = await Karta.app.models.karta_history.find({ where: { ...searchQuery, versionId: requestedVersion.id } });
+        const lastHistoryObject = requestedVersionHistory[requestedVersionHistory.length - 1];
+
+        // Comparing Latest Karta History with Requested Karta History
+        const historyIndex = latestVersionHistory.findIndex(x => {
+          if ( x.event == lastHistoryObject.event && JSON.stringify(x.kartaNodeId) == JSON.stringify(lastHistoryObject.kartaNodeId) ) {
+            if ( x.event == "node_created" || x.event == "node_removed" ) {
+              return x;
+            } else {
+              // Need to work for node updated part below
+              return x;
+            }
+          }
+        });
+
+        // Latest Karta History - Requested Karta History = History to Undo from main karta data 
+        const filteredHistory = latestVersionHistory.slice(historyIndex+1, latestVersionHistory.length);
+        
+        // Performing Undo functionality on main kartaData
+        let kartaNode = kartaData.node;
+        for ( let i = filteredHistory.length - 1; i >= 0; i-- ) {
+          let currentHistoryObj = filteredHistory[i];
+          if ( currentHistoryObj.event == "node_created" ) {
+            function updateData(data) {
+              if ( JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
+                return true;
+              }
+              else {
+                  if ( data.children && data.children.length > 0 ) {
+                    for(let j = 0; j < data.children.length; j++) {
+                      let value = updateData(data.children[j]);
+                      if (value) {
+                          delete data.children[j];
+                          break;
+                      }
+                    }
+                  }
+              }
+            }
+            updateData(kartaNode);
+          } else if ( currentHistoryObj.event == "node_updated" ) {
+            function updateData(data) {
+              if ( JSON.stringify( data.id ) == JSON.stringify( currentHistoryObj.kartaNodeId ) ) {
+                Object.keys(currentHistoryObj.old_options).map(x => {
+                  data[x] = currentHistoryObj.old_options[x];
+                });
+              }
+              else {
+                  if ( data.children && data.children.length > 0 ) {
+                    for( let j = 0; j < data.children.length; j++ ) {
+                      updateData(data.children[j]);
+                    }
+                  }
+              }
+            }
+            updateData(kartaNode);
+          } else if ( currentHistoryObj.event == "node_removed" ) {
+            // Need to check this functionaliy
+            function updateData(data) {
+              if ( data.parentId && JSON.stringify(data.parentId) == JSON.stringify(currentHistoryObj.parentNodeId) ) {
+                return data.children && data.children.length > 0 ? data.children.push(currentHistoryObj.event_options.removed) : data['children'] = [currentHistoryObj.event_options.removed];
+              }
+              else {
+                  if ( data.children && data.children.length > 0 ) {
+                    for(let j = 0; j < data.children.length; j++) {
+                      updateData(data.children[j]);
+                    }
+                  }
+              }
+            }
+            updateData(kartaNode);
+          }
+        }
+
+        return { message: "Karta data found..!!", date: kartaNode };
+      } else {
+        return { message: "Karta was not created before the requested timeframe..!!", date: null };
+      }
     }
     catch(err) {
       console.log(err);

@@ -63,6 +63,10 @@
     "active": {
       "type": "boolean",
       "default": true
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -529,7 +533,7 @@
         "verb": "post"
       }
     },
-    "blockUser": {
+    "block": {
       "accepts": [
         {
           "arg": "userId",
@@ -545,7 +549,7 @@
         "path": "/block"
       }
     },
-    "unblockUser": {
+    "unblock": {
       "accepts": [
         {
           "arg": "userId",
@@ -559,6 +563,22 @@
       "http": {
         "verb": "put",
         "path": "/unblock"
+      }
+    },
+    "delete": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/delete"
       }
     },
     "getRoles": {

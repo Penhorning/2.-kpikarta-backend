@@ -16,7 +16,7 @@ const cors = require('cors');
 
 const app = module.exports = loopback();
 
-app.middleware('parse', bodyParser.json());
+app.middleware('parse', bodyParser.json({ limit: '1mb' }));
 
 // parse application/x-www-form-urlencoded
 app.use(cors());
@@ -164,3 +164,7 @@ app.middleware('session', session({
   saveUninitialized: true,
   resave: true,
 }));
+
+// Cron jobs
+const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
+sendTargetAlertsCron(app);

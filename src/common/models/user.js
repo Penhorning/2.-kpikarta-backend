@@ -10,34 +10,12 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 
 module.exports = function(User) {
-  // Generate Password
-  const generatePassword = () => {
-    return generator.generate({
-      length: 8,
-      numbers: true,
-      symbols: "$@$!%*?&",
-      strict: true
-    });
+  /* QUERY VARIABLES
+  ----------------*/
+  const FIND_ONLY_NOT_DELETED_USERS = {
+    $match: { $or: [ { "is_deleted" : { $exists: false } }, { "is_deleted" : false } ] }
   }
-  // Send SMS
-  const sendSMS = (user, message) => {
-    try {
-      let smsOptions = {
-        type: 'sms',
-        to: user.mobile.e164Number,
-        from: "+16063667831",
-        body: message
-      };
-      User.app.models.Twilio.send(smsOptions, (err, data) => {
-        console.log('> sending code to mobile number:', user.mobile.e164Number);
-        if (err) console.log('> error while sending code to mobile number', err);
-      });
-    } catch (error) {
-      console.error("> error in SMS function", error);
-    }
-  }
-
-  // QUERY VARIABLES
+  // Role map lookup
   const ROLE_MAP_LOOKUP = (roleId) => {
     return {
       $lookup: {
@@ -52,6 +30,30 @@ module.exports = function(User) {
                 $and: [
                   { $eq: ["$principalId", "$$user_id"] },
                   { $ne: ["$roleId", roleId] }
+                ]
+              }
+            }
+          }
+        ],
+        as: "RoleMap"
+      }
+    }
+  }
+  // Role map lookup for company admin
+  const ROLE_MAP_LOOKUP_COMPANY_ADMIN = (roleId) => {
+    return {
+      $lookup: {
+        from: "RoleMapping",
+        let: {
+          user_id: "$_id"
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$principalId", "$$user_id"] },
+                  { $eq: ["$roleId", roleId] }
                 ]
               }
             }
@@ -94,6 +96,20 @@ module.exports = function(User) {
       path: "$license"
     }
   }
+  // Company lookup
+  const COMPANY_LOOKUP = {
+    $lookup: {
+      from: 'company',
+      localField: 'companyId',
+      foreignField: '_id',
+      as: 'company'
+    },
+  }
+  const UNWIND_COMPANY = {
+    $unwind: {
+      path: "$company"
+    }
+  }
   // Department lookup
   const DEPARTMENT_LOOKUP = {
     $lookup: {
@@ -107,6 +123,60 @@ module.exports = function(User) {
     $unwind: {
       path: "$department",
       preserveNullAndEmptyArrays: true
+    }
+  }
+  // Project
+  const PROJECT = {
+    $project: {
+      '_id': 1,
+      'fullName': 1,
+      'email': 1,
+      'emailVerified': 1,
+      'mobile': 1,
+      'mobileVerified': 1,
+      'street': 1,
+      'city': 1,
+      'state': 1,
+      'postal_code': 1,
+      'country': 1,
+      'profilePic': 1,
+      'license': 1,
+      'Role': 1,
+      'company': 1,
+      'department': 1,
+      'active': 1,
+      'updatedAt': 1,
+      'createdAt': 1
+    }
+  }
+  
+  /* General Methods
+  ---------------*/
+  // Generate Password
+  const generatePassword = () => {
+    return generator.generate({
+      length: 8,
+      numbers: true,
+      // symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      symbols: "@$!%*#?&",
+      strict: true
+    });
+  }
+  // Send SMS
+  const sendSMS = (user, message) => {
+    try {
+      let smsOptions = {
+        type: 'sms',
+        to: user.mobile.e164Number,
+        from: "+16063667831",
+        body: message
+      };
+      User.app.models.Twilio.send(smsOptions, (err, data) => {
+        console.log('> sending code to mobile number:', user.mobile.e164Number);
+        if (err) console.log('> error while sending code to mobile number', err);
+      });
+    } catch (error) {
+      console.error("> error in SMS function", error);
     }
   }
 
@@ -283,6 +353,7 @@ module.exports = function(User) {
             { 
               $match: query
             },
+            FIND_ONLY_NOT_DELETED_USERS,
             {
               $sort: { "createdAt": -1 }
             },
@@ -293,6 +364,7 @@ module.exports = function(User) {
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
+            PROJECT,
             {
               $facet: {
                 metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
@@ -314,6 +386,7 @@ module.exports = function(User) {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
+          FIND_ONLY_NOT_DELETED_USERS,
           ROLE_MAP_LOOKUP(role.id),
           UNWIND_ROLE_MAP
         ]).toArray((err, result) => {
@@ -362,23 +435,27 @@ module.exports = function(User) {
       }
     }
     // Find user role
-    User.app.models.Role.findOne({ where: {"name": "admin"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: {"name": "company_admin"} }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
           { 
             $match: query
           },
+          FIND_ONLY_NOT_DELETED_USERS,
           {
             $sort: { "createdAt": -1 }
           },
-          ROLE_MAP_LOOKUP(role.id),
+          ROLE_MAP_LOOKUP_COMPANY_ADMIN(role.id),
           UNWIND_ROLE_MAP,
           ROLE_LOOKUP,
           UNWIND_ROLE,
           LICENSE_LOOKUP,
           UNWIND_LICENSE,
+          COMPANY_LOOKUP,
+          UNWIND_COMPANY,
           SEARCH_MATCH,
+          PROJECT,
           {
             $facet: {
               metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
@@ -565,16 +642,32 @@ module.exports = function(User) {
   };
 
   // Block user
-  User.blockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : false }, (err)=>{
+  User.block = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+      next(err, true);
+    });
+  };
+  // Unblock user
+  User.unblock = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
       next(err, true);
     });
   };
 
-  // Unblock user
-  User.unblockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : true }, (err)=>{
-      next(err, true);
+  // Delete user
+  User.delete = function(userId, next) {
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        let error = new Error("User not found!");
+        error.status = 404;
+        next(error);
+      } else {
+        user.is_deleted = true;
+        user.active = false;
+        user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
+        user.save();
+        next(null, true);
+      }
     });
   };
 
