@@ -1,6 +1,72 @@
 'use strict';
 
 module.exports = function(Kartacatalog) {
+    /* QUERY VARIABLES
+    ----------------*/
+    // Sort
+    const SORT = {
+        $sort: { createdAt: -1 }
+    }
+    // User lookup with id
+    const USER_LOOKUP_WITH_ID = (userId) => {
+        return {
+            $lookup: {
+                from: "user",
+                let: {
+                    user_id: userId
+                },
+                pipeline: [
+                  { 
+                    $match: { 
+                      $expr: { $eq: ["$_id", "$$user_id"] }
+                    } 
+                  },
+                  {
+                    $project: { "fullName": 1, "email": 1 }
+                  }
+                ],
+                as: "user"
+            }
+        }
+    }
+    // User lookup with email
+    const USER_LOOKUP_WITH_EMAIL = (email) => {
+        return {
+            $lookup: {
+                from: "user",
+                let: {
+                    user_email: email
+                },
+                pipeline: [
+                  { 
+                    $match: { 
+                      $expr: { $eq: ["$email", "$$user_email"] }
+                    } 
+                  },
+                  {
+                    $project: { "fullName": 1, "email": 1 }
+                  }
+                ],
+                as: "user"
+            }
+        }
+    }
+    const UNWIND_USER = {
+        $unwind: "$user"
+    }
+    // Facet
+    const FACET = (page, limit) => {
+        return {
+            $facet: {
+              metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+              data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+            }
+        }
+    }
+
+
+
+/* =============================CUSTOM METHODS=========================================================== */
   // Get all catalogs
   Kartacatalog.getAll = (userId, searchQuery, page, limit, nodeTypes, next) => {
     page = parseInt(page, 10) || 1;
@@ -36,38 +102,11 @@ module.exports = function(Kartacatalog) {
         {
           $match: query
         },
-        {
-          $sort: { "createdAt" : -1 }
-        },
         SEARCH_MATCH,
-        {
-          $lookup: {
-            from: "user",
-            let: {
-                user_id: userId
-            },
-            pipeline: [
-              { 
-                $match: { 
-                  $expr: { $eq: ["$_id", "$$user_id"] }
-                } 
-              },
-              {
-                $project: { "fullName": 1, "email": 1 }
-              }
-            ],
-            as: "user"
-          }
-        },
-        {
-          $unwind: "$user"
-        },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        USER_LOOKUP_WITH_ID(userId),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
@@ -101,38 +140,11 @@ module.exports = function(Kartacatalog) {
         {
           $match: { "sharedTo.email": email, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] }
         },
-        {
-          $sort: { "createdAt" : -1 }
-        },
         SEARCH_MATCH,
-        {
-          $lookup: {
-            from: "user",
-            let: {
-                user_email: email
-            },
-            pipeline: [
-              { 
-                $match: { 
-                  $expr: { $eq: ["$email", "$$user_email"] }
-                } 
-              },
-              {
-                $project: { "fullName": 1, "email": 1 }
-              }
-            ],
-            as: "user"
-          }
-        },
-        {
-          $unwind: "$user"
-        },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        USER_LOOKUP_WITH_EMAIL(email),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);

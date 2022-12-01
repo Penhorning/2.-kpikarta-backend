@@ -1,10 +1,74 @@
 'use strict';
 
-const path = require('path');
-const ejs = require('ejs');
 const moment = require('moment');
+const { sendEmail } = require('../../helper/sendEmail');
 
 module.exports = function(Karta) {
+  /* QUERY VARIABLES
+    ----------------*/
+    // Sort
+    const SORT = {
+      $sort: { createdAt: -1 }
+  }
+  // User lookup with id
+  const USER_LOOKUP_WITH_ID = (userId) => {
+      return {
+          $lookup: {
+              from: "user",
+              let: {
+                  user_id: userId
+              },
+              pipeline: [
+                { 
+                  $match: { 
+                    $expr: { $eq: ["$_id", "$$user_id"] }
+                  } 
+                },
+                {
+                  $project: { "fullName": 1, "email": 1 }
+                }
+              ],
+              as: "user"
+          }
+      }
+  }
+  // User lookup with email
+  const USER_LOOKUP_WITH_EMAIL = (email) => {
+      return {
+          $lookup: {
+              from: "user",
+              let: {
+                  user_email: email
+              },
+              pipeline: [
+                { 
+                  $match: { 
+                    $expr: { $eq: ["$email", "$$user_email"] }
+                  } 
+                },
+                {
+                  $project: { "fullName": 1, "email": 1 }
+                }
+              ],
+              as: "user"
+          }
+      }
+  }
+  const UNWIND_USER = {
+      $unwind: "$user"
+  }
+  // Facet
+  const FACET = (page, limit) => {
+      return {
+          $facet: {
+            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+          }
+      }
+  }
+
+
+
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
@@ -51,7 +115,7 @@ module.exports = function(Karta) {
                 });
               });
               // Insert data in notification collection
-              Karta.app.models.notification.create(notificationData, (err, result) => {
+              Karta.app.models.notification.create(notificationData, err => {
                 if (err) console.log('> error while inserting data in notification collection', err);
               });
               // Separate emails that are not existing in the system
@@ -59,20 +123,15 @@ module.exports = function(Karta) {
               let kartaLink = `${process.env.WEB_URL}//karta/edit/${karta._id}`;
               // Send email to users
               newEmails.forEach(email => {
-                ejs.renderFile(path.resolve('templates/share-karta.ejs'),
-                { user: Karta.app.currentUser, kartaLink }, {}, function(err, html) {
-                  Karta.app.models.Email.send({
-                    to: email,
-                    from: Karta.app.dataSources.email.settings.transports[0].auth.user,
-                    subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
-                    html
-                  }, function(err) {
-                    console.log('> sending karta sharing email to:', email);
-                    if (err) {
-                      console.log('> error while sending karta sharing email', err);
-                    }
-                  });
-                });
+                const data = {
+                  subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
+                  template: "share-karta.ejs",
+                  email: email,
+
+                  user: Karta.app.currentUser,
+                  kartaLink
+                }
+                sendEmail(Karta.app, data, () => { });
               });
             }
           });
@@ -119,38 +178,11 @@ module.exports = function(Karta) {
         {
           $match: { "userId": userId, "is_deleted": false }
         },
-        {
-          $sort: { "createdAt" : -1 }
-        },
         SEARCH_MATCH,
-        {
-          $lookup: {
-            from: "user",
-            let: {
-                user_id: userId
-            },
-            pipeline: [
-              { 
-                $match: { 
-                  $expr: { $eq: ["$_id", "$$user_id"] }
-                } 
-              },
-              {
-                $project: { "fullName": 1, "email": 1 }
-              }
-            ],
-            as: "user"
-          }
-        },
-        {
-          $unwind: "$user"
-        },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        USER_LOOKUP_WITH_ID(userId),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
@@ -184,38 +216,11 @@ module.exports = function(Karta) {
         {
           $match: { "sharedTo.email": email, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] }
         },
-        {
-          $sort: { "createdAt" : -1 }
-        },
         SEARCH_MATCH,
-        {
-          $lookup: {
-            from: "user",
-            let: {
-                user_email: email
-            },
-            pipeline: [
-              { 
-                $match: { 
-                  $expr: { $eq: ["$email", "$$user_email"] }
-                } 
-              },
-              {
-                $project: { "fullName": 1, "email": 1 }
-              }
-            ],
-            as: "user"
-          }
-        },
-        {
-          $unwind: "$user"
-        },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        USER_LOOKUP_WITH_EMAIL(email),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
