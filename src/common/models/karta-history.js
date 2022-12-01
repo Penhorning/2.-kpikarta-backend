@@ -112,7 +112,7 @@ module.exports = function(Kartahistory) {
         }
     }
 
-    Kartahistory.undoFunctionality = async ( versionId, kartaId ) => {
+    Kartahistory.undoKartaToVersion = async ( versionId, kartaId ) => {
         try {
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
             let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
@@ -175,7 +175,7 @@ module.exports = function(Kartahistory) {
         }
     }
 
-    Kartahistory.redoFunctionality = async ( versionId, kartaId ) => {
+    Kartahistory.redoKartaToVersion = async ( versionId, kartaId ) => {
         try {
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
             let historyData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});

@@ -169,7 +169,7 @@
         "verb": "post"
       }
     },
-    "undoFunctionality": {
+    "undoKartaToVersion": {
       "accepts": [
         {
           "arg": "versionId",
@@ -191,7 +191,7 @@
         "verb": "post"
       }
     },
-    "redoFunctionality": {
+    "redoKartaToVersion": {
       "accepts": [
         {
           "arg": "versionId",
