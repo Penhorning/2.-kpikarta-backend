@@ -52,9 +52,10 @@ exports.sendTargetAlertsCron = async (app) => {
             await app.models.KartaNode.update({ "_id": item.id },  { "last_alert_sent_on": new Date() });
         } else if (params["percentage"] < params["thresholdValue"] && item.alert_type === "email") {
             const data = {
-                subject: "KPI Node Target Alert",
+                subject: "KPI Target Alert",
                 template: "kpi-target-alert.ejs",
                 email: item.karta_detail().owner().email,
+                
                 username: item.karta_detail().owner().fullName,
                 nodeName: item.name,
                 targetType: item.target[0].frequency[0].toUpperCase() + item.target[0].frequency.slice(1),

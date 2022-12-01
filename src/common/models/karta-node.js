@@ -3,6 +3,32 @@
 const moment = require('moment');
 
 module.exports = function (Kartanode) {
+  /* QUERY VARIABLES
+    ----------------*/
+  // Karta lookup
+  const KARTA_LOOKUP = {
+    $lookup: {
+      from: 'karta',
+      localField: 'kartaDetailId',
+      foreignField: '_id',
+      as: 'karta'
+    },
+  }
+  const UNWIND_KARTA = {
+    $unwind: {
+      path: "$karta"
+    }
+  }
+  // Facet
+  const FACET = (page, limit) => {
+    return {
+      $facet: {
+        metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+        data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+      }
+    }
+  }
+
   // Delete child nodes
   const deleteChildNodes = (params) => {
     try {
@@ -18,19 +44,7 @@ module.exports = function (Kartanode) {
     }
   }
 
-  const KARTA_LOOKUP = {
-    $lookup: {
-      from: 'karta',
-      localField: 'kartaDetailId',
-      foreignField: '_id',
-      as: 'karta'
-    },
-  }
-  const UNWIND_KARTA = {
-    $unwind: {
-      path: "$karta"
-    }
-  }
+
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta node to multiple users
@@ -255,12 +269,7 @@ module.exports = function (Kartanode) {
         {
           $match: creator_query
         },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
