@@ -376,9 +376,11 @@ module.exports = function(Karta) {
   }
 
   // View Previous month karta
-  Karta.viewKartaDetails = async (type, number, kartaId, kartaData, next) => {
+  Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
       // Find the latest Karta version history ----
+      let GetKartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
+      let kartaData = JSON.parse(JSON.stringify(GetKartaInfo[0]));
       const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
       const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaDetails.versionId } });
 
@@ -441,7 +443,6 @@ module.exports = function(Karta) {
         let kartaNode = kartaData.node;
         for ( let i = filteredHistory.length - 1; i >= 0; i-- ) {
           let currentHistoryObj = filteredHistory[i];
-          // console.log(currentHistoryObj, 'currentHistoryObj', i);
           if ( currentHistoryObj.event == "node_created" ) {
             function updateData(data) {
               if ( data && JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
@@ -501,7 +502,7 @@ module.exports = function(Karta) {
 
         // Remove null from children arrays
         function nullRemover( data ) {
-          if( data.children ) {
+          if( data && data.children ) {
             data.children = data.children.filter( x => x!== null );
             if ( data.children.length > 0 ) {
               for(let i = 0; i < data.children.length; i++) {
@@ -511,10 +512,11 @@ module.exports = function(Karta) {
           } else return;
         }
         nullRemover(kartaNode);
+        kartaData["node"] = kartaNode;
 
-        return { message: "Karta data found..!!", date: kartaNode };
+        return { message: "Karta data found..!!", data: kartaData };
       } else {
-        return { message: "Karta was not created before the requested timeframe..!!", date: null };
+        return { message: "Karta was not created before the requested timeframe..!!", data: null };
       }
     }
     catch(err) {
