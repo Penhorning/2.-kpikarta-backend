@@ -42,6 +42,10 @@
       "type": "boolean",
       "default": false
     },
+    "paymentVerified": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
@@ -211,6 +215,18 @@
       "http": {
         "verb": "post",
         "path": "/verify-email"
+      }
+    },
+    "verifyPaymentMethod": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify-payment"
       }
     },
     "sendMobileCode": {
