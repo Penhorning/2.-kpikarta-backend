@@ -40,7 +40,7 @@
     "sharedTo": {
       "type": [
         {
-          "email": "string"
+          "userId": "string"
         }
       ]
     },
@@ -91,6 +91,11 @@
           "required": false
         },
         {
+          "arg": "type",
+          "type": "string",
+          "required": false
+        },
+        {
           "arg": "page",
           "type": "number",
           "required": false
@@ -115,47 +120,15 @@
         "verb": "post"
       }
     },
-    "sharedAll": {
-      "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "searchQuery",
-          "type": "string",
-          "required": false
-        },
-        {
-          "arg": "page",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "limit",
-          "type": "number",
-          "required": false
-        }
-      ],
-      "returns": {
-        "arg": "catalogs",
-        "type": "karta_catalog"
-      },
-      "http": {
-        "path": "/shared-all",
-        "verb": "post"
-      }
-    },
     "share": {
       "accepts": [
         {
-          "arg": "catalog",
-          "type": "object",
+          "arg": "catalogId",
+          "type": "string",
           "required": true
         },
         {
-          "arg": "emails",
+          "arg": "userIds",
           "type": "array",
           "required": true
         }

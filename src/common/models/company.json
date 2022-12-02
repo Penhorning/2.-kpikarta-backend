@@ -15,7 +15,8 @@
   "properties": {
     "name": {
       "type": "string",
-      "required": true
+      "required": true,
+      "index": {"unique": true} 
     },
     "logo": {
       "type": "string"

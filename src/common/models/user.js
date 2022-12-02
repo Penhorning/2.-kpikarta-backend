@@ -454,14 +454,15 @@ module.exports = function(User) {
         });
       });
     });
-  };
+  }
+
   // Get all users
   User.getAll = (page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-    let query = {};
+    let query = { "creatorId": { $exists: false } };
 
     if (start && end) {
       query.createdAt = {

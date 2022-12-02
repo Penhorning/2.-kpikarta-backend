@@ -16,6 +16,19 @@ const cors = require('cors');
 
 const app = module.exports = loopback();
 
+
+// Create file upload directory
+const fs = require('fs');
+const dir1 = './storage/company';
+const dir2 = './storage/user';
+
+if (!fs.existsSync(dir1)) {
+    fs.mkdirSync(dir1, { recursive: true });
+}
+if (!fs.existsSync(dir2)) {
+  fs.mkdirSync(dir2, { recursive: true });
+}
+
 app.middleware('parse', bodyParser.json({ limit: '1mb' }));
 
 // parse application/x-www-form-urlencoded
