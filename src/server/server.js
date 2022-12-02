@@ -97,7 +97,7 @@ boot(app, __dirname, function(err) {
   // Load the provider configurations
   var config = {};
   try {
-    config = require(`../providers.${process.env.NODE_ENV || 'development'}.json`);
+    config = require('../providers.js');
   } catch (err) {
     console.error('Passport configuration', err);
     process.exit(1);
