@@ -3,7 +3,11 @@
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
-    "validateUpsert": true
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta_catalog",
+      "allowExtendedOperators": true
+    }
   },
   "mixins": {
     "TimeStamp": {
@@ -24,6 +28,25 @@
     "node": {
       "type": "object",
       "required": true
+    },
+    "node_type": {
+      "type": "string",
+      "required": true
+    },
+    "type": {
+      "type": "string",
+      "default": "private"
+    },
+    "sharedTo": {
+      "type": [
+        {
+          "email": "string"
+        }
+      ]
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -54,5 +77,114 @@
     }
   },
   "acls": [],
-  "methods": {}
+  "methods": {
+    "getAll": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "nodeTypes",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "catalogs",
+        "type": "karta_catalog"
+      },
+      "http": {
+        "path": "/get-all",
+        "verb": "post"
+      }
+    },
+    "sharedAll": {
+      "accepts": [
+        {
+          "arg": "email",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "catalogs",
+        "type": "karta_catalog"
+      },
+      "http": {
+        "path": "/shared-all",
+        "verb": "post"
+      }
+    },
+    "share": {
+      "accepts": [
+        {
+          "arg": "catalog",
+          "type": "object",
+          "required": true
+        },
+        {
+          "arg": "emails",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/share",
+        "verb": "post"
+      }
+    },
+    "delete": {
+      "accepts": [
+        {
+          "arg": "catalogId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/delete",
+        "verb": "post"
+      }
+    }
+  }
 }

@@ -39,7 +39,7 @@
       "type": "string",
       "default": "#000000"
     },
-    "type_value": {
+    "type": {
       "type": "string",
       "default": "measure"
     },

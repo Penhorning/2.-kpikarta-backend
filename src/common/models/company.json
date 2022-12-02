@@ -42,10 +42,10 @@
         "disableInclude": true
       }
     },
-    "employeesRanges": {
+    "employeesRange": {
       "type": "hasOne",
-      "model": "employees_range",
-      "foreignKey": "employeesRangeId",
+      "model": "employee_range",
+      "foreignKey": "employeeRangeId",
       "options": {
         "disableInclude": true
       }
