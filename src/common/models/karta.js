@@ -385,9 +385,12 @@ module.exports = function(Karta) {
       } else if ( type == "month" ) {
         searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
       } else if ( type == "week" ) {
-        // Need more research on this
-        var weekOfMonth = moment().isoWeek() - moment().subtract('days', 29 - 1).isoWeek() + 1;
-        console.log(moment().isoWeek(48).startOf('week'), 'weekOfMonth');
+        let cur_week_num = moment().isoWeek() - moment().subtract('days', moment().date() - 1).isoWeek() + 1;
+        let total_weeks = ( moment().week() - ( moment().month() * 4 ));
+        let week = cur_week_num - number;
+        week = week < 0 ? -week : week;
+        var queryDate = moment().add(week, 'weeks').endOf('week')
+        searchQuery["createdAt"] = { lte: queryDate }
       }
 
       // Finding version which was created before the requested time

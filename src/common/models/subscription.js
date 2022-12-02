@@ -1,97 +1,45 @@
 "use strict";
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
-const { create_product, create_plan, get_plan_by_id, update_product, update_plan, update_plan_status } = require("../../helper/stripe");
+const { create_customer, update_customer_by_id, create_token, get_plan_by_id, update_product, update_plan, create_card } = require("../../helper/stripe");
 
 module.exports = function (Subscription) {
-  Subscription.createPlan = async (planName, amount, description, duration, userId, next) => {
+  // NOTE:- Cant Change a Plan except its Name and Description
+
+  Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     try {
-      // Creating a Product on Plan Creation
-      const product = await create_product({name: planName, description});
+      const findUser = await Subscription.findOne({where: { userId }});
+      if(findUser) {
+        // Create a token
+        let [expMonth, expYear] = expirationDate.split("/");
+        let token = await create_token({cardNumber, expMonth, expYear, cvc});
 
-      // Creating a Subscription Plan
-      const plan = await create_plan({
-        amount,
-        currency: "usd",
-        duration,
-        productId: product.id,
-        planName: planName,
-      });
+        // Create Card
+        let card = await create_card({customerId: customer.id, tokenId: token.id});
 
-      // // Saving a Subscription Plan in database
-      const planData = await Subscription.create({
-        name: plan.metadata.name,
-        amount: amount,
-        description: product.description,
-        currency: plan.currency,
-        duration: plan.interval,
-        interval_count: plan.interval_count,
-        plan_id: plan.id,
-        user_id: userId,
-        product_id: product.id,
-        status: plan.active,
-      });
+        if(card) {
+          await update_customer_by_id({customerId: findUser.customerId, data: {default_source: card.id}});
+          return "Card saved successfully";
+        }
+      } else {
+        // Create Cutomer on Stripe
+        let customer = await create_customer({name: fullName, description: `Welcome to stripe, ${fullName}`});
 
-      return planData;
-    } catch (err) {
+        // Create a token
+        let [expMonth, expYear] = expirationDate.split("/");
+        let token = await create_token({cardNumber, expMonth, expYear, cvc});
+        
+        // Create Card
+        let card = await create_card({customerId: customer.id, tokenId: token.id});
+        if(card) {
+          await update_customer_by_id({customerId: customer.id, data: {default_source: card.id}});
+          await Subscription.app.models.user.update({"id": userId}, {currentPlan: plan});
+          await Subscription.create({userId, customerId: customer.id, cardId: card.id, tokenId: token.id});
+          return "Card saved successfully";
+        }
+      }
+    }
+    catch(err) {
       console.log(err);
     }
-  };
-
-  Subscription.changePlanStatus = async (planId, status, next) => {
-    // Update Plan By ID
-    const updatedPlan = await update_plan_status({ planId, status });
-
-    // Update Plan Status in Databae
-    const updatedPlanInDb = await Subscription.update({ plan_id: planId }, { status });
-
-    if(updatedPlanInDb){
-      return "Status changed successfully..!!";
-    }
   }
-
-  Subscription.saveCards = async (customerId) => {
-    //Create a Card
-    const card = await stripe.customers.createSource(
-      'cus_4QFHdAzXHKCFfn',
-      {source: 'tok_amex'}
-    );
-  }
-
-  Subscription.makeSubcription = async (customerId) => {
-    // Create a Subscription
-    const subscription = await stripe.Subscription.create({
-      customer: 'cus_MdrG2B6720sNNl',
-      items: [
-        {price: 'price_1LvEOZSGltNYnTVR4WeitFWe'},
-      ],
-    });
-
-    console.log(subscription, 'subscription');
-    return subscription;
-  }
-
-  Subscription.beforeRemote('prototype.patchAttributes', async function(context, instance,  next) {
-    // NOTE:- Cant Change a Plan except its Name and Description
-    const req = context.req;
-
-    // Get Plan Details
-    const getPlanDetails = await get_plan_by_id({ planId: req.body.planId });
-
-    // Update Product
-    const prodDetails = await update_product({ productId: getPlanDetails.product, planName: req.body.planName, description: req.body.description });
-
-    // Update Plan
-    const updatedPlan = await update_plan({ planId: req.body.planId, planName: req.body.planName });
-
-    // Update Plan in database
-    const updatedPlanDetails = await Subscription.update({ plan_id: req.body.planId, user_id: req.body.userId } , {
-      name: updatedPlan.metadata.name,
-      description: prodDetails.description,
-    });
-
-    if(updatedPlanDetails){
-      return "Plan updated successfully..!!";
-    }
-
-  });
 };

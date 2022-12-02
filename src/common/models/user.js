@@ -524,6 +524,18 @@ module.exports = function(User) {
       next(error);
     }
   };
+
+  User.verifyPaymentMethod = function(next) {
+    this.app.currentUser.updateAttributes({ "paymentVerified": true}, (error)=>{
+      if(error) {
+        let error = new Error("Invalid Code");
+        error.status = 400;
+        next(error);
+      }
+      next(error, this.app.currentUser);
+    });
+  };
+  
   // Send email code
   User.sendEmailCode = function(next) {
     var emailVerificationCode = keygen.number({length: 6});
