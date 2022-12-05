@@ -225,8 +225,8 @@ module.exports = function(User) {
     return generator.generate({
       length: 8,
       numbers: true,
-      // symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
-      symbols: "@$!%*#?&",
+      symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      // symbols: "@$!%*#?&",
       strict: true
     });
   }
