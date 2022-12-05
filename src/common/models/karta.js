@@ -329,8 +329,7 @@ module.exports = function(Karta) {
       // Find the latest Karta version history ----
       let GetKartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
       let kartaData = JSON.parse(JSON.stringify(GetKartaInfo[0]));
-      const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
-      const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaDetails.versionId } });
+      const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaData.versionId } });
 
       // Find the requested Karta version history ----
       // Search Query
@@ -369,13 +368,23 @@ module.exports = function(Karta) {
                 newObj[key] = x.old_options[key];
               });
 
-              Object.keys(lastHistoryObject.old_options).forEach(key => {
-                if ( newObj.hasOwnProperty(key) && newObj[key] == lastHistoryObject.old_options[key] ) {
-                  flagCheck = true;
-                } else {
-                  flagCheck = false;
-                }
-              });
+              if (Object.keys(lastHistoryObject.old_options).length == Object.keys(x.old_options).length) {
+                Object.keys(lastHistoryObject.old_options).forEach(key => {
+                  if ( newObj.hasOwnProperty(key) ) {
+                    if( typeof lastHistoryObject.old_options[key] == 'string' || typeof lastHistoryObject.old_options[key] == 'number' || typeof lastHistoryObject.old_options[key] == 'boolean'){
+                      newObj[key] == lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
+                    } else if ( typeof lastHistoryObject.old_options[key] == 'object' ) {
+                      Object.keys(newObj[key]).length == Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
+                    } else {
+                      newObj[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
+                    }
+                  } else {
+                    flagCheck = false;
+                  }
+                });
+              } else {
+                flagCheck = false;
+              }
 
               if( flagCheck ){
                 return x;
