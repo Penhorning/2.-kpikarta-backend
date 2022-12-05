@@ -4,6 +4,7 @@ const fs = require("fs");
 const path = require('path');
 
 module.exports = function(Company) {
+  // After company update
   Company.afterRemote('prototype.patchAttributes', function(context, instance,  next) {
     const req = context.req;
 

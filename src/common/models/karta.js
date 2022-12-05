@@ -10,40 +10,21 @@ module.exports = function(Karta) {
     const SORT = {
       $sort: { createdAt: -1 }
   }
-  // User lookup with id
-  const USER_LOOKUP_WITH_ID = (userId) => {
+  // User lookup with id or email
+  const USER_LOOKUP = (findBy, type) => {
+    let column = "_id";
+    if (type === "shared")  column = "email";
+
       return {
           $lookup: {
               from: "user",
               let: {
-                  user_id: userId
+                  find_by: findBy
               },
               pipeline: [
                 { 
                   $match: { 
-                    $expr: { $eq: ["$_id", "$$user_id"] }
-                  } 
-                },
-                {
-                  $project: { "fullName": 1, "email": 1 }
-                }
-              ],
-              as: "user"
-          }
-      }
-  }
-  // User lookup with email
-  const USER_LOOKUP_WITH_EMAIL = (email) => {
-      return {
-          $lookup: {
-              from: "user",
-              let: {
-                  user_email: email
-              },
-              pipeline: [
-                { 
-                  $match: { 
-                    $expr: { $eq: ["$email", "$$user_email"] }
+                    $expr: { $eq: ["$" + column, "$$find_by"] }
                   } 
                 },
                 {
@@ -239,13 +220,18 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getAll = (userId, searchQuery, page, limit, next) => {
+  Karta.getAll = (findBy, searchQuery, type, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-    userId = Karta.getDataSource().ObjectID(userId);
+    let query = {};
+    if (type === "shared") query = { "sharedTo.email": findBy, "is_deleted": false }
+    else {
+      findBy = Karta.getDataSource().ObjectID(findBy);
+      query = { "userId": findBy, "is_deleted": false }
+    }
 
     const SEARCH_MATCH = {
       $match: {
@@ -264,48 +250,10 @@ module.exports = function(Karta) {
       const KartaCollection = db.collection('karta');
       KartaCollection.aggregate([
         {
-          $match: { "userId": userId, "is_deleted": false }
+          $match: query
         },
         SEARCH_MATCH,
-        USER_LOOKUP_WITH_ID(userId),
-        UNWIND_USER,
-        SORT,
-        FACET(page, limit)
-      ]).toArray((err, result) => {
-        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
-        next(err, result);
-      });
-    });
-  }
-
-  // Get all shared kartas
-  Karta.getSharedAll = (email, searchQuery, page, limit, next) => {
-    page = parseInt(page, 10) || 1;
-    limit = parseInt(limit, 10) || 100;
-
-    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-
-    const SEARCH_MATCH = {
-      $match: {
-        $or: [
-          {
-            'name': {
-              $regex: search_query,
-              $options: 'i'
-            }
-          }
-        ]
-      }
-    }
-
-    Karta.getDataSource().connector.connect(function (err, db) {
-      const KartaCollection = db.collection('karta');
-      KartaCollection.aggregate([
-        {
-          $match: { "sharedTo.email": email, $or: [ { "is_deleted": false }, { "is_deleted": { "$exists": false} } ] }
-        },
-        SEARCH_MATCH,
-        USER_LOOKUP_WITH_EMAIL(email),
+        USER_LOOKUP(findBy, type),
         UNWIND_USER,
         SORT,
         FACET(page, limit)
