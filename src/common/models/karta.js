@@ -308,13 +308,17 @@ module.exports = function(Karta) {
         createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
 
         // Creating Karta Nodes for new karta based on history
-        let data = createCopyKartaNodes(newVersion, newKarta);
-        lastHistoryOfKartaVersion = data[0];
-        finalVersionId = data[1];
+        let data = await createCopyKartaNodes(newVersion, newKarta);
+        if ( data.length > 0 ) {
+          lastHistoryOfKartaVersion = data[0];
+          finalVersionId = data[1];
+        }
       }
 
-      await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
-      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
+      if ( lastHistoryOfKartaVersion && finalVersionId ) {
+        await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
+        await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
+      }
 
       return "Karta copy created successfully..!!";
     }
