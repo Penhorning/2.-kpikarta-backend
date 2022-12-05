@@ -124,5 +124,9 @@
   "license": {
     "dataSource": "db",
     "public": true
+  },
+  "karta_catalog": {
+    "dataSource": "db",
+    "public": true
   }
 }

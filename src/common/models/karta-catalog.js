@@ -1,0 +1,119 @@
+'use strict';
+
+module.exports = function(Kartacatalog) {
+    /* QUERY VARIABLES
+    ----------------*/
+    // Sort
+    const SORT = {
+        $sort: { createdAt: -1 }
+    }
+    // User lookup
+    const USER_LOOKUP = (userId) => {
+        return {
+            $lookup: {
+                from: "user",
+                let: {
+                    user_id: userId
+                },
+                pipeline: [
+                  { 
+                    $match: { 
+                      $expr: { $eq: ["$_id", "$$user_id"] }
+                    } 
+                  },
+                  {
+                    $project: { "fullName": 1, "email": 1 }
+                  }
+                ],
+                as: "user"
+            }
+        }
+    }
+    const UNWIND_USER = {
+        $unwind: "$user"
+    }
+    // Facet
+    const FACET = (page, limit) => {
+        return {
+            $facet: {
+              metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+              data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+            }
+        }
+    }
+
+
+
+/* =============================CUSTOM METHODS=========================================================== */
+  // Get all catalogs
+  Kartacatalog.getAll = (userId, searchQuery, type, page, limit, nodeTypes, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+
+    let objectUserId = Kartacatalog.getDataSource().ObjectID(userId);
+
+    let query = { "userId": objectUserId, "is_deleted": false };
+    if (type === "shared") query = { "sharedTo.userId": userId, "is_deleted": false }
+
+    // Filter catalogs
+    if (nodeTypes && nodeTypes.length > 0) {
+        query["node_type"] = { $in: nodeTypes }
+    }
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
+
+    Kartacatalog.getDataSource().connector.connect(function (err, db) {
+      const KartaCatalogCollection = db.collection('karta_catalog');
+      KartaCatalogCollection.aggregate([
+        {
+          $match: query
+        },
+        SEARCH_MATCH,
+        USER_LOOKUP(objectUserId),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
+      ]).toArray((err, result) => {
+        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
+  }
+
+  // Share karta catalog to multiple users
+  Kartacatalog.share = (catalogId, userIds, next) => {
+    if (userIds.length > 0) {
+      Kartacatalog.update({ "_id": catalogId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err, result) => {
+        next(err, "Catalog shared successfully!");
+      });
+    } else {
+      let error = new Error("Please send an userId array");
+      error.status = 400;
+      next(error);
+    }
+  }
+
+  // Delete
+  Kartacatalog.delete = (catalogId, next) => {
+    Kartacatalog.update( { "_id": catalogId } , { $set: { "is_deleted": true } }, (err) => {
+      if (err) {
+        console.log('error while soft deleting catalog', err);
+        return next(err);
+      }
+      return next(null, "Catalog deleted successfully!");
+    })
+  }
+}

@@ -42,6 +42,10 @@
       "type": "boolean",
       "default": false
     },
+    "paymentVerified": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
@@ -63,6 +67,10 @@
     "active": {
       "type": "boolean",
       "default": true
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -207,6 +215,18 @@
       "http": {
         "verb": "post",
         "path": "/verify-email"
+      }
+    },
+    "verifyPaymentMethod": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify-payment"
       }
     },
     "sendMobileCode": {
@@ -529,7 +549,7 @@
         "verb": "post"
       }
     },
-    "blockUser": {
+    "block": {
       "accepts": [
         {
           "arg": "userId",
@@ -545,7 +565,7 @@
         "path": "/block"
       }
     },
-    "unblockUser": {
+    "unblock": {
       "accepts": [
         {
           "arg": "userId",
@@ -559,6 +579,22 @@
       "http": {
         "verb": "put",
         "path": "/unblock"
+      }
+    },
+    "delete": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "status",
+        "type": "boolean"
+      },
+      "http": {
+        "verb": "put",
+        "path": "/delete"
       }
     },
     "getRoles": {

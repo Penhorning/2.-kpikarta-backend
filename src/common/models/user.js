@@ -5,39 +5,22 @@ const fs = require("fs");
 const path = require('path');
 const keygen = require('keygenerator');
 const generator = require('generate-password');
-const ejs = require('ejs');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
+const { sendEmail } = require("../../helper/sendEmail");
 
 module.exports = function(User) {
-  // Generate Password
-  const generatePassword = () => {
-    return generator.generate({
-      length: 8,
-      numbers: true,
-      symbols: "$@$!%*?&",
-      strict: true
-    });
+  /* QUERY VARIABLES
+  ----------------*/
+  // Sort
+  const SORT = {
+    $sort: { createdAt: -1 }
   }
-  // Send SMS
-  const sendSMS = (user, message) => {
-    try {
-      let smsOptions = {
-        type: 'sms',
-        to: user.mobile.e164Number,
-        from: "+16063667831",
-        body: message
-      };
-      User.app.models.Twilio.send(smsOptions, (err, data) => {
-        console.log('> sending code to mobile number:', user.mobile.e164Number);
-        if (err) console.log('> error while sending code to mobile number', err);
-      });
-    } catch (error) {
-      console.error("> error in SMS function", error);
-    }
+  // Find user who is not deleted
+  const FIND_ONLY_NOT_DELETED_USERS = {
+    $match: { $or: [ { "is_deleted" : { $exists: false } }, { "is_deleted" : false } ] }
   }
-
-  // QUERY VARIABLES
+  // Role map lookup
   const ROLE_MAP_LOOKUP = (roleId) => {
     return {
       $lookup: {
@@ -52,6 +35,30 @@ module.exports = function(User) {
                 $and: [
                   { $eq: ["$principalId", "$$user_id"] },
                   { $ne: ["$roleId", roleId] }
+                ]
+              }
+            }
+          }
+        ],
+        as: "RoleMap"
+      }
+    }
+  }
+  // Role map lookup for company admin
+  const ROLE_MAP_LOOKUP_COMPANY_ADMIN = (roleId) => {
+    return {
+      $lookup: {
+        from: "RoleMapping",
+        let: {
+          user_id: "$_id"
+        },
+        pipeline: [
+          {
+            $match: {
+              $expr: {
+                $and: [
+                  { $eq: ["$principalId", "$$user_id"] },
+                  { $eq: ["$roleId", roleId] }
                 ]
               }
             }
@@ -94,6 +101,74 @@ module.exports = function(User) {
       path: "$license"
     }
   }
+  // Company lookup
+  const COMPANY_LOOKUP = {
+    $lookup: {
+      from: 'company',
+      localField: 'companyId',
+      foreignField: '_id',
+      as: 'company'
+    },
+  }
+  const UNWIND_COMPANY = {
+    $unwind: {
+      path: "$company"
+    }
+  }
+  // Employee department lookup
+  const EMPLOYEE_DEPARTMENT_LOOKUP = {
+    $lookup: {
+        from: "department",
+        let: {
+            department_id: "$company.departmentId"
+        },
+        pipeline: [
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ["$_id", "$$department_id"] }
+                        ]
+                    }
+                }
+            }
+        ],
+        as: "company.department"
+    }
+  }
+  const UNWIND_EMPLOYEE_DEPARTMENT = {
+    $unwind: {
+      path: "$company.department",
+      preserveNullAndEmptyArrays: true
+    }
+  }
+  // Employee range lookup
+  const EMPLOYEE_RANGE_LOOKUP = {
+    $lookup: {
+        from: "employee_range",
+        let: {
+            range_id: "$company.employeeRangeId"
+        },
+        pipeline: [
+            {
+                $match: {
+                    $expr: {
+                        $and: [
+                            { $eq: ["$_id", "$$range_id"] }
+                        ]
+                    }
+                }
+            }
+        ],
+        as: "company.employee_range"
+    }
+  }
+  const UNWIND_EMPLOYEE_RANGE = {
+    $unwind: {
+      path: "$company.employee_range",
+      preserveNullAndEmptyArrays: true
+    }
+  }
   // Department lookup
   const DEPARTMENT_LOOKUP = {
     $lookup: {
@@ -107,6 +182,69 @@ module.exports = function(User) {
     $unwind: {
       path: "$department",
       preserveNullAndEmptyArrays: true
+    }
+  }
+  // Project
+  const PROJECT = {
+    $project: {
+      '_id': 1,
+      'fullName': 1,
+      'email': 1,
+      'emailVerified': 1,
+      'mobile': 1,
+      'mobileVerified': 1,
+      'street': 1,
+      'city': 1,
+      'state': 1,
+      'postal_code': 1,
+      'country': 1,
+      'profilePic': 1,
+      'license': 1,
+      'Role': 1,
+      'company': 1,
+      'department': 1,
+      'active': 1,
+      'updatedAt': 1,
+      'createdAt': 1
+    }
+  }
+  // Facet
+  const FACET = (page, limit) => {
+    return {
+        $facet: {
+          metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+          data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+        }
+    }
+  }
+  
+  /* General Methods
+  ---------------*/
+  // Generate Password
+  const generatePassword = () => {
+    return generator.generate({
+      length: 8,
+      numbers: true,
+      symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      // symbols: "@$!%*#?&",
+      strict: true
+    });
+  }
+  // Send SMS
+  const sendSMS = (user, message) => {
+    try {
+      let smsOptions = {
+        type: 'sms',
+        to: user.mobile.e164Number,
+        from: "+16063667831",
+        body: message
+      };
+      User.app.models.Twilio.send(smsOptions, (err, data) => {
+        console.log('> sending code to mobile number:', user.mobile.e164Number);
+        if (err) console.log('> error while sending code to mobile number', err);
+      });
+    } catch (error) {
+      console.error("> error in SMS function", error);
     }
   }
 
@@ -165,21 +303,18 @@ module.exports = function(User) {
               } else {
                 next(null, "User invited successfully!");
                 // Send email and password to user
-                user.updateAttributes({ password }, {}, err => {
-                  ejs.renderFile(path.resolve('templates/welcome.ejs'),
-                    { user, name: User.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
-                      User.app.models.Email.send({
-                        to: user.email,
-                        from: User.app.dataSources.email.settings.transports[0].auth.user,
-                        subject: `Welcome to | ${User.app.get('name')}`,
-                        html
-                      }, function(err) {
-                        console.log('> sending welcome email to invited user:', user.email);
-                        if (err) {
-                          console.log('> error while sending welcome email to invited user', err);
-                        }
-                      });
-                  });
+                const data = {
+                  subject: `Welcome to | ${User.app.get('name')}`,
+                  template: "welcome.ejs",
+                  email: user.email,
+
+                  user,
+                  password,
+                  loginUrl: `${process.env.WEB_URL}/login`,
+                  appName: User.app.get('name')
+                }
+                sendEmail(User.app, data, async () => {
+                  await user.updateAttributes({ password });
                 });
               }
             });
@@ -205,22 +340,24 @@ module.exports = function(User) {
             console.log('> error while updating new credentials', err);
             return next(err);
           } else {
-            next(null, "Credentials sent successully!");
             // Send email and password to user
-            ejs.renderFile(path.resolve('templates/credential.ejs'),
-                { user, name: User.app.get('name'), password }, {}, function(err, html) {
-                  User.app.models.Email.send({
-                    to: user.email,
-                    from: User.app.dataSources.email.settings.transports[0].auth.user,
-                    subject: `New Credentials | ${User.app.get('name')}`,
-                    html
-                  }, function(err) {
-                    console.log('> sending credentials email to user:', user.email);
-                    if (err) {
-                      console.log('> error while sending credentials email to user', err);
-                    }
-                  });
-              });
+            const data = {
+              subject: `New Credentials | ${User.app.get('name')}`,
+              template: "credential.ejs",
+              email: user.email,
+
+              user,
+              password,
+              appName: User.app.get('name')
+            }
+            sendEmail(User.app, data, async (response) => {
+              if (response.success) {
+                await user.updateAttributes({ password });
+                next(null, 'Credentials sent successully!');
+              } else {
+                next(response.message);
+              }
+            });
           }
         });
       }
@@ -239,8 +376,7 @@ module.exports = function(User) {
         userId = User.getDataSource().ObjectID(userId);
         
         let query = { "companyId": user.companyId, "_id": { $ne: userId } };
-        // if (type === "all") query = { "companyId": user.companyId };
-        if (type === "all") query = { };
+        if (type === "all") query = { "companyId": user.companyId };
         else if (type === "members") {
           if (user.departmentId) {
             query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } };
@@ -284,9 +420,7 @@ module.exports = function(User) {
             { 
               $match: query
             },
-            {
-              $sort: { "createdAt": -1 }
-            },
+            FIND_ONLY_NOT_DELETED_USERS,
             LICENSE_LOOKUP,
             UNWIND_LICENSE,
             ROLE_LOOKUP,
@@ -294,12 +428,9 @@ module.exports = function(User) {
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
-            {
-              $facet: {
-                metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-                data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-              }
-            }
+            SORT,
+            PROJECT,
+            FACET(page, limit)
           ]).toArray((err, result) => {
             if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
             next(err, result);
@@ -315,6 +446,7 @@ module.exports = function(User) {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
+          FIND_ONLY_NOT_DELETED_USERS,
           ROLE_MAP_LOOKUP(role.id),
           UNWIND_ROLE_MAP
         ]).toArray((err, result) => {
@@ -322,14 +454,15 @@ module.exports = function(User) {
         });
       });
     });
-  };
+  }
+
   // Get all users
   User.getAll = (page, limit, searchQuery, start, end, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-    let query = {};
+    let query = { "creatorId": { $exists: false } };
 
     if (start && end) {
       query.createdAt = {
@@ -363,29 +496,30 @@ module.exports = function(User) {
       }
     }
     // Find user role
-    User.app.models.Role.findOne({ where: {"name": "admin"} }, (err, role) => {
+    User.app.models.Role.findOne({ where: {"name": "company_admin"} }, (err, role) => {
       User.getDataSource().connector.connect(function(err, db) {
         const userCollection = db.collection('user');
         userCollection.aggregate([
           { 
             $match: query
           },
-          {
-            $sort: { "createdAt": -1 }
-          },
-          ROLE_MAP_LOOKUP(role.id),
+          FIND_ONLY_NOT_DELETED_USERS,
+          ROLE_MAP_LOOKUP_COMPANY_ADMIN(role.id),
           UNWIND_ROLE_MAP,
           ROLE_LOOKUP,
           UNWIND_ROLE,
           LICENSE_LOOKUP,
           UNWIND_LICENSE,
+          COMPANY_LOOKUP,
+          UNWIND_COMPANY,
+          EMPLOYEE_DEPARTMENT_LOOKUP,
+          UNWIND_EMPLOYEE_DEPARTMENT,
+          EMPLOYEE_RANGE_LOOKUP,
+          UNWIND_EMPLOYEE_RANGE,
           SEARCH_MATCH,
-          {
-            $facet: {
-              metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-              data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-            }
-          }
+          SORT,
+          PROJECT,
+          FACET(page, limit)
         ]).toArray((err, result) => {
           if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
           next(err, result);
@@ -465,26 +599,37 @@ module.exports = function(User) {
       next(error);
     }
   };
+
+  User.verifyPaymentMethod = function(next) {
+    this.app.currentUser.updateAttributes({ "paymentVerified": true}, (error)=>{
+      if(error) {
+        let error = new Error("Invalid Code");
+        error.status = 400;
+        next(error);
+      }
+      next(error, this.app.currentUser);
+    });
+  };
+  
   // Send email code
   User.sendEmailCode = function(next) {
-    var emailVerificationCode = keygen.number({length: 6});
-    this.app.currentUser.updateAttributes({emailVerificationCode}, {}, err => {
-      ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
-      {user: User.app.currentUser, emailVerificationCode}, {}, function(err, html) {
-        User.app.models.Email.send({
-          to: User.app.currentUser.email,
-          from: User.app.dataSources.email.settings.transports[0].auth.user,
-          subject: `Verfication Code | ${User.app.get('name')}`,
-          html
-        }, function(err) {
-          console.log('> sending verification code email to:', User.app.currentUser.email);
-          if (err) {
-            console.log('> error while sending verification code email', err);
-            return next(err);
-          }
-          next(null, 'success');
-        });
-      });
+    const emailVerificationCode = keygen.number({ length: 6 });
+    const data = {
+      subject: `Verfication Code | ${User.app.get('name')}`,
+      template: "verification-code.ejs",
+      email: User.app.currentUser.email,
+
+      user: User.app.currentUser,
+      emailVerificationCode,
+      appName: User.app.get('name')
+    }
+    sendEmail(User.app, data, async (response) => {
+      if (response.success) {
+        await this.app.currentUser.updateAttributes({ emailVerificationCode });
+        next(null, 'success');
+      } else {
+        next(response.message);
+      }
     });
   };
   // Verify mobile
@@ -566,16 +711,32 @@ module.exports = function(User) {
   };
 
   // Block user
-  User.blockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : false }, (err)=>{
+  User.block = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+      next(err, true);
+    });
+  };
+  // Unblock user
+  User.unblock = function(userId, next) {
+    User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
       next(err, true);
     });
   };
 
-  // Unblock user
-  User.unblockUser = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : true }, (err)=>{
-      next(err, true);
+  // Delete user
+  User.delete = function(userId, next) {
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        let error = new Error("User not found!");
+        error.status = 404;
+        next(error);
+      } else {
+        user.is_deleted = true;
+        user.active = false;
+        user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
+        user.save();
+        next(null, true);
+      }
     });
   };
 
@@ -593,22 +754,34 @@ module.exports = function(User) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
-  User.on('resetPasswordRequest', function(info) {
-    var resetLink = `${process.env.WEB_URL}/reset-password?access_token=${info.accessToken.id}`;
-    ejs.renderFile(path.resolve('templates/forgot-password.ejs'),
-    { fullName: info.user.fullName, resetLink }, {}, function(err, html) {
-      User.app.models.Email.send({
-        to: info.email,
-        from: User.app.dataSources.email.settings.transports[0].auth.user,
-        subject: 'Reset your password | ' + User.app.get('name'),
-        html
-      }, function(err) {
-        console.log('> sending password reset email to:', info.email);
-        if (err) return console.log('> error while sending password reset email', err);
-      });
+  User.on('resetPasswordRequest', (user) => {
+    const resetLink = `${process.env.WEB_URL}/reset-password?access_token=${user.accessToken.id}`;
+    const data = {
+      subject: `Reset your password | ${User.app.get('name')}`,
+      template: "forgot-password.ejs",
+      email: user.email,
+      
+      user: user.user,
+      resetLink,
+      appName: User.app.get('name')
+    }
+    sendEmail(User.app, data, () => { });
+  });
+
+  // Before user create
+  User.beforeRemote('create', (context, user, next) => {
+    const req = context.req;
+    User.app.models.company.findOne({ where: { "name": { like: req.body.companyName.trim(), options: "i" } } }, (err, result) => {;
+      if (err) return next(err);
+      else if (result) {
+        let error = new Error("Company name is already registered!");
+        error.status = 400;
+        next(error);
+      } else next();
     });
   });
 
+  // After user create
   User.afterRemote('create', (context, user, next) => {
     const req = context.req;
     // Find role
@@ -620,7 +793,7 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Create company
-        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
+        User.app.models.company.create({ "name": req.body.companyName.trim(), "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
@@ -661,51 +834,40 @@ module.exports = function(User) {
         // Send email and password to new users
         if (req.body.addedBy == "admin") {
           const password = generatePassword();
-          user.updateAttributes({ "emailVerified": true, password }, {}, err => {
-            ejs.renderFile(path.resolve('templates/welcome.ejs'),
-              { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
-                User.app.models.Email.send({
-                  to: user.email,
-                  from: User.app.dataSources.email.settings.transports[0].auth.user,
-                  subject: `Welcome to | ${req.app.get('name')}`,
-                  html
-                }, function(err) {
-                  console.log('> sending welcome email to admin side user:', user.email);
-                  if (err) {
-                    console.log('> error while sending welcome email to admin side user', err);
-                  }
-                });
-            });
+          const data = {
+            subject: `Welcome to | ${User.app.get('name')}`,
+            template: "welcome.ejs",
+            email: user.email,
+      
+            user,
+            password,
+            loginUrl: `${process.env.WEB_URL}/login`,
+            appName: User.app.get('name')
+          }
+          sendEmail(User.app, data, async () => {
+            await user.updateAttributes({ "emailVerified": true, password });
           });
         } else {
-          // Generate verification code and update in db
-          let emailVerificationCode = keygen.number({length: 6});
-          user.updateAttributes({ emailVerificationCode }, {}, err => {
-            if (err) {
-              console.log('> error while update attributes', err);
-              return next(err);
-            }
-            let emailOptions = {
-              name: User.app.get('name'),
-              type: 'email',
-              to: user.email,
-              from: User.app.dataSources.email.settings.transports[0].auth.user,
-              subject: process.env.TEMPLATE_SIGNUP_SUBJECT,
-              template: path.resolve(__dirname, '../../templates/signup.ejs'),
-              user,
-              emailVerificationCode
-            };
-            // Send email
-            user.verify(emailOptions, function(err, response) {
-              console.log('> sending email to: ', user.email);
-              if (err) console.log('> error while sending code to email', user.email);
-            });
+          // Generate verification code and send email
+          const emailVerificationCode = keygen.number({ length: 6 });
+          const data = {
+            subject: `Thanks for signing up | ${User.app.get('name')}`,
+            template: "signup.ejs",
+            email: user.email,
+
+            user,
+            emailVerificationCode,
+            appName: User.app.get('name')
+          }
+          sendEmail(User.app, data, async () => {
+            await user.updateAttributes({ emailVerificationCode });
           });
         }
       });
     });
   });
 
+  // After user login
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
@@ -719,22 +881,18 @@ module.exports = function(User) {
         // If email is not verified
         else if (!user.emailVerified) {
           next();
-          let emailVerificationCode = keygen.number({ length: 6 });
-          user.updateAttributes({ emailVerificationCode }, {}, err => {
-            ejs.renderFile(path.resolve('templates/send-verification-code.ejs'),
-            { user, emailVerificationCode }, {}, (err, html) => {
-              User.app.models.Email.send({
-                to: user.email,
-                from: User.app.dataSources.email.settings.transports[0].auth.user,
-                subject: `Verfication Code | ${User.app.get('name')}`,
-                html
-              }, (err) => {
-                console.log('> sending verification code email to:', user.email);
-                if (err) {
-                  console.log('> error while sending verification code email', err);
-                }
-              });
-            });
+          const emailVerificationCode = keygen.number({ length: 6 });
+          const data = {
+            subject: `Verfication Code | ${User.app.get('name')}`,
+            template: "verification-code.ejs",
+            email: user.email,
+
+            user,
+            emailVerificationCode,
+            appName: User.app.get('name')
+          }
+          sendEmail(User.app, data, async () => {
+            await user.updateAttributes({ emailVerificationCode });
           });
         }
         // User is verified, checking for twoFactor enabled or not
@@ -759,6 +917,7 @@ module.exports = function(User) {
     } else next();
   });
 
+  // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
     const user = User.app.currentUser;
     const req = context.req;
@@ -796,20 +955,17 @@ module.exports = function(User) {
               next();
             });
             if (!user.email.includes("facebook.com")) {
-              ejs.renderFile(path.resolve('templates/welcome.ejs'),
-              { user, name: req.app.get('name'), loginUrl: `${process.env.WEB_URL}/login`, password }, {}, function(err, html) {
-                User.app.models.Email.send({
-                  to: user.email,
-                  from: User.app.dataSources.email.settings.transports[0].auth.user,
-                  subject: `Welcome to | ${req.app.get('name')}`,
-                  html
-                }, function(err) {
-                  console.log('> sending welcome email to social user:', user.email);
-                  if (err) {
-                    console.log('> error while sending welcome email to social user', err);
-                  }
-                });
-              });
+              const data = {
+                subject: `Welcome to | ${User.app.get('name')}`,
+                template: "welcome.ejs",
+                email: user.email,
+
+                user,
+                password,
+                loginUrl: `${process.env.WEB_URL}/login`,
+                appName: User.app.get('name')
+              }
+              sendEmail(User.app, data, () => { });
             }
           });
         });

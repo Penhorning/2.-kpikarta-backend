@@ -3,6 +3,32 @@
 const moment = require('moment');
 
 module.exports = function (Kartanode) {
+  /* QUERY VARIABLES
+    ----------------*/
+  // Karta lookup
+  const KARTA_LOOKUP = {
+    $lookup: {
+      from: 'karta',
+      localField: 'kartaDetailId',
+      foreignField: '_id',
+      as: 'karta'
+    },
+  }
+  const UNWIND_KARTA = {
+    $unwind: {
+      path: "$karta"
+    }
+  }
+  // Facet
+  const FACET = (page, limit) => {
+    return {
+      $facet: {
+        metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+        data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+      }
+    }
+  }
+
   // Delete child nodes
   const deleteChildNodes = (params) => {
     try {
@@ -18,19 +44,7 @@ module.exports = function (Kartanode) {
     }
   }
 
-  const KARTA_LOOKUP = {
-    $lookup: {
-      from: 'karta',
-      localField: 'kartaDetailId',
-      foreignField: '_id',
-      as: 'karta'
-    },
-  }
-  const UNWIND_KARTA = {
-    $unwind: {
-      path: "$karta"
-    }
-  }
+
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta node to multiple users
@@ -255,12 +269,7 @@ module.exports = function (Kartanode) {
         {
           $match: creator_query
         },
-        {
-          $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-          }
-        }
+        FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
         next(err, result);
@@ -287,6 +296,11 @@ module.exports = function (Kartanode) {
 
   Kartanode.calculationPeriod = async (nodeId, type, next) => {
     try {
+
+      function findTarget(type) {
+        return element.target.find((item) => item.frequency === type);
+      }
+
       if ( type == "month-to-date" ) {
         // Month To Date Calculation
         const totalDays = moment().daysInMonth();
@@ -294,92 +308,250 @@ module.exports = function (Kartanode) {
         const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
         if ( kartaNodeDetails ) {
           let element = kartaNodeDetails;
-          let targetValue = element.target[0].value;
-          targetValue = todayDate * (targetValue / totalDays); // target value per day
+          let targetValue;
+          if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+          else if (findTarget('annually')) targetValue = findTarget('annually').value * 12;
+          else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 3;
+          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 4;
+
+          // target value per day
+          targetValue = todayDate * (targetValue / totalDays);
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
-          return { message: "Percentage calculated..!!", data: element.percentage };
+          return { message: "Percentage calculated..!!", percentage: element.percentage };
         }
         else {
-          return { message: "Karta Node not found..!!", data: null };
+          return { message: "Karta Node not found..!!", percentage: null };
         }
       }
       else if ( type == "year-to-date" ) { 
         // Year To Date Calculation
         const currentYear = moment().year();
         const totalDays = moment([currentYear]).isLeapYear() ? 366 : 365;
-        const todayDate = moment().date();
+        const todayDate = moment().dayOfYear();
         const kartaNodeDetails = await Kartanode.findOne({ where: { "id": nodeId }});
         if ( kartaNodeDetails ) {
           let element = kartaNodeDetails;
-          let targetValue = element.target.find((item) => item.frequency === 'annually').value;
-          targetValue = todayDate * (targetValue / totalDays);  // target value per day
+          let targetValue;
+          if (findTarget('annually')) targetValue = findTarget('annually').value;
+          else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
+          else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
+          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 52;
+
+          // target value per day
+          targetValue = todayDate * (targetValue / totalDays);
           let current_percentage= (element.achieved_value/targetValue) * 100;
           element.percentage = Math.round(current_percentage);
           element.percentage = element.percentage === Infinity ? 0 : Math.round(current_percentage);
-          return { message: "Percentage calculated..!!", data: element.percentage };
+          return { message: "Percentage calculated..!!", percentage: element.percentage };
         }
         else {
-          return { message: "Karta Node not found..!!", data: null };
+          return { message: "Karta Node not found..!!", percentage: null };
         }
       }
-      else if ( type == "month-over-month" ) { 
-        // Month Over Month Calculation
+      else if ( type == "month-over-month" || type == "year-over-year" ) { 
+        // Month Over Month and Year Over Year Calculation
 
         const currentYear = moment().year();
         const currentMonth = moment().month() + 1;
         const todayDate = moment().date();
         const previousMonth = currentMonth == 1 ? currentMonth : currentMonth - 1;
         const lastMonthLastDate = moment(`${currentYear-previousMonth}`, "YYYY-MM").daysInMonth();
-        
-        let currentMonthQuery = {
-          event: "node_updated",
-          kartaNodeId: nodeId,
-          and: [
-            { "createdAt": { gte: new Date(new Date(`${currentYear}-${currentMonth}-01`).setUTCHours(0,0,0,0)) } },
-            { "createdAt": { lte: new Date(new Date(`${currentYear}-${currentMonth}-${todayDate}`).setUTCHours(23,59,59,999)) } }
-          ]
-        };
+        let currentMonthQuery;
+        let previousMonthQuery;
 
-        let previousMonthQuery = {
-          event: "node_updated",
-          kartaNodeId: nodeId,
-          and: [
-            { "createdAt": { gte: new Date(new Date(`${currentYear}-${previousMonth}-01`).setUTCHours(0,0,0,0)), } },
-            { "createdAt": { lte: new Date(new Date(`${currentYear}-${previousMonth}-${lastMonthLastDate}`).setUTCHours(23,59,59,999)) } }
-          ]
-        };
+        if ( type == "month-over-month" ) {
+          currentMonthQuery = {
+            event: "node_updated",
+            kartaNodeId: nodeId,
+            and: [
+              { "createdAt": { gte: new Date(new Date(`${currentYear}-${currentMonth}-01`).setUTCHours(0,0,0,0)) } },
+              { "createdAt": { lte: new Date(new Date(`${currentYear}-${currentMonth}-${todayDate}`).setUTCHours(23,59,59,999)) } }
+            ]
+          };
+  
+          previousMonthQuery = {
+            event: "node_updated",
+            kartaNodeId: nodeId,
+            and: [
+              { "createdAt": { gte: new Date(new Date(`${currentYear}-${previousMonth}-01`).setUTCHours(0,0,0,0)), } },
+              { "createdAt": { lte: new Date(new Date(`${currentYear}-${previousMonth}-${lastMonthLastDate}`).setUTCHours(23,59,59,999)) } }
+            ]
+          };
+        } else if ( type == "year-over-year" ) {
+          currentMonthQuery = {
+            event: "node_updated",
+            kartaNodeId: nodeId,
+            and: [
+              { "createdAt": { gte: new Date(new Date(`${currentYear-1}-01-01`).setUTCHours(0,0,0,0)) } },
+              { "createdAt": { lte: new Date(new Date(`${currentYear-1}-12-31`).setUTCHours(23,59,59,999)) } }
+            ]
+          };
+  
+          previousMonthQuery = {
+            event: "node_updated",
+            kartaNodeId: nodeId,
+            and: [
+              { "createdAt": { gte: new Date(new Date(`${currentYear}-01-01`).setUTCHours(0,0,0,0)), } },
+              { "createdAt": { lte: new Date(new Date(`${currentYear}-12-${todayDate}`).setUTCHours(23,59,59,999)) } }
+            ]
+          };
+        }
 
         const currentMonthHistoryDetails = await Kartanode.app.models.karta_history.find({ where: currentMonthQuery });
-        let currentMonthData = {};
+        let currentMonthData = null;
 
         const previousMonthhistoryDetails = await Kartanode.app.models.karta_history.find({ where: previousMonthQuery });
-        let previousMonthData = {};
+        let previousMonthData = null;
 
-        if ( currentMonthHistoryDetails.length > 0 ) {
-          const sortedHistory = currentMonthHistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
-          currentMonthData = sortedHistory[sortedHistory.length - 1];
-        }
-        else {
-          currentMonthQuery["event"] = "node_created";
-        }
-        
-        return { message: "Karta Node not found..!!", data: null };
-        // --------------- Algorithm-------------
-        // 1. Find current month and previous month
-        // 2. Find latest target value of previous month and current month using history
-        // 3. Find the difference between last month percentage minus current month percentage
-        // 4. return value
-      }
-      else if ( type == "year-over-year" ) { 
-        // Year Over Year Calculation
+        if ( currentMonthHistoryDetails.length > 0 && previousMonthhistoryDetails.length > 0 ) {
+          // 1. If Data found for previous month and current month
 
-        // --------------- Algorithm-------------
-        // 1. Find current year and previous month
-        // 2. Find latest target value of previous month and current month using history
-        // 3. Find the difference between last month value minus current month value
-        // 4. return value
+          // Filtering out the values for target values only from the history
+          const currentSortedHistory = currentMonthHistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
+          const previousSortedHistory = previousMonthhistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
+
+          // If target values were found then returning the latest updated value from the history
+          if ( currentSortedHistory.length > 0 ) {
+            currentMonthData = currentSortedHistory[currentSortedHistory.length - 1];
+          }
+          if ( previousSortedHistory.length > 0 ) {
+            previousMonthData = previousSortedHistory[previousSortedHistory.length - 1];
+          }
+
+          // Different conditions to check if target values were found or not 
+          if (currentMonthData && previousMonthData) {
+            // If both were found then simply returning the percentage
+            let percentage = currentMonthData.event_options.updated.target[0].percentage - previousMonthData.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+
+          } else if (currentMonthData && !previousMonthData) {
+            // If only data found in current month
+            let percentage = currentMonthData.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+            
+          } else if (!currentMonthData && previousMonthData) {
+            // If only data found in previous month
+            let percentage = previousMonthData.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+
+          } else if (!currentMonthData && !previousMonthData) {
+            let nodeHistory = { event: "node_created", kartaNodeId: nodeId };
+            let nodeDetails = await Kartanode.app.models.karta_history.findOne({ where : nodeHistory });
+            if (nodeDetails) {
+              let percentage = nodeDetails.event_options.updated.target[0].percentage;
+              if ( type == "month-over-month" ) {
+                return { message: "Data found for month over month..!!", percentage };
+              } else {
+                return { message: "Data found for year over year..!!", percentage };
+              }
+            } else {
+              return { message: "Something went wrong in history data..!!", percentage: null };
+            }
+          }
+
+        } else if ( currentMonthHistoryDetails.length > 0 && previousMonthhistoryDetails.length == 0 ) {
+          // 2. If Data found for only current month
+
+          // Filtering out the values for target values only from the history
+          const currentSortedHistory = currentMonthHistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
+
+          // If target values were found then returning the latest updated value from the history
+          if ( currentSortedHistory.length > 0 ) {
+            currentMonthData = currentSortedHistory[currentSortedHistory.length - 1];
+          }
+
+          // Different conditions to check if target values were found or not 
+          if ( currentMonthData ) {
+            // If data found in current month
+            let percentage = currentMonthData.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+
+          } else {
+            let nodeHistory = { event: "node_created", kartaNodeId: nodeId };
+            let nodeDetails = await Kartanode.app.models.karta_history.findOne({ where : nodeHistory });
+            if (nodeDetails) {
+              let percentage = nodeDetails.event_options.updated.target[0].percentage;
+              if ( type == "month-over-month" ) {
+                return { message: "Data found for month over month..!!", percentage };
+              } else {
+                return { message: "Data found for year over year..!!", percentage };
+              }
+            } else {
+              return { message: "Something went wrong in history data..!!", percentage: null };
+            }
+          }
+
+        } else if ( currentMonthHistoryDetails.length == 0 && previousMonthhistoryDetails.length > 0 ) {
+          // 3. If Data found for only previous month
+
+          // Filtering out the values for target values only from the history
+          const previousSortedHistory = previousMonthhistoryDetails.filter(x => x.event_options.updated.hasOwnProperty("target"));
+
+          // If target values were found then returning the latest updated value from the history
+          if ( previousSortedHistory.length > 0 ) {
+            previousMonthData = previousSortedHistory[previousSortedHistory.length - 1];
+          }
+
+          // Different conditions to check if target values were found or not 
+          if ( previousMonthData ) {
+            // If data found in previous month
+            let percentage = previousMonthData.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+
+          } else {
+            let nodeHistory = { event: "node_created", kartaNodeId: nodeId };
+            let nodeDetails = await Kartanode.app.models.karta_history.findOne({ where : nodeHistory });
+            if (nodeDetails) {
+              let percentage = nodeDetails.event_options.updated.target[0].percentage;
+              if ( type == "month-over-month" ) {
+                return { message: "Data found for month over month..!!", percentage };
+              } else {
+                return { message: "Data found for year over year..!!", percentage };
+              }
+            } else {
+              return { message: "Something went wrong in history data..!!", percentage: null };
+            }
+          }
+
+        } else if ( currentMonthHistoryDetails.length == 0 && previousMonthhistoryDetails.length == 0 ) {
+          // 4. If Data not found for both current and previous month
+
+          let nodeHistory = { event: "node_created", kartaNodeId: nodeId };
+          let nodeDetails = await Kartanode.app.models.karta_history.findOne({ where : nodeHistory });
+          if (nodeDetails) {
+            let percentage = nodeDetails.event_options.updated.target[0].percentage;
+            if ( type == "month-over-month" ) {
+              return { message: "Data found for month over month..!!", percentage };
+            } else {
+              return { message: "Data found for year over year..!!", percentage };
+            }
+          } else {
+            return { message: "Something went wrong in history data..!!", percentage: null };
+          }
+
+        }
       }
     }
     catch(err) {

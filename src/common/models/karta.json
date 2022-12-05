@@ -120,15 +120,20 @@
         "verb": "post"
       }
     },
-    "getKartas": {
+    "getAll": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "findBy",
           "type": "string",
           "required": true
         },
         {
           "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "type",
           "type": "string",
           "required": false
         },
@@ -148,43 +153,11 @@
         "type": "karta"
       },
       "http": {
-        "path": "/get-kartas",
+        "path": "/get-all",
         "verb": "post"
       }
     },
-    "sharedKartas": {
-      "accepts": [
-        {
-          "arg": "email",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "searchQuery",
-          "type": "string",
-          "required": false
-        },
-        {
-          "arg": "page",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "limit",
-          "type": "number",
-          "required": false
-        }
-      ],
-      "returns": {
-        "arg": "kartas",
-        "type": "karta"
-      },
-      "http": {
-        "path": "/shared-kartas",
-        "verb": "post"
-      }
-    },
-    "softDelete": {
+    "delete": {
       "accepts": [
         {
           "arg": "kartaId",
@@ -220,6 +193,33 @@
       },
       "http": {
         "path": "/copy",
+        "verb": "post"
+      }
+    },
+    "viewKartaDetails": {
+      "accepts": [
+        {
+          "arg": "type",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "number",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/view-karta-details",
         "verb": "post"
       }
     }

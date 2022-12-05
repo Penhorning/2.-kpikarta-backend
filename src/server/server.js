@@ -16,7 +16,20 @@ const cors = require('cors');
 
 const app = module.exports = loopback();
 
-app.middleware('parse', bodyParser.json());
+
+// Create file upload directory
+const fs = require('fs');
+const dir1 = './storage/company';
+const dir2 = './storage/user';
+
+if (!fs.existsSync(dir1)) {
+    fs.mkdirSync(dir1, { recursive: true });
+}
+if (!fs.existsSync(dir2)) {
+  fs.mkdirSync(dir2, { recursive: true });
+}
+
+app.middleware('parse', bodyParser.json({ limit: '1mb' }));
 
 // parse application/x-www-form-urlencoded
 app.use(cors());
@@ -97,7 +110,7 @@ boot(app, __dirname, function(err) {
   // Load the provider configurations
   var config = {};
   try {
-    config = require(`../providers.${process.env.NODE_ENV || 'development'}.json`);
+    config = require('../providers.js');
   } catch (err) {
     console.error('Passport configuration', err);
     process.exit(1);
@@ -164,3 +177,7 @@ app.middleware('session', session({
   saveUninitialized: true,
   resave: true,
 }));
+
+// Cron jobs
+const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
+sendTargetAlertsCron(app);

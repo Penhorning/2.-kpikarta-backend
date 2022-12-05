@@ -39,7 +39,7 @@
       "type": "string",
       "default": "#000000"
     },
-    "type_value": {
+    "type": {
       "type": "string",
       "default": "measure"
     },
@@ -94,14 +94,14 @@
     "is_achieved_modified": {
       "type": "boolean"
     },
-    "threshold_value": {
-      "type": "number"
-    },
     "alert_type": {
       "type": "string"
     },
     "alert_frequency": {
       "type": "string"
+    },
+    "last_alert_sent_on": {
+      "type": "date"
     },
     "sharedTo": {
       "type": [
@@ -146,7 +146,7 @@
       }
     },
     "contributor": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "user",
       "foreignKey": "contributorId",
       "options": {
@@ -154,7 +154,7 @@
       }
     },
     "notify_user": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "user",
       "foreignKey": "notifyUserId",
       "options": {
