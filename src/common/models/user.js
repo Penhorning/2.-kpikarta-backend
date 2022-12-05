@@ -220,13 +220,16 @@ module.exports = function(User) {
   
   /* General Methods
   ---------------*/
+  // Remove extra space from string
+  const removeSpace = (str) => {
+    return str.trim().replace(/  +/g, ' ');
+  }
   // Generate Password
   const generatePassword = () => {
     return generator.generate({
       length: 8,
       numbers: true,
-      symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
-      // symbols: "@$!%*#?&",
+      symbols: '!@#$%^&*()+=\?;,./{}|\":<>][\\\'~_-`',
       strict: true
     });
   }
@@ -770,8 +773,10 @@ module.exports = function(User) {
 
   // Before user create
   User.beforeRemote('create', (context, user, next) => {
-    const req = context.req;
-    User.app.models.company.findOne({ where: { "name": { like: req.body.companyName.trim(), options: "i" } } }, (err, result) => {;
+    const companyName = removeSpace(context.req.body.companyName);
+    const regex = new RegExp(["^", companyName, "$"].join(""), "i");
+
+    User.app.models.company.findOne({ where: { "name": regex } }, (err, result) => {
       if (err) return next(err);
       else if (result) {
         let error = new Error("Company name is already registered!");
@@ -793,7 +798,7 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Create company
-        User.app.models.company.create({ "name": req.body.companyName.trim(), "userId": user.id }, {}, (err, company) => {
+        User.app.models.company.create({ "name": removeSpace(req.body.companyName), "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
