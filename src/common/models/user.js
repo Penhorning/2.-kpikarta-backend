@@ -225,8 +225,8 @@ module.exports = function(User) {
     return generator.generate({
       length: 8,
       numbers: true,
-      // symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
-      symbols: "@$!%*#?&",
+      symbols: `~!@#$%^&*()_-+={[}]|\:;"'<,>.?/`,
+      // symbols: "@$!%*#?&",
       strict: true
     });
   }
@@ -768,6 +768,20 @@ module.exports = function(User) {
     sendEmail(User.app, data, () => { });
   });
 
+  // Before user create
+  User.beforeRemote('create', (context, user, next) => {
+    const req = context.req;
+    User.app.models.company.findOne({ where: { "name": { like: req.body.companyName.trim(), options: "i" } } }, (err, result) => {;
+      if (err) return next(err);
+      else if (result) {
+        let error = new Error("Company name is already registered!");
+        error.status = 400;
+        next(error);
+      } else next();
+    });
+  });
+
+  // After user create
   User.afterRemote('create', (context, user, next) => {
     const req = context.req;
     // Find role
@@ -779,7 +793,7 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Create company
-        User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
+        User.app.models.company.create({ "name": req.body.companyName.trim(), "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
@@ -853,6 +867,7 @@ module.exports = function(User) {
     });
   });
 
+  // After user login
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
@@ -902,6 +917,7 @@ module.exports = function(User) {
     } else next();
   });
 
+  // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
     const user = User.app.currentUser;
     const req = context.req;
