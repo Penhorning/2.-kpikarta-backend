@@ -1,8 +1,8 @@
 # KpiKarta Project
-Technology = Nodejs
-Framework = Lookback 3
-SMS Service = Twilio
-Social login plugin (google, facebook & linkedIn) = passport
+Technology = Nodejs <br />
+Framework = Lookback 3 <br />
+SMS Service = Twilio <br />
+Social login plugin (google, facebook & linkedIn) = passport <br />
 Payment gateway = Stripe
 
 # [START PROJECT]
