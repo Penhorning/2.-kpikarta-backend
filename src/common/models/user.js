@@ -378,12 +378,12 @@ module.exports = function(User) {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         userId = User.getDataSource().ObjectID(userId);
         
+        let creatorId = user.creatorId || user.id;
         let query = { "companyId": user.companyId, "_id": { $ne: userId } };
+
         if (type === "all") query = { "companyId": user.companyId };
-        else if (type === "members") {
-          if (user.departmentId) {
-            query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } };
-          } else query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        else if (type === "members" && user.departmentId) {
+          query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } }; 
         }
 
         if (start && end) {
@@ -420,6 +420,9 @@ module.exports = function(User) {
         User.getDataSource().connector.connect(function(err, db) {
           const userCollection = db.collection('user');
           userCollection.aggregate([
+            {
+              $match: { creatorId }
+            },
             { 
               $match: query
             },
@@ -697,7 +700,6 @@ module.exports = function(User) {
   };
   // Enable/Disable 2FA
   User.toggle2FA = function(type, next) {
-
     if (type && this.app.currentUser.mobile && this.app.currentUser.mobileVerified) {
       this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
         next(err, type);
@@ -715,16 +717,42 @@ module.exports = function(User) {
 
   // Block user
   User.block = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
-      next(err, true);
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        let error = new Error("User not found!");
+        error.status = 404;
+        next(error);
+      }
+      else if (user.creatorId) {
+        User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+          next(err, true);
+        });
+      } else {
+        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
+          next(err, true);
+        });
+      }
     });
-  };
+  }
   // Unblock user
   User.unblock = function(userId, next) {
-    User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
-      next(err, true);
+    User.findOne({ where: { "_id": userId } }, (err, user) => {
+      if (err) {
+        let error = new Error("User not found!");
+        error.status = 404;
+        next(error);
+      }
+      else if (user.creatorId) {
+        User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+          next(err, true);
+        });
+      } else {
+        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
+          next(err, true);
+        });
+      }
     });
-  };
+  }
 
   // Delete user
   User.delete = function(userId, next) {

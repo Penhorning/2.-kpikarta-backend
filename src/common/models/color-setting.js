@@ -2,14 +2,9 @@
 
 module.exports = function(Colorsetting) {
     // Get color settings by user
-    Colorsetting.getColorsByUser = (userId, next) => {
-        Colorsetting.findOne({ where: { userId, "kartaId" : { "exists" : false } } }, function (err, userResult) {
-            if (userResult) next(err, userResult);
-            else {
-                Colorsetting.findOne({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, function (error, globalResult) {
-                    next(error, globalResult);
-                });
-            }
+    Colorsetting.getColorSettings = (next) => {
+        Colorsetting.findOne({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, function (error, result) {
+            next(error, result);
         });
     }
     // Get color settings by karta
