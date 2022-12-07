@@ -121,7 +121,7 @@ module.exports = function(Karta) {
           finalHistoryData = tempHistoryData.concat(mainHistoryData);
           await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
         } else {
-          if(!finalHistoryData[j].event_options.updated.hasOwnProperty("contributorId") && !finalHistoryData[j].event_options.updated.hasOwnProperty("achieved_value")){
+          if(!finalHistoryData[j].event_options.updated.hasOwnProperty("contributorId") && !finalHistoryData[j].event_options.updated.hasOwnProperty("achieved_value") && !finalHistoryData[j].event_options.updated.hasOwnProperty("notifyUserId")){
             await Karta.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
           }
         }
@@ -308,13 +308,17 @@ module.exports = function(Karta) {
         createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
 
         // Creating Karta Nodes for new karta based on history
-        let data = createCopyKartaNodes(newVersion, newKarta);
-        lastHistoryOfKartaVersion = data[0];
-        finalVersionId = data[1];
+        let data = await createCopyKartaNodes(newVersion, newKarta);
+        if ( data.length > 0 ) {
+          lastHistoryOfKartaVersion = data[0];
+          finalVersionId = data[1];
+        }
       }
 
-      await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
-      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
+      if ( lastHistoryOfKartaVersion && finalVersionId ) {
+        await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
+        await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
+      }
 
       return "Karta copy created successfully..!!";
     }

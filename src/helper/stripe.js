@@ -1,10 +1,32 @@
 'use strict';
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 
-// CREATE PRODUCT PLAN
-exports.create_product = async (params) => {
+// CREATE PRICE
+exports.create_price = async (nickname, productId, amount, interval) => {
     try {
-        const response = await stripe.products.create({ name: params.name, description: params.description });
+        const response = await stripe.prices.create({
+            nickname: nickname,
+            product: productId,
+            // unit_amount: amount,
+            currency: 'usd',
+            recurring: { interval: interval, usage_type: 'licensed' }, // interval can be month/year
+            billing_scheme: 'tiered', 
+            tiers_mode: 'graduated', 
+            tiers: [
+                { up_to: 'inf', unit_amount: amount*100 },
+            ]
+        });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// CREATE PRODUCT PLAN
+exports.create_product = async (name, description) => {
+    try {
+        const response = await stripe.products.create({ name, description });
         return response;
     } catch (err) {
         console.log(err);
@@ -17,6 +39,19 @@ exports.get_product_by_id = async (params) => {
     try {
         const response = await stripe.products.retrieve( params.prodId );
         return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// LIST ALL PRODUCT
+exports.get_all_products = async () => {
+    try {
+        const products = await stripe.products.list({
+            limit: 2,
+        });
+        return products.data;
     } catch (err) {
         console.log(err);
         return err;
@@ -99,7 +134,19 @@ exports.update_plan_status = async (params) => {
 // CREATE CUSTOMER
 exports.create_customer = async (params) => {
     try {
-        const response = await stripe.customers.create({ name: params.name,  description: params.description });
+        const response = await stripe.customers.create({ 
+            name: params.name,  
+            description: params.description, 
+            address: {
+                city: "Gurgaon",
+                country: "India",
+                line1: "Test Line 1",
+                line2: "Test Line 2",
+                postal_code: "",
+                state: "Haryana"
+            },
+            test_clock: params.clock
+        });
         return response;
     } catch (err) {
         console.log(err);
@@ -172,11 +219,15 @@ exports.get_card_by_id = async (params) => {
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
+        const currentDate = new Date().getDate();
+        const currentYear = new Date().getFullYear();
+        const currentMonth = new Date().getMonth() + 1;
+        const utcDate = new Date(Date.UTC(currentYear, currentMonth, currentDate));
         const response = await stripe.subscriptions.create({ 
             customer: params.customerId,
-            items: [
-              {price: params.planId},
-            ],
+            items: params.items,
+            trial_period_days: 10
+            // billing_cycle_anchor: utcDate
         });
         return response;
     } catch (err) {

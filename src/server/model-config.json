@@ -128,5 +128,9 @@
   "karta_catalog": {
     "dataSource": "db",
     "public": true
+  },
+  "price_mapping": {
+    "dataSource": "db",
+    "public": true
   }
 }

@@ -229,7 +229,7 @@ module.exports = function(User) {
     return generator.generate({
       length: 8,
       numbers: true,
-      symbols: '!@#$%^&*()+=\?;,./{}|\":<>][\\\'~_-`',
+      symbols: '!@#$%^&*()+=?;,./"{}|:<>~_-`][\\\'',
       strict: true
     });
   }
