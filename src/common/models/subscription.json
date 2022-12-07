@@ -32,6 +32,10 @@
     "tokenId": {
       "type": "string",
       "required": true
+    },
+    "subscriptionId": {
+      "type": "string",
+      "required": true
     }
   },
   "validations": [],
@@ -85,6 +89,43 @@
       },
       "http": {
         "path": "/save-card",
+        "verb": "post"
+      }
+    },
+    "createPrice": {
+      "accepts": [
+        {
+          "arg": "nickname",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "interval",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "licenseType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-price",
         "verb": "post"
       }
     }
