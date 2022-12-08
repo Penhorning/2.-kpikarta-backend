@@ -64,21 +64,15 @@
     }
   ],
   "methods": {
-    "getColorsByUser": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        }
-      ],
+    "getColorSettings": {
+      "accepts": [],
       "returns": {
         "arg": "color_settings",
         "type": "color_setting"
       },
       "http": {
-        "path": "/by-user",
-        "verb": "post"
+        "path": "/global",
+        "verb": "get"
       }
     },
     "getColorsByKarta": {
