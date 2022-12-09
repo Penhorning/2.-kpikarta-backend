@@ -294,18 +294,18 @@ module.exports = function(Karta) {
        const newKarta = await Karta.create(newObj);
 
        // Fetching version details of that karta
-       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id }});
+       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id, id: kartaDetails.versionId }});
        let lastHistoryOfKartaVersion = "";
        let finalVersionId = "";
 
        // Looping through each version of that karta till latest version 
        for ( let i = 0; i < versionDetails.length; i++ ) {
         const currentVersion = versionDetails[i];
-        const newVersion = await Karta.app.models.karta_version.create({ "name" : currentVersion.name, "kartaId": newKarta.id });
+        const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
         const oldVersionHistory = await Karta.app.models.karta_history.find({ where: { versionId: currentVersion.id, kartaId }});
 
         // Creating Karta History for new Karta
-        createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
+        await createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
 
         // Creating Karta Nodes for new karta based on history
         let data = await createCopyKartaNodes(newVersion, newKarta);
@@ -313,6 +313,8 @@ module.exports = function(Karta) {
           lastHistoryOfKartaVersion = data[0];
           finalVersionId = data[1];
         }
+
+        await Karta.app.models.karta_history.remove({ kartaId: newKarta.id, versionId: newVersion.id })
       }
 
       if ( lastHistoryOfKartaVersion && finalVersionId ) {
