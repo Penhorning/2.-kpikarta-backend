@@ -49,14 +49,12 @@ module.exports = function (Kartanode) {
 /* =============================CUSTOM METHODS=========================================================== */
   // Share karta node to multiple users
   Kartanode.share = (nodeId, userIds, next) => {
-
     if (userIds.length > 0) {
       Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err) => {
         if (err) {
           console.log('> error while updating the node sharedTo property ', err);
           next(err);
-        }
-        else next(null, "Node shared successfully!");
+        } else next(null, "Node shared successfully!");
       });
     } else {
       let error = new Error("Please send an userId array");
@@ -560,9 +558,86 @@ module.exports = function (Kartanode) {
   }
 
 /* =============================REMOTE HOOKS=========================================================== */
+
+  // Add node and update weightage of other nodes
+  Kartanode.afterRemote('create', function(context, node, next) {
+    const kartaId = node.kartaDetailId;
+    const currentNodeId = node.id;
+    const phaseId = node.phaseId;
+
+    if (kartaId) {
+      // Find version of current karta
+      Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
+        if (err) return next(err);
+        // Prepare history data
+        let history_data = {
+          event: "node_created",
+          kartaNodeId: currentNodeId,
+          userId: Kartanode.app.currentUser.id,
+          versionId: karta.versionId,
+          kartaId: kartaId,
+          parentNodeId: node.parentId,
+          historyType: 'main',
+          event_options: {
+            created: node.__data,
+            updated: null,
+            removed: null,
+          }
+        }
+        // Create history of current node
+        Kartanode.app.models.karta_history.create(history_data, {}, () => {});
+        
+        /* Adjust weight of current node
+        */
+        // Find children of current karta
+        Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, phaseId, "is_deleted": false } }, (err, nodes) => {
+          if (err) next(err);
+          // Check if children exists
+          else if (nodes.length > 0) {
+            let nodeIds = [];
+            nodes.forEach(element => nodeIds.push(element.id));
+            // Find if we have nested children
+            Kartanode.findOne({ where: { "parentId": { in: nodeIds }, "kartaDetailId": kartaId, phaseId, "is_deleted": false } }, (err, result) => {
+              if (err) next(err);
+              else if (!result) {
+                // Divide weightage, if we not have nested children
+                let weightage = + (100 / (nodes.length + 1)).toFixed(2);
+                // Assign divided weightage to all the nodes of that phase of current karta
+                Kartanode.updateAll({ "kartaDetailId": kartaId, phaseId, "is_deleted": false, $set: { weightage } }, (err, result2) => {
+                  next(err, result2);
+                  // Make history of updated nodes
+                  nodes.forEach(item => {
+                    // Prepare history data
+                    let history_data = {
+                      event: "node_updated",
+                      kartaNodeId: item.id,
+                      userId: Kartanode.app.currentUser.id,
+                      versionId: karta.versionId,
+                      kartaId: kartaId,
+                      parentNodeId: item.parentId,
+                      historyType: 'main',
+                      event_options: {
+                        created: null,
+                        updated: { weightage },
+                        removed: null,
+                      },
+                      old_options: { weightage: item.weightage }
+                    }
+                    // Create history of current node
+                    Kartanode.app.models.karta_history.create(history_data, {}, () => {});
+                  });
+                });
+              }
+            });
+          } else next();
+        });
+      });
+    } else next();
+  });
+
   // Include childrens when fetching nodes by kartaId
   Kartanode.observe("access", (ctx, next) => {
-    if(!ctx.query.include){
+    if (!ctx.query.include && ctx.query.where) {
       ctx.query.include = ["children", "phase"];
       ctx.query.where.is_deleted = false;
     }
