@@ -569,6 +569,10 @@ module.exports = function (Kartanode) {
       // Find version of current karta
       Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
         if (err) return next(err);
+        let created_node = {
+          ...node.__data,
+        };
+        created_node["id"] ? delete created_node["id"] : null;
         // Prepare history data
         let history_data = {
           event: "node_created",
@@ -579,13 +583,15 @@ module.exports = function (Kartanode) {
           parentNodeId: node.parentId,
           historyType: 'main',
           event_options: {
-            created: node.__data,
+            created: created_node,
             updated: null,
             removed: null,
           }
         }
         // Create history of current node
-        Kartanode.app.models.karta_history.create(history_data, {}, () => {});
+        Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
+          Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+        });
         
         /* Adjust weight of current node
         */
@@ -624,7 +630,9 @@ module.exports = function (Kartanode) {
                       old_options: { weightage: item.weightage }
                     }
                     // Create history of current node
-                    Kartanode.app.models.karta_history.create(history_data, {}, () => {});
+                    Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
+                      Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+                    });
                   });
                 });
               }

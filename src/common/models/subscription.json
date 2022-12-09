@@ -128,6 +128,23 @@
         "path": "/create-price",
         "verb": "post"
       }
+    },
+    "getCards": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-cards",
+        "verb": "post"
+      }
     }
   }
 }

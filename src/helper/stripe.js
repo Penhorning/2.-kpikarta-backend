@@ -1,6 +1,7 @@
 'use strict';
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 
+//---------------- PRICE APIS ----------------
 // CREATE PRICE
 exports.create_price = async (nickname, productId, amount, interval) => {
     try {
@@ -22,7 +23,10 @@ exports.create_price = async (nickname, productId, amount, interval) => {
         return err;
     }
 }
+//----------------
 
+
+//---------------- PRODUCT APIS ----------------
 // CREATE PRODUCT PLAN
 exports.create_product = async (name, description) => {
     try {
@@ -57,7 +61,10 @@ exports.get_all_products = async () => {
         return err;
     }
 }
+//----------------
 
+
+//---------------- PLAN APIS ----------------
 // UPDATE PRODUCT PLAN
 exports.update_product = async (params) => {
     try {
@@ -130,7 +137,10 @@ exports.update_plan_status = async (params) => {
         return err;
     }
 }
+//----------------
 
+
+//---------------- CUSTOMER APIS ----------------
 // CREATE CUSTOMER
 exports.create_customer = async (params) => {
     try {
@@ -145,7 +155,7 @@ exports.create_customer = async (params) => {
                 postal_code: "",
                 state: "Haryana"
             },
-            test_clock: params.clock
+            // test_clock: params.clock
         });
         return response;
     } catch (err) {
@@ -175,7 +185,40 @@ exports.update_customer_by_id = async (params) => {
         return err;
     }
 }
+//----------------
 
+// ----------------- SETUPINTENT APIS --------------------
+exports.create_setup_intent = async (customerId, cardId) => {
+    try {
+        const setupIntent = await stripe.setupIntents.create({
+            customer: customerId,
+            payment_method_types: ['card'],
+            // payment_method: cardId,
+            usage: 'off_session',
+        });
+        return setupIntent;
+    } catch ( err ) {
+        console.log(err);
+        return err;
+    }
+} 
+
+exports.confirm_setup_intent = async (setupIntentId, cardId) => {
+    try {
+        const setupIntent = await stripe.setupIntents.confirm(
+            setupIntentId,
+            { payment_method: cardId }
+        );
+        return setupIntent;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+//----------------
+
+
+// ----------------- CARD APIS --------------------
 // CREATE TOKEN WHICH TAKES CARD INFORMATION - TOKEN NEEDS TO BE CREATED BEFORE CARD
 exports.create_token = async (params) => {
     try {
@@ -185,6 +228,7 @@ exports.create_token = async (params) => {
               exp_month: params.expMonth,
               exp_year: params.expYear,
               cvc: params.cvc,
+              name: params.name,
             },
         });
         return response;
@@ -194,7 +238,7 @@ exports.create_token = async (params) => {
     }
 }
 
-// CREATE CUSTOMER
+// CREATE CARD
 exports.create_card = async (params) => {
     try {
         const response = await stripe.customers.createSource( params.customerId, { source: params.tokenId } );
@@ -206,9 +250,9 @@ exports.create_card = async (params) => {
 }
 
 // GET CUSTOMER CARD BY CARD ID
-exports.get_card_by_id = async (params) => {
+exports.get_card_by_id = async (customerId, cardId) => {
     try {
-        const response = await stripe.customers.retrieveSource( params.customerId, params.cardId );
+        const response = await stripe.customers.retrieveSource( customerId, cardId );
         return response;
     } catch (err) {
         console.log(err);
@@ -216,18 +260,35 @@ exports.get_card_by_id = async (params) => {
     }
 }
 
+// LIST ALL CARDS BY USER ID
+exports.get_all_cards = async (customerId) => {
+    try {
+        const response = await stripe.customers.listSources(
+            customerId,
+            {object: 'card', limit: 3}
+        );
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+//----------------
+
+
+// ----------------- SUBSCRIPTION APIS --------------------
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
-        const currentDate = new Date().getDate();
-        const currentYear = new Date().getFullYear();
-        const currentMonth = new Date().getMonth() + 1;
-        const utcDate = new Date(Date.UTC(currentYear, currentMonth, currentDate));
         const response = await stripe.subscriptions.create({ 
             customer: params.customerId,
+            proration_behavior: 'create_prorations',
             items: params.items,
-            trial_period_days: 10
-            // billing_cycle_anchor: utcDate
+            trial_period_days: 10,
+            // collection_method: "charge_automatically",
+            // default_source: params.sourceId,
+            expand: ["latest_invoice.payment_intent"],
+            off_session: true,
         });
         return response;
     } catch (err) {
@@ -244,6 +305,18 @@ exports.get_subscription_plan_by_id = async (params) => {
     } catch (err) {
         console.log(err.response);
         return err.response;
+    }
+}
+
+exports.update_subscription = async (params) => {
+    try {
+        const subscription = await stripe.subscriptions.update(
+            'sub_1MCdVj2eZvKYlo2CGKqmDzwj',
+            params.data
+        );
+        return subscription;
+    } catch (err) {
+        console.log(err);
     }
 }
 
@@ -268,9 +341,6 @@ exports.get_all_subscription_plans = async (params) => {
         return err.response;
     }
 }
-//----------------
-
-
 
 // ACTIVATE SUBSCRIPTION PLAN
 exports.activate_subscription_plan = async (params) => {
@@ -295,3 +365,4 @@ exports.deactivate_subscription_plan = async (params) => {
         return err.response;
     }
 }
+//----------------
