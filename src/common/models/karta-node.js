@@ -596,7 +596,7 @@ module.exports = function (Kartanode) {
         /* Adjust weight of current node
         */
         // Find children of current karta
-        Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, phaseId, "is_deleted": false } }, (err, nodes) => {
+        Kartanode.find({ where: { "kartaDetailId": kartaId, phaseId, "is_deleted": false } }, (err, nodes) => {
           if (err) next(err);
           // Check if children exists
           else if (nodes.length > 0) {
@@ -607,7 +607,7 @@ module.exports = function (Kartanode) {
               if (err) next(err);
               else if (!result) {
                 // Divide weightage, if we not have nested children
-                let weightage = + (100 / (nodes.length + 1)).toFixed(2);
+                let weightage = + (100 / (nodes.length)).toFixed(2);
                 // Assign divided weightage to all the nodes of that phase of current karta
                 Kartanode.updateAll({ "kartaDetailId": kartaId, phaseId, "is_deleted": false, $set: { weightage } }, (err, result2) => {
                   next(err, result2);
