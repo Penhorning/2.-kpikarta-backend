@@ -1,0 +1,133 @@
+{
+  "name": "subscription",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "subscription",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "userId": {
+      "type": "string",
+      "required": true
+    },
+    "customerId": {
+      "type": "string",
+      "required": true
+    },
+    "cardId": {
+      "type": "string",
+      "required": true
+    },
+    "tokenId": {
+      "type": "string",
+      "required": true
+    },
+    "subscriptionId": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "validations": [],
+  "relations": {
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [],
+  "methods": {
+    "saveCard": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "cardNumber",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "expirationDate",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "fullName",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "cvc",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/save-card",
+        "verb": "post"
+      }
+    },
+    "createPrice": {
+      "accepts": [
+        {
+          "arg": "nickname",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "interval",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "licenseType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-price",
+        "verb": "post"
+      }
+    }
+  }
+}

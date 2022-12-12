@@ -1,0 +1,367 @@
+{
+  "name": "karta_node",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta_node",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "default": "Child"
+    },
+    "assigned_date": {
+      "type": "date"
+    },
+    "due_date": {
+      "type": "date"
+    },
+    "font_style": {
+      "type": "string",
+      "default": "sans-serif"
+    },
+    "alignment": {
+      "type": "string",
+      "default": "center"
+    },
+    "text_color": {
+      "type": "string",
+      "default": "#000000"
+    },
+    "type": {
+      "type": "string"
+    },
+    "node_type": {
+      "type": {
+        "metrics": "boolean",
+        "fields": [
+          {
+            "fieldName": "string",
+            "fieldValue": "number"
+          }
+        ],
+        "formula": "string"
+      }
+    },
+    "start_date": {
+      "type": "date"
+    },
+    "days_to_calculate": {
+      "type": "string",
+      "default": "all"
+    },
+    "fiscal_year_start_date": {
+      "type": "date"
+    },
+    "fiscal_year_end_date": {
+      "type": "date"
+    },
+    "weightage": {
+      "type": "number",
+      "default": 0
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
+    },
+    "kpi_calc_period": {
+      "type": "string"
+    },
+    "target": {
+      "type": [
+        {
+          "frequecy": "string",
+          "value": "number",
+          "percentage": "number"
+        }
+      ]
+    },
+    "achieved_value": {
+      "type": "number"
+    },
+    "is_achieved_modified": {
+      "type": "boolean"
+    },
+    "alert_type": {
+      "type": "string"
+    },
+    "alert_frequency": {
+      "type": "string"
+    },
+    "last_alert_sent_on": {
+      "type": "date"
+    },
+    "sharedTo": {
+      "type": [
+        {
+          "userId": "string"
+        }
+      ]
+    }
+  },
+  "validations": [],
+  "relations": {
+    "karta_detail": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaDetailId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "phase": {
+      "type": "belongsTo",
+      "model": "karta_phase",
+      "foreignKey": "phaseId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "contributor": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "contributorId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "notify_user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "notifyUserId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "children": {
+      "type": "hasMany",
+      "model": "karta_node",
+      "foreignKey": "parentId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "parent": {
+      "type": "belongsTo",
+      "model": "karta_node",
+      "foreignKey": "parentId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    }
+  ],
+  "methods": {
+    "share": {
+      "accepts": [
+        {
+          "arg": "nodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/share",
+        "verb": "post"
+      }
+    },
+    "kpiCreators": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "creators",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/kpiCreators",
+        "verb": "post"
+      }
+    },
+    "kpiStats": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "kpi_stats",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/kpiStats",
+        "verb": "post"
+      }
+    },
+    "kpiNodes": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "statusType",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "kartaCreatorIds",
+          "type": "array",
+          "required": false
+        },
+        {
+          "arg": "kpiType",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "sortBy",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "percentage",
+          "type": "array",
+          "required": false
+        },
+        {
+          "arg": "targetTypes",
+          "type": "array",
+          "required": false
+        },
+        {
+          "arg": "startUpdatedDate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "endUpdatedDate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "startDueDate",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "endDueDate",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "kpi_nodes",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/kpis",
+        "verb": "post"
+      }
+    },
+    "deleteNodes": {
+      "accepts": [
+        {
+          "arg": "nodeId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/delete",
+        "verb": "post"
+      }
+    },
+    "calculationPeriod": {
+      "accepts": [
+        {
+          "arg": "nodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "type",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/calculation-period",
+        "verb": "post"
+      }
+    }
+  }
+}

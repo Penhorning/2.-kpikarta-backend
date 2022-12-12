@@ -2,6 +2,8 @@
   "restApiRoot": "/api",
   "host": "0.0.0.0",
   "port": 3000,
+  "name": "KPI Karta",
+  "weburl": "http://159.89.234.66:3340",
   "remoting": {
     "context": false,
     "rest": {
@@ -18,5 +20,6 @@
       "limit": "100kb"
     },
     "cors": false
-  }
+  },
+  "cookieSecret": "thisiscookiesecret"
 }

@@ -1,0 +1,57 @@
+{
+  "name": "karta_sub_phase",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "name": {
+      "type": "string",
+      "required": true
+    }
+  },
+  "validations": [],
+  "relations": {
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "parent": {
+      "type": "belongsTo",
+      "model": "karta_sub_phase",
+      "foreignKey": "parentId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_phase": {
+      "type": "belongsTo",
+      "model": "karta_phase",
+      "foreignKey": "kartaPhaseId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    }
+  ],
+  "methods": {}
+}

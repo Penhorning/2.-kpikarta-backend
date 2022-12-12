@@ -1,0 +1,239 @@
+{
+  "name": "karta_history",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta_history",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "event": {
+      "type": "string",
+      "required": true
+    },
+    "event_options": {
+      "type": "object",
+      "required": true
+    },
+    "old_options": {
+      "type": "object"
+    },
+    "kartaNodeId": {
+      "type": "string",
+      "required": true
+    },
+    "versionId": {
+      "type": "string",
+      "required": true
+    },
+    "userId": {
+      "type": "string",
+      "required": true
+    },
+    "kartaId": {
+      "type": "string",
+      "required": true
+    },
+    "parentNodeId": {
+      "type": "string"
+    },
+    "historyType": {
+      "type": "string"
+    },
+    "undoCheck": {
+      "type": "boolean",
+      "default": false
+    }
+  },
+  "validations": [],
+  "relations": {
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_version": {
+      "type": "hasOne",
+      "model": "karta_version",
+      "foreignKey": "versionId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta_node": {
+      "type": "belongsTo",
+      "model": "karta_node",
+      "foreignKey": "kartaNodeId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [],
+  "methods": {
+    "createKartaHistory": {
+      "accepts": [
+        {
+          "arg": "event",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "eventValue",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "oldValue",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "kartaNodeId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "parentNodeId",
+          "type": "string"
+        },
+        {
+          "arg": "historyType",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-karta-history",
+        "verb": "post"
+      }
+    },
+    "versionControlChange": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/version-control",
+        "verb": "post"
+      }
+    },
+    "undoKartaToVersion": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/undo-control",
+        "verb": "post"
+      }
+    },
+    "redoKartaToVersion": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/redo-control",
+        "verb": "post"
+      }
+    },
+    "syncKartaHistory": {
+      "accepts": [
+        {
+          "arg": "versionId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/sync-history",
+        "verb": "post"
+      }
+    }
+  }
+}

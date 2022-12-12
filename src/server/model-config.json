@@ -4,21 +4,31 @@
       "loopback/common/models",
       "loopback/server/models",
       "../common/models",
-      "./models"
+      "./models",
+      "../node_modules/loopback-component-passport/lib/models"
     ],
     "mixins": [
       "loopback/common/mixins",
       "loopback/server/mixins",
       "../common/mixins",
-      "./mixins"
+      "./mixins",
+      "../node_modules/loopback-ds-timestamp-mixin"
     ]
   },
   "User": {
-    "dataSource": "db"
+    "dataSource": "db",
+    "public": false
   },
   "AccessToken": {
     "dataSource": "db",
-    "public": false
+    "public": false,
+    "relations": {
+      "user": {
+        "type": "belongsTo",
+        "model": "user",
+        "foreignKey": "userId"
+      }
+    }
   },
   "ACL": {
     "dataSource": "db",
@@ -34,5 +44,93 @@
   "Role": {
     "dataSource": "db",
     "public": false
+  },
+  "Email": {
+    "dataSource": "email",
+    "public": false
+  },
+  "user": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_node": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_phase": {
+    "dataSource": "db",
+    "public": true
+  },
+  "userCredential": {
+    "dataSource": "db",
+    "public": true
+  },
+  "userIdentity": {
+    "dataSource": "db",
+    "public": true
+  },
+  "suggestion": {
+    "dataSource": "db",
+    "public": true
+  },
+  "Twilio": {
+    "dataSource": "twilio",
+    "public": false
+  },
+  "company": {
+    "dataSource": "db",
+    "public": true
+  },
+  "Container": {
+    "dataSource": "storage",
+    "public": true
+  },
+  "department": {
+    "dataSource": "db",
+    "public": true
+  },
+  "employee_range": {
+    "dataSource": "db",
+    "public": true
+  },
+  "color_setting": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_sub_phase": {
+    "dataSource": "db",
+    "public": true
+  },
+  "notification": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_history": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_version": {
+    "dataSource": "db",
+    "public": true
+  },
+  "subscription": {
+    "dataSource": "db",
+    "public": true
+  },
+  "license": {
+    "dataSource": "db",
+    "public": true
+  },
+  "karta_catalog": {
+    "dataSource": "db",
+    "public": true
+  },
+  "price_mapping": {
+    "dataSource": "db",
+    "public": true
   }
 }
