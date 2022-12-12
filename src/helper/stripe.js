@@ -1,5 +1,6 @@
 'use strict';
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+const moment = require('moment');
 
 //---------------- PRICE APIS ----------------
 // CREATE PRICE
@@ -148,14 +149,13 @@ exports.create_customer = async (params) => {
             name: params.name,  
             description: params.description, 
             address: {
-                city: "Gurgaon",
-                country: "India",
-                line1: "Test Line 1",
-                line2: "Test Line 2",
-                postal_code: "",
-                state: "Haryana"
+                line1: '510 Townsend St',
+                postal_code: '98140',
+                city: 'San Francisco',
+                state: 'CA',
+                country: 'US',
             },
-            // test_clock: params.clock
+            test_clock: params.clock
         });
         return response;
     } catch (err) {
@@ -185,6 +185,20 @@ exports.update_customer_by_id = async (params) => {
         return err;
     }
 }
+
+// ATTACH PAYMENT METHOD TO A CUSTOMER
+exports.attach_payment_method = async (paymentMethodId, cutomerId) => {
+    try {
+        const response = await stripe.paymentMethods.attach(
+            paymentMethodId,
+            {customer: cutomerId}
+        );
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
 //----------------
 
 // ----------------- SETUPINTENT APIS --------------------
@@ -193,8 +207,9 @@ exports.create_setup_intent = async (customerId, cardId) => {
         const setupIntent = await stripe.setupIntents.create({
             customer: customerId,
             payment_method_types: ['card'],
-            // payment_method: cardId,
+            payment_method: cardId,
             usage: 'off_session',
+            confirm: true
         });
         return setupIntent;
     } catch ( err ) {
@@ -280,15 +295,19 @@ exports.get_all_cards = async (customerId) => {
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
+        // let startDateOfsubscription = moment().add(9, 'days').add(1, 'months');
+        let startDateOfsubscription = moment().add(1, 'months').subtract(1, 'days');
+        let unixTimeStamp = Math.floor(startDateOfsubscription / 1000);
         const response = await stripe.subscriptions.create({ 
             customer: params.customerId,
-            proration_behavior: 'create_prorations',
+            payment_behavior: 'allow_incomplete',
             items: params.items,
-            trial_period_days: 10,
-            // collection_method: "charge_automatically",
-            // default_source: params.sourceId,
+            // trial_period_days: 10,
+            collection_method: "charge_automatically",
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
+            billing_cycle_anchor: unixTimeStamp,
+            proration_behavior : 'none'
         });
         return response;
     } catch (err) {
@@ -298,9 +317,9 @@ exports.create_subscription = async (params) => {
 }
 
 // GET SUBSCRIPTION PLAN BY ID
-exports.get_subscription_plan_by_id = async (params) => {
+exports.get_subscription_plan_by_id = async (subscriptionId) => {
     try {
-        const response = await stripe.subscriptions.retrieve( params.subscriptionId );
+        const response = await stripe.subscriptions.retrieve( subscriptionId );
         return response;
     } catch (err) {
         console.log(err.response);
@@ -308,11 +327,11 @@ exports.get_subscription_plan_by_id = async (params) => {
     }
 }
 
-exports.update_subscription = async (params) => {
+exports.update_subscription = async (subscriptionId, data) => {
     try {
         const subscription = await stripe.subscriptions.update(
-            'sub_1MCdVj2eZvKYlo2CGKqmDzwj',
-            params.data
+            subscriptionId,
+            data
         );
         return subscription;
     } catch (err) {
