@@ -74,8 +74,10 @@ module.exports = function (Subscription) {
           // Create Subscription
           const intervalValue = plan == "monthly" ? "month" : "year";
           const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
+          const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
           const priceArray = [
             { price: getCreatorPriceId.priceId, quantity: 1 },
+            { price: getChampionPriceId.priceId, quantity: 0 },
           ];
           const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
           await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, subscriptionId: subscription.id });
