@@ -155,7 +155,13 @@
         },
         {
           "arg": "licenseType",
-          "type": "string"
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "type",
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {
@@ -164,6 +170,39 @@
       },
       "http": {
         "path": "/update-subscription",
+        "verb": "post"
+      }
+    },
+    "getSubscribedUsers": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-subscription-users",
+        "verb": "post"
+      }
+    },
+    "getInvoices": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-invoices",
         "verb": "post"
       }
     }

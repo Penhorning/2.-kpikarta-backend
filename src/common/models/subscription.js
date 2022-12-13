@@ -13,7 +13,10 @@ const {
   confirm_setup_intent, 
   get_all_cards,
   attach_payment_method,
-  get_subscription_plan_by_id
+  get_subscription_plan_by_id,
+  get_price_by_id,
+  get_product_by_id,
+  get_invoices
 } = require("../../helper/stripe");
 
 module.exports = function (Subscription) {
@@ -109,7 +112,7 @@ module.exports = function (Subscription) {
       // LicenseType - Creator/Champion
       // INTERVAL - Month/Year
       const allProducts = await get_all_products();
-      const findProductByInterval = allProducts.findIndex(prod => prod.name == interval);
+      const findProductByInterval = allProducts.findIndex(prod => prod.name == interval && prod.active == true );
       if ( findProductByInterval == -1 ) {
         const newProduct = await create_product(interval, `PER SEAT ${interval.toUpperCase()} PLAN`);
         const price = await create_price(nickname, newProduct.id, amount, interval);
@@ -127,9 +130,10 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.updateSubscription = async (userId, licenseType) => {
+  Subscription.updateSubscription = async (userId, licenseType, type) => {
     try {
       // LicenseType - Creator/Champion
+      // Type - Add/Remove
       const findUser = await Subscription.findOne({ where: { userId }});
       const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
       const itemsData = subscriptionDetails.items.data;
@@ -143,7 +147,7 @@ module.exports = function (Subscription) {
           pricingArr.push({
             id: currentItem.id,
             price: currentItem.price.id, 
-            quantity: currentItem.quantity + 1
+            quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
           });
         } else {
           pricingArr.push({
@@ -159,6 +163,103 @@ module.exports = function (Subscription) {
 
     } catch (err) {
       console.log(err);
+    }
+  }
+
+  Subscription.getSubscribedUsers = async (userId) => {
+    try {
+      const findUser = await Subscription.findOne({ where: { userId }});
+      const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
+      const itemsData = subscriptionDetails.items.data;
+
+      let userArr = {};
+      let userArray = [];
+      let interval = "";
+
+      for( let i = 0; i < itemsData.length; i++ ) {
+        let currentItem = itemsData[i];
+        const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
+        interval = currentItem.plan.interval;
+        userArr["interval"] = currentItem.plan.interval + "ly";
+
+        if ( findPricing.licenseType == "Creator" ) {
+          let newObj = {
+            user: "Creator",
+            quantity: currentItem.quantity,
+            unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+            total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+            currency: currentItem.price.currency
+          };
+          userArray.push(newObj);
+        } else {
+          let newObj = {
+            user: "Champion",
+            quantity: currentItem.quantity,
+            unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+            total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+            currency: currentItem.price.currency
+          };
+          userArray.push(newObj);
+        }
+      };
+
+      // If UserArray Only has Creator subscription
+      if(userArray.length == 1) {
+        const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { licenseType: "Champion", interval }} );
+        const priceDetails = await get_price_by_id( findPricing.priceId );
+        let newObj = {
+          user: "Champion",
+          quantity: 0,
+          unit_amount: priceDetails.metadata.unit_amount,
+          total_amount: 0,
+          currency: "usd"
+        };
+        userArray.push(newObj);
+      }
+
+      // Finding Spectators from Application Database
+      const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+      const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
+      const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
+      let newObj = {
+        user: "Spectators",
+        quantity: findSpectatorsList.length,
+        unit_amount: 0,
+        total_amount: "Free",
+        currency: "usd"
+      };
+      userArray.push(newObj);
+      
+      userArr["userDetails"] = userArray;
+
+      return userArr;
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getInvoices = async (userId) => {
+    try {
+      if( userId ) {
+        const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+        let invoices = await get_invoices( subscriptionDetails.customerId );
+        if ( invoices.data.length > 0 ) {
+          return invoices;
+        } else {
+          return [];
+        }
+      } else {
+        let invoices = await get_invoices("");
+        if ( invoices.data.length > 0 ) {
+          return invoices;
+        } else {
+          return [];
+        }
+      }
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
     }
   }
 };

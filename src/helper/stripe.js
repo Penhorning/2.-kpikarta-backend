@@ -9,15 +9,28 @@ exports.create_price = async (nickname, productId, amount, interval) => {
         const response = await stripe.prices.create({
             nickname: nickname,
             product: productId,
-            // unit_amount: amount,
             currency: 'usd',
             recurring: { interval: interval, usage_type: 'licensed' }, // interval can be month/year
             billing_scheme: 'tiered', 
             tiers_mode: 'graduated', 
             tiers: [
                 { up_to: 'inf', unit_amount: amount*100 },
-            ]
+            ],
+            metadata: {
+                unit_amount: amount,
+            }
         });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+// GET PRICE
+exports.get_price_by_id = async (priceId) => {
+    try {
+        const response = await stripe.prices.retrieve( priceId );
         return response;
     } catch (err) {
         console.log(err);
@@ -40,9 +53,9 @@ exports.create_product = async (name, description) => {
 }
 
 // GET PRODUCT BY ID
-exports.get_product_by_id = async (params) => {
+exports.get_product_by_id = async (productId) => {
     try {
-        const response = await stripe.products.retrieve( params.prodId );
+        const response = await stripe.products.retrieve( productId );
         return response;
     } catch (err) {
         console.log(err);
@@ -382,6 +395,23 @@ exports.deactivate_subscription_plan = async (params) => {
     } catch (err) {
         console.log(err.response);
         return err.response;
+    }
+}
+//----------------
+
+
+// ----------------- INVOICES APIS --------------------
+
+// GET INVOICES
+exports.get_invoices = async (customerId) => {
+    try {
+        let query = {};
+        customerId ? query['customer'] =  customerId : null;
+        const invoices = await stripe.invoices.list(query);
+        return invoices;
+    } catch ( err ) {
+        console.log(err);
+        return err;
     }
 }
 //----------------
