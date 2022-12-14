@@ -58,8 +58,7 @@
       "type": "date"
     },
     "days_to_calculate": {
-      "type": "string",
-      "default": "all"
+      "type": "string"
     },
     "fiscal_year_start_date": {
       "type": "date"
@@ -69,7 +68,7 @@
     },
     "weightage": {
       "type": "number",
-      "default": 0
+      "default": 100
     },
     "is_deleted": {
       "type": "boolean",
@@ -321,6 +320,38 @@
       },
       "http": {
         "path": "/kpis",
+        "verb": "post"
+      }
+    },
+    "addNodeByInventory": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "node",
+          "type": "object",
+          "required": true
+        },
+        {
+          "arg": "parent",
+          "type": "object",
+          "required": false
+        },
+        {
+          "arg": "nodeType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/add-node-by-inventory",
         "verb": "post"
       }
     },
