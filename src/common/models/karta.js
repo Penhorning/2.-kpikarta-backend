@@ -140,7 +140,7 @@ module.exports = function(Karta) {
   // Copy Karta Functions Ends----------------
 
   // Share karta to multiple users
-  Karta.share = (karta, emails, next) => {
+  Karta.share = (karta, emails, accessType, next) => {
 
     let kartaId = "";
     if (karta.hasOwnProperty("id")) kartaId = karta.id;
@@ -178,6 +178,7 @@ module.exports = function(Karta) {
               users.forEach(item => {
                 notificationData.push({
                   title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
+                  click_type: accessType,
                   type: "karta_shared",
                   contentId: karta._id,
                   userId: item.id
@@ -189,7 +190,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit/${karta._id}`;
+              let kartaLink = `${process.env.WEB_URL}/karta/${accessType}/${karta._id}`;
               // Send email to users
               newEmails.forEach(email => {
                 const data = {

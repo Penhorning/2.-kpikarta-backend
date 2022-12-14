@@ -89,7 +89,10 @@ module.exports = function (Kartanode) {
     const phases = await Kartanode.app.models.karta_phase.find({});
     // Find phase index
     const findIndex = (phaseId) => {
-      return phases.map(item => item.id.toString()).indexOf(phaseId.toString());
+      // return phases.map(item => item.id.toString()).indexOf(phaseId.toString());
+      for (let i=0; i<phases.length; i++) {
+        if (phases[i].id.toString() === phaseId.toString()) return i;
+      }
     }
 
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
@@ -97,8 +100,16 @@ module.exports = function (Kartanode) {
       if (parentData) index = 1; 
       const phase = phases[findIndex(phaseId) + index];
       const result = await createNode(kartaId, nodeData, parentData, phase);
-      // Assign divided weightage to all the nodes of that phase of current karta
-      // await Kartanode.updateAll({ "kartaDetailId": kartaId, phaseId: phase.id, "is_deleted": false }, { weightage });
+      if (parentData) {
+        // Find children of current karta
+        const childrens = await Kartanode.find({ where: { "kartaDetailId": kartaId, "parentId": parentData.id, phaseId: phase.id, "is_deleted": false } });
+        // Assign divided weightage to all the nodes of that phase of current karta
+        if (childrens.length > 0) {
+          // Divide weightage
+          const weightage = + (100 / childrens.length).toFixed(2);
+          await Kartanode.updateAll({ "kartaDetailId": kartaId, "parentId": parentData.id, phaseId: phase.id, "is_deleted": false }, { weightage });
+        }
+      }
       if (nodeData.children && nodeData.children.length > 0) {
         for (let i = 0; i < nodeData.children.length; i++) {
           await setCreateNodeParam(nodeData.children[i], result, phase.id);
@@ -106,7 +117,8 @@ module.exports = function (Kartanode) {
       } else return;
     }
 
-    if (nodeType === "branch" && parent) setCreateNodeParam(node, parent, parent.phaseId);
+    if (nodeType === "branch" && parent) await setCreateNodeParam(node, parent, parent.phaseId);
+    else if (nodeType === "branch" && !parent) await setCreateNodeParam(node, null, phases[0].id);
     else {
       const phase = phases[findIndex(parent.phaseId) + 1];
       await createNode(kartaId, node, parent, phase);

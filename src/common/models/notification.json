@@ -24,6 +24,10 @@
     "contentId": {
       "type": "string",
       "required": true
+    },
+    "click_type": {
+      "type": "string",
+      "required": false
     }
   },
   "validations": [],
