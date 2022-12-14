@@ -51,7 +51,7 @@ module.exports = function(Karta) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-  // Copy Karta Functions ----------------
+  // Copy Karta Functions Starts----------------
   async function createCopyKartaHistory(oldVersionHistory, newVersion, newKarta) {
     for ( let k = 0; k < oldVersionHistory.length; k++ ) {
       let history_data = {
@@ -137,7 +137,7 @@ module.exports = function(Karta) {
     }
   }
 
-  // Copy Karta Functions ----------------
+  // Copy Karta Functions Ends----------------
 
   // Share karta to multiple users
   Karta.share = (karta, emails, next) => {
