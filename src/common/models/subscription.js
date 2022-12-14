@@ -205,20 +205,6 @@ module.exports = function (Subscription) {
         }
       };
 
-      // If UserArray Only has Creator subscription
-      if(userArray.length == 1) {
-        const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { licenseType: "Champion", interval }} );
-        const priceDetails = await get_price_by_id( findPricing.priceId );
-        let newObj = {
-          user: "Champion",
-          quantity: 0,
-          unit_amount: priceDetails.metadata.unit_amount,
-          total_amount: 0,
-          currency: "usd"
-        };
-        userArray.push(newObj);
-      }
-
       // Finding Spectators from Application Database
       const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
       const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
@@ -262,6 +248,23 @@ module.exports = function (Subscription) {
     } catch (err) {
       console.log(err);
       throw Error(err);
+    }
+  }
+
+  Subscription.getPrices = async () => {
+    try {
+      const priceMapping = await Subscription.app.models.price_mapping.find({ where : { licenseType: "Creator" }});
+      let priceObj = {};
+      for(let i = 0; i < priceMapping.length; i++ ) {
+        const priceDetails = await get_price_by_id(priceMapping[i].priceId);
+        priceObj[priceDetails.recurring.interval] = priceDetails.metadata.unit_amount
+      }
+
+      return priceObj;
+
+    } catch(err) {
+      console.log(err);
+      return err;
     }
   }
 };

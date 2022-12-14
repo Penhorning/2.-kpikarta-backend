@@ -205,6 +205,17 @@
         "path": "/get-invoices",
         "verb": "post"
       }
+    },
+    "getPrices": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-prices",
+        "verb": "get"
+      }
     }
   }
 }

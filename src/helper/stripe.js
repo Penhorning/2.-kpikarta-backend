@@ -308,18 +308,19 @@ exports.get_all_cards = async (customerId) => {
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
-        // let startDateOfsubscription = moment().add(9, 'days').add(1, 'months');
+        let trialDays = 10;
+        // let startDateOfsubscription = moment().add(1, 'months').add(trialDays - 1, 'days');
         let startDateOfsubscription = moment().add(1, 'months').subtract(1, 'days');
         let unixTimeStamp = Math.floor(startDateOfsubscription / 1000);
         const response = await stripe.subscriptions.create({ 
             customer: params.customerId,
             payment_behavior: 'allow_incomplete',
             items: params.items,
-            // trial_period_days: 10,
             collection_method: "charge_automatically",
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
             billing_cycle_anchor: unixTimeStamp,
+            // trial_period_days: trialDays,
             proration_behavior : 'none'
         });
         return response;
