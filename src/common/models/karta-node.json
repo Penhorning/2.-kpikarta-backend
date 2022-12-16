@@ -39,12 +39,11 @@
       "type": "string",
       "default": "#000000"
     },
-    "type": {
+    "node_type": {
       "type": "string"
     },
-    "node_type": {
+    "node_formula": {
       "type": {
-        "metrics": "boolean",
         "fields": [
           {
             "fieldName": "string",
