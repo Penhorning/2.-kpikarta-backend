@@ -109,6 +109,11 @@
           "arg": "emails",
           "type": "array",
           "required": true
+        },
+        {
+          "arg": "accessType",
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {
