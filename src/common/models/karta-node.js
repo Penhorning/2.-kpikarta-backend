@@ -66,7 +66,7 @@ module.exports = function (Kartanode) {
     }
 
     if (phase.name === "KPI") {
-      data.target = node.target;
+      data.target = node.target || [{ frequency: 'monthly', value: 0, percentage: 0 }];
       data.achieved_value = 0;
       data.is_achieved_modified = false;
       data.days_to_calculate = node.days_to_calculate;
@@ -351,6 +351,31 @@ module.exports = function (Kartanode) {
         next(err, result);
       });
     });
+  }
+
+  // Update nodes and adjust weightage of all the other child nodes
+  Kartanode.updateNodeAndWeightage = async (kartaId, node, next) => {
+    const updateNodeAndAssignWeightage = async (nodeData) => {
+      await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
+      // Find children of current karta
+      const childrens = await Kartanode.find({ where: { "kartaDetailId": kartaId, "parentId": nodeData.parentId, "phaseId": nodeData.phaseId, "is_deleted": false } });
+      // Assign divided weightage to all the nodes of that phase of current karta
+      if (childrens.length > 0) {
+        // Divide weightage
+        const weightage = + (100 / childrens.length).toFixed(2);
+        await Kartanode.updateAll({ "kartaDetailId": kartaId, "parentId": nodeData.parentId, "phaseId": nodeData.phaseId, "is_deleted": false }, { weightage });
+      }
+      if (nodeData.children && nodeData.children.length > 0) {
+        for (let children of node.children) updateNodeAndAssignWeightage(children);
+      }
+    }
+    try {
+      await updateNodeAndAssignWeightage(node);
+      return "Node updated successfully!";
+    } catch (err) {
+      console.log("===>>> Error in updateNode ", err);
+      return err;
+    }
   }
 
   // Soft delete Karta Nodes

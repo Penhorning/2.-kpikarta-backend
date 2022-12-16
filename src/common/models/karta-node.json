@@ -355,6 +355,28 @@
         "verb": "post"
       }
     },
+    "updateNodeAndWeightage": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "node",
+          "type": "object",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-node",
+        "verb": "patch"
+      }
+    },
     "deleteNodes": {
       "accepts": [
         {
