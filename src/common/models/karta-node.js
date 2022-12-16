@@ -66,6 +66,8 @@ module.exports = function (Kartanode) {
     }
 
     if (phase.name === "KPI") {
+      data.node_type = node.node_type || "measure";
+      data.node_formula = node.node_formula || null;
       data.target = node.target || [{ frequency: 'monthly', value: 0, percentage: 0 }];
       data.achieved_value = 0;
       data.is_achieved_modified = false;
