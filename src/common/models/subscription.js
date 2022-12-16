@@ -241,7 +241,7 @@ module.exports = function (Subscription) {
         }
       } else {
         let invoices = await get_invoices_for_admin();
-        if ( invoices.data.length > 0 ) {
+        if ( invoices.data && invoices.data.length > 0 ) {
           let invoice_obj = {};
           for (let i = 0; i < invoices.data.length; i++ ) {
             let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
