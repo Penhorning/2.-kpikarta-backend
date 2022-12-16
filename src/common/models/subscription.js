@@ -16,8 +16,10 @@ const {
   get_subscription_plan_by_id,
   get_price_by_id,
   get_product_by_id,
-  get_invoices
+  get_invoices,
+  get_invoices_for_admin
 } = require("../../helper/stripe");
+const moment = require('moment');
 
 module.exports = function (Subscription) {
   Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
@@ -238,9 +240,25 @@ module.exports = function (Subscription) {
           return [];
         }
       } else {
-        let invoices = await get_invoices("");
+        let invoices = await get_invoices_for_admin();
         if ( invoices.data.length > 0 ) {
-          return invoices;
+          let invoice_obj = {};
+          for (let i = 0; i < invoices.data.length; i++ ) {
+            let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
+            if( invoice_obj[date] ) {
+              invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
+            } else {
+              invoice_obj[date] = invoices.data[i].amount_paid
+            }
+          }
+
+          let finalMapping = Object.keys(invoice_obj).map(data => {
+            return {
+              invoice_date: data,
+              amount: invoice_obj[data]
+            }
+          });
+          return finalMapping;
         } else {
           return [];
         }
