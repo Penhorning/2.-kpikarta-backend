@@ -15,7 +15,7 @@ module.exports = function (app) {
             email: user.email
         }
 
-        if( user.active && !user.is_deleted ) {
+        if(user.active && !user.is_deleted) {
             if (user.emailVerified) {
                 // Get company details
                 req.app.models.company.findById(user.companyId.toString(), (err, company) => {
@@ -51,9 +51,7 @@ module.exports = function (app) {
                 res.redirect(`${process.env.WEB_URL}/sign-up?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}`);
             });
             }
-        } else {
-            res.redirect(`${process.env.WEB_URL}/login?isDeleted=${true}&isActive=${false}`);
-        }
+        } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });
 
     // Get suggestion by phase

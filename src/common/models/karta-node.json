@@ -91,6 +91,9 @@
     "is_achieved_modified": {
       "type": "boolean"
     },
+    "notify_type": {
+      "type": "string"
+    },
     "alert_type": {
       "type": "string"
     },
