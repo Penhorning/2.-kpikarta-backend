@@ -19,6 +19,7 @@
     "express-session": "^1.17.3",
     "generate-password": "^1.7.0",
     "helmet": "^3.10.0",
+    "jsforce": "^1.11.0",
     "keygenerator": "^1.0.4",
     "loopback": "^3.22.0",
     "loopback-boot": "^2.6.5",

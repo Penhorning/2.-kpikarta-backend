@@ -162,6 +162,10 @@ boot(app, __dirname, function(err) {
     passportConfigurator.configureProvider(s, c);
   }
 /* ====================================================================================================== */
+
+/* =================================SALESFORCE CONFIGURATIONS============================================== */
+  sales_login();
+/* ====================================================================================================== */
 });
 
 // The access token is only available after boot
@@ -180,4 +184,5 @@ app.middleware('session', session({
 
 // Cron jobs
 const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
+const { sales_login } = require('../helper/salesforce.js');
 sendTargetAlertsCron(app);
