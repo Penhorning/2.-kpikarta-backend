@@ -379,11 +379,11 @@ module.exports = function(User) {
         userId = User.getDataSource().ObjectID(userId);
         
         let creatorId = user.creatorId || user.id;
-        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
+        let query = { "companyId": user.companyId, creatorId, "_id": { $ne: userId } };
 
         if (type === "all") query = { "companyId": user.companyId };
         else if (type === "members" && user.departmentId) {
-          query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } }; 
+          query = { "companyId": user.companyId, "departmentId": user.departmentId, creatorId, "_id": { $ne: userId } }; 
         }
 
         if (start && end) {
@@ -420,9 +420,6 @@ module.exports = function(User) {
         User.getDataSource().connector.connect(function(err, db) {
           const userCollection = db.collection('user');
           userCollection.aggregate([
-            {
-              $match: { creatorId }
-            },
             { 
               $match: query
             },

@@ -51,7 +51,7 @@ module.exports = function(Karta) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
-  // Copy Karta Functions ----------------
+  // Copy Karta Functions Starts----------------
   async function createCopyKartaHistory(oldVersionHistory, newVersion, newKarta) {
     for ( let k = 0; k < oldVersionHistory.length; k++ ) {
       let history_data = {
@@ -137,10 +137,10 @@ module.exports = function(Karta) {
     }
   }
 
-  // Copy Karta Functions ----------------
+  // Copy Karta Functions Ends----------------
 
   // Share karta to multiple users
-  Karta.share = (karta, emails, next) => {
+  Karta.share = (karta, emails, accessType, next) => {
 
     let kartaId = "";
     if (karta.hasOwnProperty("id")) kartaId = karta.id;
@@ -178,6 +178,7 @@ module.exports = function(Karta) {
               users.forEach(item => {
                 notificationData.push({
                   title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
+                  click_type: accessType,
                   type: "karta_shared",
                   contentId: karta._id,
                   userId: item.id
@@ -189,7 +190,7 @@ module.exports = function(Karta) {
               });
               // Separate emails that are not existing in the system
               newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}//karta/edit/${karta._id}`;
+              let kartaLink = `${process.env.WEB_URL}/karta/${accessType}/${karta._id}`;
               // Send email to users
               newEmails.forEach(email => {
                 const data = {
@@ -294,18 +295,18 @@ module.exports = function(Karta) {
        const newKarta = await Karta.create(newObj);
 
        // Fetching version details of that karta
-       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id }});
+       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id, id: kartaDetails.versionId }});
        let lastHistoryOfKartaVersion = "";
        let finalVersionId = "";
 
        // Looping through each version of that karta till latest version 
        for ( let i = 0; i < versionDetails.length; i++ ) {
         const currentVersion = versionDetails[i];
-        const newVersion = await Karta.app.models.karta_version.create({ "name" : currentVersion.name, "kartaId": newKarta.id });
+        const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
         const oldVersionHistory = await Karta.app.models.karta_history.find({ where: { versionId: currentVersion.id, kartaId }});
 
         // Creating Karta History for new Karta
-        createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
+        await createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
 
         // Creating Karta Nodes for new karta based on history
         let data = await createCopyKartaNodes(newVersion, newKarta);
@@ -313,6 +314,8 @@ module.exports = function(Karta) {
           lastHistoryOfKartaVersion = data[0];
           finalVersionId = data[1];
         }
+
+        await Karta.app.models.karta_history.remove({ kartaId: newKarta.id, versionId: newVersion.id })
       }
 
       if ( lastHistoryOfKartaVersion && finalVersionId ) {
