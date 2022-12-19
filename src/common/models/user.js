@@ -759,7 +759,7 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       } else {
-        user.is_deleted = true;
+        user.is_deleted = true;``
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
         user.save();
