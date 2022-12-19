@@ -5,7 +5,7 @@ module.exports = {
     "profileFields": ["gender", "link", "locale", "name", "displayName", "timezone", "verified", "email", "updated_time"],
     "clientID": process.env.FACEBOOK_CLIENT_ID,
     "clientSecret": process.env.FACEBOOK_CLIENT_SECRET,
-    "callbackURL": "https://5e83-103-57-84-32.ngrok.io/auth/facebook/callback",
+    "callbackURL": `${process.env.API_URL}/auth/facebook/callback`,
     "authPath": "/auth/facebook",
     "callbackPath": "/auth/facebook/callback",
     "successRedirect": "/auth/account",
