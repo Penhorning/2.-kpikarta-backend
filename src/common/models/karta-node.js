@@ -670,6 +670,7 @@ module.exports = function (Kartanode) {
     const kartaId = node.kartaDetailId;
     const currentNodeId = node.id;
     const phaseId = node.phaseId;
+    const parentId = node.parentId;
     const nextPhaseId = context.req.body.nextPhaseId;
 
     if (kartaId) {
@@ -703,7 +704,7 @@ module.exports = function (Kartanode) {
         /* Adjust weight of current node
         */
         // Find children of current karta
-        Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, phaseId, "is_deleted": false } }, (err, nodes) => {
+        Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } }, (err, nodes) => {
           if (err) next(err);
           // Check if children exists
           else if (nodes.length > 0) {
