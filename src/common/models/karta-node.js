@@ -779,7 +779,7 @@ module.exports = function (Kartanode) {
   Kartanode.observe("access", (ctx, next) => {
     if (!ctx.query.include && ctx.query.where) {
       ctx.query.include = ["children", "phase"];
-      ctx.query.where.is_deleted = false;
+      if (!ctx.query.where.is_deleted) ctx.query.where.is_deleted = false;
     }
     next();
   });

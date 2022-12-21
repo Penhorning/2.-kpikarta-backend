@@ -1,6 +1,18 @@
 'use strict';
 
 module.exports = function(Kartahistory) {
+    // Generic functions 
+    async function findChildNodes(nodeId, type) {
+        let boolValue = type == "remove" ? true : false;
+        await Kartahistory.app.models.karta_node.update({ "id": nodeId, "is_deleted": boolValue }, { "is_deleted": !boolValue });
+        const children = await Kartahistory.app.models.karta_node.find({ where: { "parentId": nodeId, "is_deleted": boolValue }});
+        if (children && children.length > 0) {
+            for ( let i = 0; i < children.length; i++ ) {
+                await findChildNodes(children[i].id, type);
+            }
+        }
+    }
+
     Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, next) => {
         const event_object = {
             "node_created": "created",
@@ -123,7 +135,8 @@ module.exports = function(Kartahistory) {
                 if( finalHistoryData[toSetIndex].event == "node_created" ) {
                     if ( toSetIndex > 0 ) {
                         await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
-                        await Kartahistory.app.models.karta_node.remove({ "id": finalHistoryData[toSetIndex].kartaNodeId });
+                        // await Kartahistory.app.models.karta_node.update({ "id": finalHistoryData[toSetIndex].kartaNodeId }, { "is_deleted": true });
+                        await findChildNodes(finalHistoryData[toSetIndex].kartaNodeId, "create");
                     }
                     let nextHistoryIndex = toSetIndex - 1;
                     if ( nextHistoryIndex >= 0 ) {
@@ -151,14 +164,8 @@ module.exports = function(Kartahistory) {
                     if ( nextHistoryIndex >= 0 ) {
                         await Kartahistory.update({ "id": finalHistoryData[toSetIndex].id }, { "undoCheck" : true });
                         await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": finalHistoryData[nextHistoryIndex].id });
-                        let newObj = {
-                            ...finalHistoryData[toSetIndex].event_options.removed,
-                            parentId: finalHistoryData[toSetIndex].parentNodeId
-                        }
-                        let newKartaNodeChild = await Kartahistory.app.models.karta_node.create( newObj );
-                        await Kartahistory.app.models.karta_history.update({ "parentNodeId": finalHistoryData[toSetIndex].kartaNodeId, kartaId, versionId }, { "parentNodeId": newKartaNodeChild.id });
-                        await Kartahistory.app.models.karta_history.update({ "kartaNodeId": finalHistoryData[toSetIndex].kartaNodeId, kartaId, versionId }, { "kartaNodeId": newKartaNodeChild.id });
-                        await Kartahistory.app.models.karta_history.update({ "id": finalHistoryData[toSetIndex].id, kartaId, versionId }, { event_options: { "created": null, "updated": null, "removed": newObj } });
+                        // await Kartahistory.app.models.karta_node.update({ "id": finalHistoryData[toSetIndex].kartaNodeId, "is_deleted": true }, { "is_deleted": false });
+                        await findChildNodes(finalHistoryData[toSetIndex].kartaNodeId, "remove");
                         finalHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
                         return { "message": "done", "data": finalHistoryData[toSetIndex] };
                     }
@@ -187,15 +194,8 @@ module.exports = function(Kartahistory) {
                     if ( historyData[nextIndex].event == "node_created" ) {
                         await Kartahistory.update({ "id": historyData[nextIndex].id }, { "undoCheck" : false });
                         await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": historyData[nextIndex].id });
-    
-                        let newObj = {
-                            ...historyData[nextIndex].event_options.created,
-                            parentId: historyData[nextIndex].parentNodeId
-                        }
-                        let newKartaNodeChild = await Kartahistory.app.models.karta_node.create( newObj );
-                        await Kartahistory.app.models.karta_history.update({ "parentNodeId": historyData[nextIndex].kartaNodeId, kartaId, versionId }, { "parentNodeId": newKartaNodeChild.id });
-                        await Kartahistory.app.models.karta_history.update({ "kartaNodeId": historyData[nextIndex].kartaNodeId, kartaId, versionId }, { "kartaNodeId": newKartaNodeChild.id });
-                        await Kartahistory.app.models.karta_history.update({ "id": historyData[nextIndex].id, kartaId, versionId }, { event_options: { "created": newObj, "updated": null, "removed": null } });
+                        // await Kartahistory.app.models.karta_node.update({ "id": historyData[toSetIndex].kartaNodeId }, { "is_deleted": false });
+                        await findChildNodes(historyData[toSetIndex].kartaNodeId, "remove");
                         historyData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
                         return { "message": "done", "data": historyData[nextIndex] };
                     } 
@@ -207,7 +207,8 @@ module.exports = function(Kartahistory) {
                     }
                     else if ( historyData[nextIndex].event == "node_removed" ) {
                         await Kartahistory.update({ "id": historyData[nextIndex].id }, { "undoCheck" : false });
-                        await Kartahistory.app.models.karta_node.remove({ "id": historyData[nextIndex].kartaNodeId });
+                        // await Kartahistory.app.models.karta_node.update({ "id": historyData[nextIndex].kartaNodeId }, { "is_deleted": true });
+                        await findChildNodes(historyData[toSetIndex].kartaNodeId, "create");
                         await Kartahistory.app.models.karta.update({ "id": kartaId }, { "historyId": historyData[nextIndex].id });
                         return { "message": "done", "data": historyData[nextIndex] };
                     }
