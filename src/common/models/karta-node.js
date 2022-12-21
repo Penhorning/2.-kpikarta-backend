@@ -50,32 +50,30 @@ module.exports = function (Kartanode) {
   }
 
   // Create history
-  const createHistory = (kartaId, nodes, updatedData) => {
+  const createHistory = (kartaId, node, updatedData) => {
     Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
       // Create history
-      nodes.forEach(item => {
-        // Prepare history data
-        let history_data = {
-          event: "node_updated",
-          kartaNodeId: item.id,
-          userId: Kartanode.app.currentUser.id,
-          versionId: karta.versionId,
-          kartaId: kartaId,
-          parentNodeId: item.parentId,
-          historyType: 'main',
-          event_options: {
-            created: null,
-            updated: updatedData,
-            removed: null,
-          }
+      // Prepare history data
+      let history_data = {
+        event: "node_updated",
+        kartaNodeId: node.id,
+        userId: Kartanode.app.currentUser.id,
+        versionId: karta.versionId,
+        kartaId: kartaId,
+        parentNodeId: node.parentId,
+        historyType: 'main',
+        event_options: {
+          created: null,
+          updated: updatedData,
+          removed: null,
         }
-        let oldOptions = {};
-        Object.keys(updatedData).forEach(el => oldOptions[el] = item[el]);
-        history_data["old_options"] = oldOptions;
-        // Create history of current node
-        Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
-          Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
-        });
+      }
+      let oldOptions = {};
+      Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
+      history_data["old_options"] = oldOptions;
+      // Create history of current node
+      Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
+        Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
       });
     });
   }
@@ -90,7 +88,7 @@ module.exports = function (Kartanode) {
       const weightage = + (100 / childrens.length).toFixed(2);
       await Kartanode.updateAll({ "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false }, { weightage });
       // Create new history
-      createHistory(kartaId, childrens, { weightage });
+      for (let children of childrens) createHistory(kartaId, children, { weightage });
     }
   }
 
@@ -112,7 +110,6 @@ module.exports = function (Kartanode) {
 
     if (phase.name === "KPI") {
       data.node_type = node.node_type || "measure";
-      data.node_formula = node.node_formula || null;
       data.target = node.target || [{ frequency: 'monthly', value: 0, percentage: 0 }];
       data.achieved_value = 0;
       data.is_achieved_modified = false;
@@ -394,18 +391,19 @@ module.exports = function (Kartanode) {
   }
 
   // Update nodes and adjust weightage of all the other child nodes
-  Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
-    const updateNodeAndAssignWeightage = async (nodeData) => {
-      await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
-      // Create new history
-      createHistory(kartaId, childrens, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) });
-      await reAdjustWeightage(kartaId, nodeData.parentId, nodeData.phaseId);
-      if (nodeData.children && nodeData.children.length > 0) {
-        for (let children of nodeData.children) updateNodeAndAssignWeightage(children);
-      }
+  async function updateNodeAndAssignWeightage (kartaId, nodeData) {
+    await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
+    await reAdjustWeightage(kartaId, nodeData.parentId, nodeData.phaseId);
+    // Create new history
+    createHistory(kartaId, nodeData, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) });
+    // Check if children exists or not
+    if (nodeData.children && nodeData.children.length > 0) {
+      for (let children of nodeData.children) updateNodeAndAssignWeightage(children);
     }
+  }
+  Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     try {
-      await updateNodeAndAssignWeightage(draggingNode);
+      await updateNodeAndAssignWeightage(kartaId, draggingNode);
       await reAdjustWeightage(kartaId, previousDraggedParentId, previousDraggedPhaseId);
       return "Node updated successfully!";
     } catch (err) {
