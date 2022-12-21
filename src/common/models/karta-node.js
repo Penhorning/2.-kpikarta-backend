@@ -49,6 +49,51 @@ module.exports = function (Kartanode) {
     }
   }
 
+  // Create history
+  const createHistory = (kartaId, nodes, updatedData) => {
+    Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
+      // Create history
+      nodes.forEach(item => {
+        // Prepare history data
+        let history_data = {
+          event: "node_updated",
+          kartaNodeId: item.id,
+          userId: Kartanode.app.currentUser.id,
+          versionId: karta.versionId,
+          kartaId: kartaId,
+          parentNodeId: item.parentId,
+          historyType: 'main',
+          event_options: {
+            created: null,
+            updated: updatedData,
+            removed: null,
+          }
+        }
+        let oldOptions = {};
+        Object.keys(updatedData).forEach(el => oldOptions[el] = item[el]);
+        history_data["old_options"] = oldOptions;
+        // Create history of current node
+        Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
+          Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+        });
+      });
+    });
+  }
+
+  // Adjust weightage
+  const reAdjustWeightage = async (kartaId, parentId, phaseId) => {
+    // Find children of current karta
+    const childrens = await Kartanode.find({ where: { "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } });
+    // Assign divided weightage to all the nodes of that phase of current karta
+    if (childrens.length > 0) {
+      // Divide weightage
+      const weightage = + (100 / childrens.length).toFixed(2);
+      await Kartanode.updateAll({ "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false }, { weightage });
+      // Create new history
+      createHistory(kartaId, childrens, { weightage });
+    }
+  }
+
   // Create node
   const createNode = async (kartaId, node, parent, phase) => {
     let data = {
@@ -103,14 +148,7 @@ module.exports = function (Kartanode) {
       const phase = phases[findIndex(phaseId) + index];
       const result = await createNode(kartaId, nodeData, parentData, phase);
       if (parentData) {
-        // Find children of current karta
-        const childrens = await Kartanode.find({ where: { "kartaDetailId": kartaId, "parentId": parentData.id, phaseId: phase.id, "is_deleted": false } });
-        // Assign divided weightage to all the nodes of that phase of current karta
-        if (childrens.length > 0) {
-          // Divide weightage
-          const weightage = + (100 / childrens.length).toFixed(2);
-          await Kartanode.updateAll({ "kartaDetailId": kartaId, "parentId": parentData.id, phaseId: phase.id, "is_deleted": false }, { weightage });
-        }
+        await reAdjustWeightage(kartaId, parentData.id, phase.id);
       }
       if (nodeData.children && nodeData.children.length > 0) {
         for (let i = 0; i < nodeData.children.length; i++) {
@@ -356,23 +394,19 @@ module.exports = function (Kartanode) {
   }
 
   // Update nodes and adjust weightage of all the other child nodes
-  Kartanode.updateNodeAndWeightage = async (kartaId, node, next) => {
+  Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     const updateNodeAndAssignWeightage = async (nodeData) => {
       await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
-      // Find children of current karta
-      const childrens = await Kartanode.find({ where: { "kartaDetailId": kartaId, "parentId": nodeData.parentId, "phaseId": nodeData.phaseId, "is_deleted": false } });
-      // Assign divided weightage to all the nodes of that phase of current karta
-      if (childrens.length > 0) {
-        // Divide weightage
-        const weightage = + (100 / childrens.length).toFixed(2);
-        await Kartanode.updateAll({ "kartaDetailId": kartaId, "parentId": nodeData.parentId, "phaseId": nodeData.phaseId, "is_deleted": false }, { weightage });
-      }
+      // Create new history
+      createHistory(kartaId, childrens, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) });
+      await reAdjustWeightage(kartaId, nodeData.parentId, nodeData.phaseId);
       if (nodeData.children && nodeData.children.length > 0) {
-        for (let children of node.children) updateNodeAndAssignWeightage(children);
+        for (let children of nodeData.children) updateNodeAndAssignWeightage(children);
       }
     }
     try {
-      await updateNodeAndAssignWeightage(node);
+      await updateNodeAndAssignWeightage(draggingNode);
+      await reAdjustWeightage(kartaId, previousDraggedParentId, previousDraggedPhaseId);
       return "Node updated successfully!";
     } catch (err) {
       console.log("===>>> Error in updateNode ", err);
@@ -381,7 +415,7 @@ module.exports = function (Kartanode) {
   }
 
   // Soft delete Karta Nodes
-  Kartanode.deleteNodes = (nodeId, next) => {
+  Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
     Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, (err) => {
       if (err) {
         console.log('error while soft deleting karta Nodes', err);
@@ -392,6 +426,7 @@ module.exports = function (Kartanode) {
           if (err) console.log('> error while finding child nodes', err);
           deleteChildNodes(result);
         });
+        reAdjustWeightage(kartaId, parentId, phaseId);
         return next(null, "Node deleted successfully..!!");
       }
     })
@@ -666,7 +701,7 @@ module.exports = function (Kartanode) {
 /* =============================REMOTE HOOKS=========================================================== */
 
   // Add node and update weightage of other nodes
-  Kartanode.afterRemote('create', function(context, node, next) {
+  Kartanode.afterRemote('create', async function (context, node, next) {
     const kartaId = node.kartaDetailId;
     const currentNodeId = node.id;
     const phaseId = node.phaseId;
@@ -674,112 +709,75 @@ module.exports = function (Kartanode) {
     const nextPhaseId = context.req.body.nextPhaseId;
 
     if (kartaId) {
-      // Find version of current karta
-      Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
-        if (err) return next(err);
-        let created_node = {
-          ...node.__data,
-        };
-        created_node["id"] ? delete created_node["id"] : null;
-        // Prepare history data
-        let history_data = {
-          event: "node_created",
-          kartaNodeId: currentNodeId,
-          userId: Kartanode.app.currentUser.id,
-          versionId: karta.versionId,
-          kartaId: kartaId,
-          parentNodeId: node.parentId,
-          historyType: 'main',
-          event_options: {
-            created: created_node,
-            updated: null,
-            removed: null,
-          }
+      // Find details of current karta
+      const karta = await Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } });
+      // Find children of current karta
+      const childrens = await Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } });
+      // If children exists
+      if (childrens.length > 0) {
+        // Prepare nodeIds list
+        let nodeIds = [];
+        childrens.forEach(element => nodeIds.push(element.id));
+        // Find if we have nested children
+        const nestedChildrens = await Kartanode.findOne({ where: { "parentId": { inq: nodeIds }, "kartaDetailId": kartaId, "phaseId": nextPhaseId, "is_deleted": false } });
+        // Divide weightage, if we not have nested children
+        if (!nestedChildrens) {
+          const weightage = + (100 / (childrens.length + 1)).toFixed(2);
+          // Assign divided weightage to all the nodes of that phase of current karta
+          await Kartanode.updateAll({ "kartaDetailId": kartaId, phaseId, "is_deleted": false }, { weightage });
+          // Make history of updated nodes
+          childrens.forEach(async item => {
+            // Prepare history data
+            let history_data = {
+              event: "node_updated",
+              kartaNodeId: item.id,
+              userId: Kartanode.app.currentUser.id,
+              versionId: karta.versionId,
+              kartaId: kartaId,
+              parentNodeId: item.parentId,
+              historyType: 'main',
+              event_options: {
+                created: null,
+                updated: { weightage },
+                removed: null,
+              },
+              old_options: { weightage: item.weightage }
+            }
+            // Create history of updated node
+            const history = await Kartanode.app.models.karta_history.create(history_data);
+            await Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
+          });
         }
-        // Create history of current node
-        Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
-          Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
-        });
-        
-        /* Adjust weight of current node
-        */
-        // Find children of current karta
-        Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } }, (err, nodes) => {
-          if (err) next(err);
-          // Check if children exists
-          else if (nodes.length > 0) {
-            let nodeIds = [];
-            nodes.forEach(element => nodeIds.push(element.id));
-            // Find if we have nested children
-            Kartanode.findOne({ where: { "parentId": { inq: nodeIds }, "kartaDetailId": kartaId, "phaseId": nextPhaseId, "is_deleted": false } }, (err, result) => {
-              if (err) next(err);
-              else if (!result) {
-                // Divide weightage, if we not have nested children
-                let weightage = + (100 / (nodes.length + 1)).toFixed(2);
-                // Assign divided weightage to all the nodes of that phase of current karta
-                Kartanode.updateAll({ "kartaDetailId": kartaId, phaseId, "is_deleted": false }, { weightage }, (err, result2) => {
-                  next(err, result2);
-                  // Make history of updated nodes
-                  nodes.forEach(item => {
-                    // Prepare history data
-                    let history_data = {
-                      event: "node_updated",
-                      kartaNodeId: item.id,
-                      userId: Kartanode.app.currentUser.id,
-                      versionId: karta.versionId,
-                      kartaId: kartaId,
-                      parentNodeId: item.parentId,
-                      historyType: 'main',
-                      event_options: {
-                        created: null,
-                        updated: { weightage },
-                        removed: null,
-                      },
-                      old_options: { weightage: item.weightage }
-                    }
-                    // Create history of current node
-                    Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
-                      Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
-                    });
-                  });
-
-                  let history_data = {
-                    event: "node_updated",
-                    kartaNodeId: node.id,
-                    userId: Kartanode.app.currentUser.id,
-                    versionId: karta.versionId,
-                    kartaId: kartaId,
-                    parentNodeId: node.parentId,
-                    historyType: 'main',
-                    event_options: {
-                      created: null,
-                      updated: { weightage },
-                      removed: null,
-                    },
-                    old_options: { weightage: node.weightage }
-                  }
-                  // Create history of current node
-                  Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
-                    Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
-                  });
-                });
-              } else {
-                Kartanode.update({ "_id": currentNodeId, "kartaDetailId": kartaId }, { "weightage": 0 }, (err, result3) => {
-                  next(err, result3);
-                });
-              }
-            });
-          } else next();
-        });
-      });
-    } else next();
+      }
+      // Create history of current node
+      let created_node = { ...node.__data }
+      created_node["id"] ? delete created_node["id"] : null;
+      // Prepare history data
+      let history_data = {
+        event: "node_created",
+        kartaNodeId: currentNodeId,
+        userId: Kartanode.app.currentUser.id,
+        versionId: karta.versionId,
+        kartaId: kartaId,
+        parentNodeId: node.parentId,
+        historyType: 'main',
+        event_options: {
+          created: created_node,
+          updated: null,
+          removed: null,
+        }
+      }
+      // Create history of current node
+      const history = await Kartanode.app.models.karta_history.create(history_data);
+      await Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
+    }
   });
 
   // Include childrens when fetching nodes by kartaId
   Kartanode.observe("access", (ctx, next) => {
     if (!ctx.query.include && ctx.query.where) {
       ctx.query.include = ["children", "phase"];
-      ctx.query.where.is_deleted = false;
+      if (!ctx.query.where.is_deleted) ctx.query.where.is_deleted = false;
     }
     next();
   });
