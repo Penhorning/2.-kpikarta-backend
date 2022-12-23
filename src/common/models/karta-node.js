@@ -12,7 +12,7 @@ module.exports = function (Kartanode) {
       localField: 'kartaDetailId',
       foreignField: '_id',
       as: 'karta'
-    },
+    }
   }
   const UNWIND_KARTA = {
     $unwind: {
