@@ -8,6 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
+const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -594,6 +595,7 @@ module.exports = function(User) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
+        sales_update_user(this.app.currentUser, "email");
         next(err, this.app.currentUser);
       });
     } else {
@@ -838,18 +840,21 @@ module.exports = function(User) {
             return next(err);
           }
           // Find license
-          User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
+          User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
             if (err) {
               console.log('> error while finding license', err);
               return next(err);
             }
+            let ret = await sales_user_details(user, company.name);
+            if(ret && ret.id) {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
+                  if (err) {
+                    console.log('> error while updating user', err);
+                    return next(err);
+                  }
+              });
+            }
             // Assign roleId, licenseId and companyId
-            User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              }
-            });
           });
         });
         // Create token
