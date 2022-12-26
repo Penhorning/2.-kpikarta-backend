@@ -1,6 +1,7 @@
 'use strict';
 
 const moment = require('moment');
+const { sales_karta_details, sales_update_karta } = require('../../helper/salesforce');
 const { sendEmail } = require('../../helper/sendEmail');
 
 module.exports = function(Karta) {
@@ -491,12 +492,13 @@ module.exports = function(Karta) {
 /* =============================REMOTE HOOKS=========================================================== */
     Karta.afterRemote('create', function(context, karta, next) {
       // Create Version
-      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (err, result) => {
+      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , async (err, result) => {
         if (err) {
           console.log('> error while creating karta version', err);
           return next(err);
         } else {
-          Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
+          let skarta = await sales_karta_details(karta);
+          Karta.update({ "id" : karta.id }, { "versionId" : result.id, "selfCopyCount": 0, "sharedCopyCount": 0, karta_sforceId: skarta.id }, (err, data) => {
             if (err) {
               console.log('> error while updating newly crated karta', err);
               return next(err);
@@ -504,5 +506,13 @@ module.exports = function(Karta) {
           });
         }
       });
+    });
+
+    Karta.afterRemote('prototype.patchAttributes', function(context, instance, next) {
+      const req = context.req;
+      if (req.body.updatedAt) {
+        sales_update_karta(instance.karta_sforceId, { updatedAt: req.body.updatedAt });
+        next();
+      } else next();
     });
 };

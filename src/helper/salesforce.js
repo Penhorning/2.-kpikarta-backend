@@ -1,5 +1,6 @@
 const jsforce = require('jsforce');
 const conn = new jsforce.Connection();
+const moment = require('moment');
 const salesForceInfo = {
     username: "tarun.kethwalia@otssolutions.com",
     password: "otssolutions18",
@@ -73,9 +74,9 @@ exports.sales_update_user = (user, type) => {
 exports.sales_last_login = async (user) => {
     try {
         let createObj = {
-            Name: user.fullName,
-            UserId : user.id,
-            LastLogin : new Date().toISOString().slice(0, 19).replace('T', ' '),
+            Name: user.fullName || user.name,
+            UserId__c : user.id || user.userId,
+            LastLogin__c : new Date(),
         };
 
         const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );
@@ -84,6 +85,75 @@ exports.sales_last_login = async (user) => {
         }
 
         return ret;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+exports.sales_last_login = async (user) => {
+    try {
+        let createObj = {
+            Name: user.fullName || user.name,
+            UserId__c : user.id || user.userId,
+            LastLogin__c : moment(),
+        };
+
+        const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );
+        if (!ret.success) {
+            return false;
+        }
+
+        return ret;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+exports.sales_karta_details = async (karta) => {
+    try {
+        let createObj = {
+            Name: karta.name,
+            KartaId__c : karta.id,
+            LastUpdated__c : karta.updatedAt,
+            IsActive__c : karta.status,
+            IsDeleted__c : karta.is_deleted,
+        };
+
+        const ret = await conn.sobject(salesForceInfo.kartaModel).insert( createObj );
+        if (!ret.success) {
+            return false;
+        }
+
+        return ret;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+exports.sales_update_karta = (karta_sforceId, upadatedValue) => {
+    try {
+        let keyValues = {
+            updatedAt: "LastUpdated__c",
+            status: "IsActive__c",
+            is_deleted: "IsDeleted__c",
+        };
+        let updateObj = {
+            Id : karta_sforceId,
+        }
+        Object.keys(upadatedValue).forEach(key => {
+            updateObj[keyValues[key]] = upadatedValue[key];
+        });
+        
+        conn.sobject(salesForceInfo.kartaModel).update( updateObj , function(err, ret) {
+            if (err || !ret.success) { 
+                console.error(err, ret); 
+                return err; 
+            }
+            return ret;
+        });
     } catch (err) {
         console.log(err);
         return err;

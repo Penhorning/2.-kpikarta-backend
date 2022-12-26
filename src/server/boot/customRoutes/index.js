@@ -1,6 +1,7 @@
 'use strict';
 
 const keygen = require('keygenerator');
+const { sales_last_login } = require('../../../helper/salesforce');
 
 module.exports = function (app) {
     // Success redirect url for social login
@@ -44,6 +45,7 @@ module.exports = function (app) {
                           });
                         });
                     }
+                    sales_last_login(user_data);
                     res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
                 });
             } else {

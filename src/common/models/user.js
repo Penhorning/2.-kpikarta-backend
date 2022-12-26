@@ -8,7 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
-const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
+const { sales_user_details, sales_update_user, sales_last_login } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -572,6 +572,7 @@ module.exports = function(User) {
           if (roles.indexOf(role) > -1) {
             next(null, token);
           } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            sales_last_login(user);
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
