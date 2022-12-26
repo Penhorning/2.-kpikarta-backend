@@ -252,7 +252,30 @@ module.exports = function (Subscription) {
 
       let invoices = await get_invoices_for_admin(page, limit);
       if ( invoices.data && invoices.data.length > 0 ) {
-        return invoices.data;
+
+        let newArr = []; 
+        for( let i = 0; i < invoices.data.length; i++) {
+          let inv = invoices.data[i];
+          let newObj = {
+            planName: inv.lines.data[0].plan.nickname,
+            price: inv.total,
+            paymentDate : moment(inv.created * 1000),
+            status: inv.status
+          };
+
+          let SubscriptionData = await Subscription.findOne({ where: { customerId: inv.customer }});
+
+          if (SubscriptionData) {
+            let UserData = await Subscription.app.models.user.findOne({ where: { id: SubscriptionData.userId }});
+            newObj["username"] = UserData.fullName;
+          } else {
+            newObj["username"] = inv.customer_name;
+          }
+
+          newArr.push(newObj);
+        }
+
+        return newArr;
       } else {
         return [];
       }
@@ -264,8 +287,8 @@ module.exports = function (Subscription) {
 
   Subscription.getInvoicesForAdminChart = async (startDate, endDate) => {
     try {
-      startDate = moment(startDate, 'DD.MM.YYYY').unix();
-      endDate = moment(endDate, 'DD.MM.YYYY').unix();
+      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
       let finalMapping = [];
       let invoices = await get_invoices_for_admin_chart(startDate, endDate);
@@ -290,7 +313,6 @@ module.exports = function (Subscription) {
       }
 
       return finalMapping;
-      
     } catch (err) {
       console.log(err);
       throw Error(err);
