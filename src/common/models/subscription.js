@@ -17,7 +17,8 @@ const {
   get_price_by_id,
   get_product_by_id,
   get_invoices,
-  get_invoices_for_admin
+  get_invoices_for_admin,
+  get_invoices_for_admin_chart
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -231,38 +232,65 @@ module.exports = function (Subscription) {
 
   Subscription.getInvoices = async (userId) => {
     try {
-      if( userId ) {
-        const subscriptionDetails = await Subscription.findOne({ where: { userId }});
-        let invoices = await get_invoices( subscriptionDetails.customerId );
-        if ( invoices.data.length > 0 ) {
-          return invoices;
-        } else {
-          return [];
-        }
+      const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+      let invoices = await get_invoices( subscriptionDetails.customerId );
+      if ( invoices.data.length > 0 ) {
+        return invoices;
       } else {
-        let invoices = await get_invoices_for_admin();
-        if ( invoices.data && invoices.data.length > 0 ) {
-          let invoice_obj = {};
-          for (let i = 0; i < invoices.data.length; i++ ) {
-            let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
-            if( invoice_obj[date] ) {
-              invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
-            } else {
-              invoice_obj[date] = invoices.data[i].amount_paid
-            }
-          }
-
-          let finalMapping = Object.keys(invoice_obj).map(data => {
-            return {
-              invoice_date: data,
-              amount: invoice_obj[data]
-            }
-          });
-          return finalMapping;
-        } else {
-          return [];
-        }
+        return [];
       }
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getInvoicesForAdmin = async (page, limit) => {
+    try {
+      page = parseInt(page, 10) || 1;
+      limit = parseInt(limit, 10) || 100;
+
+      let invoices = await get_invoices_for_admin(page, limit);
+      if ( invoices.data && invoices.data.length > 0 ) {
+        return invoices.data;
+      } else {
+        return [];
+      }
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getInvoicesForAdminChart = async (startDate, endDate) => {
+    try {
+      startDate = moment(startDate, 'DD.MM.YYYY').unix();
+      endDate = moment(endDate, 'DD.MM.YYYY').unix();
+
+      let finalMapping = [];
+      let invoices = await get_invoices_for_admin_chart(startDate, endDate);
+
+      if(invoices && invoices.data && invoices.data.length) {
+        let invoice_obj = {};
+        for (let i = 0; i < invoices.data.length; i++ ) {
+          let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
+          if( invoice_obj[date] ) {
+            invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
+          } else {
+            invoice_obj[date] = invoices.data[i].amount_paid
+          }
+        }
+  
+        finalMapping = Object.keys(invoice_obj).map(data => {
+          return {
+            invoice_date: data,
+            amount: invoice_obj[data]
+          }
+        });
+      }
+
+      return finalMapping;
+      
     } catch (err) {
       console.log(err);
       throw Error(err);
