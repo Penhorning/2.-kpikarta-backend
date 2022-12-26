@@ -4,7 +4,9 @@ const salesForceInfo = {
     username: "tarun.kethwalia@otssolutions.com",
     password: "otssolutions18",
     token: "LxSfZRr4Roea0U5YLuMXRgImf",
-    userModelName: "KPIUser__c"
+    userModel: "KPIUser__c",
+    userLoginModel: "KPIUserLogin__c",
+    kartaModel: "KPIKarta__c",
 }
 
 exports.sales_login = () => {
@@ -38,7 +40,7 @@ exports.sales_user_details = async (user, companyName) => {
             // Department__c: "",
             // Address__c: ""
         }
-        const ret = await conn.sobject(salesForceInfo.userModelName).insert( userObject );
+        const ret = await conn.sobject(salesForceInfo.userModel).insert( userObject );
         if (!ret.success) {
             return false;
         }
@@ -55,13 +57,33 @@ exports.sales_update_user = (user, type) => {
             Id : user.sforceId,
         }
         type == "email" ? updateObj["UserVerified__c"] = true : updateObj["LastUpdated__c"] = user.updatedAt;
-        conn.sobject(salesForceInfo.userModelName).update( updateObj , function(err, ret) {
+        conn.sobject(salesForceInfo.userModel).update( updateObj , function(err, ret) {
             if (err || !ret.success) { 
                 console.error(err, ret); 
                 return err; 
             }
             return ret;
         });
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
+exports.sales_last_login = async (user) => {
+    try {
+        let createObj = {
+            Name: user.fullName,
+            UserId : user.id,
+            LastLogin : new Date().toISOString().slice(0, 19).replace('T', ' '),
+        };
+
+        const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );
+        if (!ret.success) {
+            return false;
+        }
+
+        return ret;
     } catch (err) {
         console.log(err);
         return err;
