@@ -59,6 +59,23 @@
     }
   ],
   "methods": {
+    "getGloabl": {
+      "accepts": [
+        {
+          "arg": "phaseId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "suggestion",
+        "type": "suggestion"
+      },
+      "http": {
+        "path": "/global",
+        "verb": "post"
+      }
+    },
     "getByUser": {
       "accepts": [
         {
