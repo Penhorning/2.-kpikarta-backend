@@ -206,6 +206,46 @@
         "verb": "post"
       }
     },
+    "getInvoicesForAdmin": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices",
+        "verb": "post"
+      }
+    },
+    "getInvoicesForAdminChart": {
+      "accepts": [
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices-chart",
+        "verb": "post"
+      }
+    },
     "getPrices": {
       "accepts": [],
       "returns": {
