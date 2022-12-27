@@ -10,6 +10,27 @@ const salesForceInfo = {
     kartaModel: "KPIKarta__c",
 }
 
+const salesForceModels = {
+    fullName: "Name",
+    userName: "Name",
+    mobile: "Mobile__c",
+    mobileVerified: "MobileVerified__c",
+    _2faEnabled: "TwoFAVerified__c",
+    emailVerified: "UserVerified__c",
+    email: "Email__c",
+    createdAt: "RegistrationDate__c",
+    userUpdatedAt: "UserLastUpdated__c",
+    companyName: "CompanyName__c",
+    designation: "Designation__c",
+    department: "Department__c",
+    licenseType: "License__c",
+    address: "Address__c",
+    userLastLogin: "LastLogin__c",
+    activeKarta: "ActiveKarta__c",
+    deleteKarta: "DeletedKarta__c",
+    kartaLastUpdate: "KartaLastUpdated__c"
+}
+
 exports.sales_login = () => {
     const username = salesForceInfo.username;
     const password = salesForceInfo.password;
