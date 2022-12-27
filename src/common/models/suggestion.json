@@ -58,5 +58,28 @@
       "permission": "ALLOW"
     }
   ],
-  "methods": {}
+  "methods": {
+    "getByUser": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "phaseId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "suggestion",
+        "type": "suggestion"
+      },
+      "http": {
+        "path": "/by-user",
+        "verb": "post"
+      }
+    }
+  }
 }

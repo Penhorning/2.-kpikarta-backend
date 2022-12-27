@@ -65,7 +65,7 @@ module.exports = function (Kartanode) {
         event_options: {
           created: null,
           updated: updatedData,
-          removed: null,
+          removed: null
         }
       }
       let oldOptions = {};

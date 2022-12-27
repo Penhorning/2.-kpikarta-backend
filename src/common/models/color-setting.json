@@ -21,6 +21,9 @@
           "color": "string"
         }
       ],
+      "is_global": {
+        "type": "boolean"
+      },
       "required": true
     }
   },
@@ -64,18 +67,24 @@
     }
   ],
   "methods": {
-    "getColorSettings": {
-      "accepts": [],
+    "getGloabl": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "returns": {
         "arg": "color_settings",
         "type": "color_setting"
       },
       "http": {
         "path": "/global",
-        "verb": "get"
+        "verb": "post"
       }
     },
-    "getColorsByKarta": {
+    "getByUser": {
       "accepts": [
         {
           "arg": "userId",
@@ -93,7 +102,7 @@
         "type": "color_setting"
       },
       "http": {
-        "path": "/by-karta",
+        "path": "/by-user",
         "verb": "post"
       }
     }
