@@ -322,7 +322,8 @@ exports.create_subscription = async (params) => {
             billing_cycle_anchor: startDateOfsubscription,
             // trial_end: trialEnds,
             // trial_period_days: trialDays,
-            proration_behavior : 'none'
+            // proration_behavior : 'create_prorations',
+            proration_behavior : 'none',
         });
         return response;
     } catch (err) {
@@ -418,10 +419,32 @@ exports.get_invoices = async (customerId) => {
 }
 
 // GET INVOICES FOR ADMIN
-exports.get_invoices_for_admin = async () => {
+exports.get_invoices_for_admin = async (page, limit) => {
     try {
         let query = {
-            status: "paid"
+            // query: 'status>\'paid\'',
+            // page,
+            status: "paid", 
+            limit
+        };
+        const invoices = await stripe.invoices.list(query);
+        // const invoices = await stripe.invoices.search(query);
+        return invoices;
+    } catch ( err ) {
+        console.log(err);
+        return err;
+    }
+}
+
+// GET INVOICES FOR ADMIN CHART
+exports.get_invoices_for_admin_chart = async (startDate, endDate) => {
+    try {
+        let query = {
+            created: {
+                gte: startDate,
+                lte: endDate
+            },
+            status: "paid",
         };
         const invoices = await stripe.invoices.list(query);
         return invoices;

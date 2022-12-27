@@ -494,6 +494,12 @@ module.exports = function(User) {
               $regex: searchQuery,
               $options: 'i'
             }
+          },
+          {
+            'company.name': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
           }
         ]
       }
@@ -754,11 +760,20 @@ module.exports = function(User) {
   // Delete user
   User.delete = function(userId, next) {
     User.findOne({ where: { "_id": userId } }, (err, user) => {
-      if (err) {
+      if (err) next(err);
+      else if (!user) {
         let error = new Error("User not found!");
         error.status = 404;
         next(error);
       } else {
+        User.app.models.userIdentity.findOne({ userId }, (err, resp) => {
+          if (err) next(err);
+          if (resp) {
+            User.app.models.userIdentity.remove({ userId }, (err, resp) => {
+              if (err) next(err);
+            });
+          }
+        });
         user.is_deleted = true;
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;

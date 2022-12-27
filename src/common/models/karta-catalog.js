@@ -29,6 +29,14 @@ module.exports = function(Kartacatalog) {
             }
         }
     }
+    const ALL_USER_LOOKUP = {
+      $lookup: {
+        from: 'user',
+        localField: 'userId',
+        foreignField: '_id',
+        as: 'user'
+      }
+    }
     const UNWIND_USER = {
         $unwind: "$user"
     }
@@ -46,7 +54,7 @@ module.exports = function(Kartacatalog) {
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Get all catalogs
-  Kartacatalog.getAll = (userId, searchQuery, type, page, limit, nodeTypes, next) => {
+  Kartacatalog.getAll = (userId, searchQuery, type, accessType, page, limit, nodeTypes, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
@@ -56,6 +64,8 @@ module.exports = function(Kartacatalog) {
 
     let query = { "userId": objectUserId, "is_deleted": false };
     if (type === "shared") query = { "sharedTo.userId": userId, "is_deleted": false }
+    // Fetch catalog with access type like public or private
+    if (accessType) query.type = accessType;
 
     // Filter catalogs
     if (nodeTypes && nodeTypes.length > 0) {
@@ -83,6 +93,51 @@ module.exports = function(Kartacatalog) {
         },
         SEARCH_MATCH,
         USER_LOOKUP(objectUserId),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
+      ]).toArray((err, result) => {
+        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
+  }
+
+  // Get all public catalogs
+  Kartacatalog.getAllPublic = (searchQuery, page, limit, nodeTypes, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+
+    let query = { type: "public" }
+
+    // Filter catalogs
+    if (nodeTypes && nodeTypes.length > 0) {
+        query["node_type"] = { $in: nodeTypes }
+    }
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
+
+    Kartacatalog.getDataSource().connector.connect(function (err, db) {
+      const KartaCatalogCollection = db.collection('karta_catalog');
+      KartaCatalogCollection.aggregate([
+        {
+          $match: query
+        },
+        SEARCH_MATCH,
+        ALL_USER_LOOKUP,
         UNWIND_USER,
         SORT,
         FACET(page, limit)
