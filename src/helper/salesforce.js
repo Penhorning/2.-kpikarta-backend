@@ -76,27 +76,7 @@ exports.sales_last_login = async (user) => {
         let createObj = {
             Name: user.fullName || user.name,
             UserId__c : user.id || user.userId,
-            LastLogin__c : new Date(),
-        };
-
-        const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );
-        if (!ret.success) {
-            return false;
-        }
-
-        return ret;
-    } catch (err) {
-        console.log(err);
-        return err;
-    }
-}
-
-exports.sales_last_login = async (user) => {
-    try {
-        let createObj = {
-            Name: user.fullName || user.name,
-            UserId__c : user.id || user.userId,
-            LastLogin__c : moment(),
+            LastLogin__c : moment().format('YYYY-MM-DD, HH:mm:ss'),
         };
 
         const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );

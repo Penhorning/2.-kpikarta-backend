@@ -274,8 +274,10 @@ module.exports = function(Karta) {
         return next(err);
       }
       else {
-        Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
+        Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, async (err, result) => {
             if (err) console.log('> error while deleting karta', err);
+            const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+            sales_update_karta(kartaDetails.karta_sforceId, { "updatedAt": kartaDetails.updatedAt, "status": kartaDetails.status, "is_deleted": true });
             next(null, "Karta deleted successfully..!!");
         });
       }
