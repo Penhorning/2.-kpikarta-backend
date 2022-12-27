@@ -12,7 +12,7 @@ module.exports = function (Kartanode) {
       localField: 'kartaDetailId',
       foreignField: '_id',
       as: 'karta'
-    },
+    }
   }
   const UNWIND_KARTA = {
     $unwind: {
@@ -65,7 +65,7 @@ module.exports = function (Kartanode) {
         event_options: {
           created: null,
           updated: updatedData,
-          removed: null,
+          removed: null
         }
       }
       let oldOptions = {};
