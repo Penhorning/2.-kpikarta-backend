@@ -16,10 +16,50 @@
     "name": {
       "type": "string",
       "required": true
+    },
+    "global_name": {
+      "type": "string"
+    },
+    "is_global": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
-  "relations": {},
+  "relations": {
+    "phase": {
+      "type": "belongsTo",
+      "model": "karta_phase",
+      "foreignKey": "phaseId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "parent": {
+      "type": "belongsTo",
+      "model": "karta_phase",
+      "foreignKey": "parentId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "karta": {
+      "type": "belongsTo",
+      "model": "karta",
+      "foreignKey": "kartaId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
   "acls": [
     {
       "accessType": "READ",
