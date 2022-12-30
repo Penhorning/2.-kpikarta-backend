@@ -329,7 +329,7 @@ module.exports = function(Karta) {
             }
             else {
               // Delete phases
-              Karta.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+              Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
                 if (err) {
                   console.log('> error while deleting phase', err);
                   return next(err);
@@ -563,7 +563,7 @@ module.exports = function(Karta) {
               return next(err);
             } else {
               // Get all phases
-              Karta.app.models.karta_phase.find({}, (phaseErr, phaseResult) => {
+              Karta.app.models.karta_phase.find({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, (phaseErr, phaseResult) => {
                 if (phaseErr) {
                   console.log('> error while fetching all global phases', phaseErr);
                   return next(err);
