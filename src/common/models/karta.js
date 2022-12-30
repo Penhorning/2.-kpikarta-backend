@@ -1,7 +1,7 @@
 'use strict';
 
 const moment = require('moment');
-const { sales_karta_details, sales_update_karta } = require('../../helper/salesforce');
+const { sales_update_user } = require('../../helper/salesforce');
 const { sendEmail } = require('../../helper/sendEmail');
 
 module.exports = function(Karta) {
@@ -277,7 +277,8 @@ module.exports = function(Karta) {
         Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, async (err, result) => {
             if (err) console.log('> error while deleting karta', err);
             const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
-            sales_update_karta(kartaDetails.karta_sforceId, { "updatedAt": kartaDetails.updatedAt, "status": kartaDetails.status, "is_deleted": true });
+            const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
+            sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
             next(null, "Karta deleted successfully..!!");
         });
       }
@@ -499,8 +500,11 @@ module.exports = function(Karta) {
           console.log('> error while creating karta version', err);
           return next(err);
         } else {
-          let skarta = await sales_karta_details(karta);
-          Karta.update({ "id" : karta.id }, { "versionId" : result.id, "selfCopyCount": 0, "sharedCopyCount": 0, karta_sforceId: skarta.id }, (err, data) => {
+          const userDetails = await Karta.app.models.user.findOne({ where: { "id": karta.userId }});
+          if (userDetails) {
+            await sales_update_user({ sforceId: userDetails.sforceId }, { activeKarta: karta.name, kartaLastUpdate: karta.updatedAt });
+          }
+          Karta.update({ "id" : karta.id }, { "versionId" : result.id, "selfCopyCount": 0, "sharedCopyCount": 0 }, (err, data) => {
             if (err) {
               console.log('> error while updating newly crated karta', err);
               return next(err);
@@ -513,7 +517,7 @@ module.exports = function(Karta) {
     Karta.afterRemote('prototype.patchAttributes', function(context, instance, next) {
       const req = context.req;
       if (req.body.updatedAt) {
-        sales_update_karta(instance.karta_sforceId, { updatedAt: req.body.updatedAt });
+        sales_update_user({ sforceId: instance.karta_sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
         next();
       } else next();
     });

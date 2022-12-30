@@ -52,9 +52,6 @@
     },
     "historyId": {
       "type": "string"
-    },
-    "karta_sforceId": {
-      "type": "string"
     }
   },
   "validations": [],

@@ -785,8 +785,16 @@ module.exports = function (Kartanode) {
     const req = context.req;
     if (req.body.contributorId) {
       Kartanode.update({ "_id": instance.id, $set: { "assigned_date": new Date() } }, (err, result) => {
-        next(err, result);
+        if(err){
+          next(err, result);
+        }
       });
-    } else next();
+    };
+    let kartaId = instance.kartaId || instance.kartaDetailId;
+    Kartanode.app.models.karta.update( { "id": kartaId }, { updatedAt: instance.updatedAt }, (err, result) => {
+      if (err) {
+        next(err);
+      } else next();
+    });
   });
 };

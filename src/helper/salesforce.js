@@ -5,6 +5,7 @@ const salesForceInfo = {
     username: "tarun.kethwalia@otssolutions.com",
     password: "otssolutions18",
     token: "LxSfZRr4Roea0U5YLuMXRgImf",
+    contactModel: "Contact",
     userModel: "KPIUser__c",
     userLoginModel: "KPIUserLogin__c",
     kartaModel: "KPIKarta__c",
@@ -13,16 +14,16 @@ const salesForceInfo = {
 const salesForceModels = {
     fullName: "Name",
     userName: "Name",
-    mobile: "Mobile__c",
+    mobile: "MobilePhone",
     mobileVerified: "MobileVerified__c",
     _2faEnabled: "TwoFAVerified__c",
     emailVerified: "UserVerified__c",
-    email: "Email__c",
+    email: "Email",
     createdAt: "RegistrationDate__c",
     userUpdatedAt: "UserLastUpdated__c",
     companyName: "CompanyName__c",
     designation: "Designation__c",
-    department: "Department__c",
+    department: "Department",
     licenseType: "License__c",
     address: "Address__c",
     userLastLogin: "LastLogin__c",
@@ -45,24 +46,26 @@ exports.sales_login = () => {
     });
 }
 
-exports.sales_user_details = async (user, companyName) => {
+exports.sales_user_details = async (user) => {
     try {
-        let mobile = user.mobile.e164Number.split(user.mobile.dialCode).join("");
+        let mobile = user.mobile ? user.mobile.e164Number.split(user.mobile.dialCode).join("") : ( user.__data.mobile ? user.__data.mobile.e164Number.split(user.__data.mobile.dialCode).join("") : null);
         let userObject = {
-            Name: user.fullName,
-            TwoFAVerified__c: user._2faEnabled,
-            RegistrationDate__c: user.createdAt,
-            MobileVerified__c: user.mobileVerified,
-            Mobile__c: mobile,
-            License__c: "Creator",
-            LastUpdated__c: user.updatedAt,
-            Email__c: user.email,
-            Designation__c: "admin",
-            CompanyName__c: companyName,
-            // Department__c: "",
-            // Address__c: ""
+            FullName__c: user.fullName || user.userName || user.__data.fullName || user.__data.userName || "-",
+            LastName: user.fullName || user.userName || user.__data.fullName || user.__data.userName || "-",
+            MobilePhone: mobile || "-",
+            MobileVerified__c: user.mobileVerified || user.__data.mobileVerified || "-",
+            TwoFAVerified__c: user._2faEnabled || user.__data._2faEnabled || "-",
+            Email: user.email || user.__data.email || "-",
+            UserVerified__c: user.emailVerified || user.__data.emailVerified || "false",
+            RegistrationDate__c: moment(user.createdAt).format('DD/MM/YYYY, HH:mm A') || moment(user.__data.createdAt).format('DD/MM/YYYY, HH:mm A'),
+            UserLastUpdated__c: moment(user.updatedAt).format('DD/MM/YYYY, HH:mm A') || moment(user.__data.updatedAt).format('DD/MM/YYYY, HH:mm A'),
+            CompanyName__c: user.companyName || "-",
+            Designation__c: user.role || "-",
+            Department: user.department || "-",
+            License__c: user.license || user.__data.license || "-",
+            Address__c: user.address || "-"
         }
-        const ret = await conn.sobject(salesForceInfo.userModel).insert( userObject );
+        const ret = await conn.sobject(salesForceInfo.contactModel).insert( userObject );
         if (!ret.success) {
             return false;
         }
@@ -73,61 +76,24 @@ exports.sales_user_details = async (user, companyName) => {
     }
 }
 
-exports.sales_update_user = (user, type) => {
+exports.sales_update_user = (user, data) => {
     try {
+        let timeValues = ["createdAt", "updatedAt", "kartaLastUpdate", "userUpdatedAt"];
         let updateObj = {
             Id : user.sforceId,
-        }
-        type == "email" ? updateObj["UserVerified__c"] = true : updateObj["LastUpdated__c"] = user.updatedAt;
-        conn.sobject(salesForceInfo.userModel).update( updateObj , function(err, ret) {
+        };
+        Object.keys(data).forEach(key => {
+            if (salesForceModels[key]) {
+                updateObj[salesForceModels[key]] = timeValues.includes(key) ? moment(data[key]).format('DD/MM/YYYY, HH:mm A') : data[key];
+            }
+        })
+        conn.sobject(salesForceInfo.contactModel).update( updateObj , function(err, ret) {
             if (err || !ret.success) { 
                 console.error(err, ret); 
                 return err; 
             }
             return ret;
         });
-    } catch (err) {
-        console.log(err);
-        return err;
-    }
-}
-
-exports.sales_last_login = async (user) => {
-    try {
-        let createObj = {
-            Name: user.fullName || user.name,
-            UserId__c : user.id || user.userId,
-            LastLogin__c : moment().format('YYYY-MM-DD, HH:mm:ss'),
-        };
-
-        const ret = await conn.sobject(salesForceInfo.userLoginModel).insert( createObj );
-        if (!ret.success) {
-            return false;
-        }
-
-        return ret;
-    } catch (err) {
-        console.log(err);
-        return err;
-    }
-}
-
-exports.sales_karta_details = async (karta) => {
-    try {
-        let createObj = {
-            Name: karta.name,
-            KartaId__c : karta.id,
-            LastUpdated__c : karta.updatedAt,
-            IsActive__c : karta.status,
-            IsDeleted__c : karta.is_deleted,
-        };
-
-        const ret = await conn.sobject(salesForceInfo.kartaModel).insert( createObj );
-        if (!ret.success) {
-            return false;
-        }
-
-        return ret;
     } catch (err) {
         console.log(err);
         return err;
