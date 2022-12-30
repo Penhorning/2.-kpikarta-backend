@@ -325,6 +325,23 @@
         "verb": "post"
       }
     },
+    "updateKpiNodes": {
+      "accepts": [
+        {
+          "arg": "nodes",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-kpi-nodes",
+        "verb": "post"
+      }
+    },
     "addNodeByInventory": {
       "accepts": [
         {
