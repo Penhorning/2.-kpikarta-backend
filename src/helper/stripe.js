@@ -308,10 +308,12 @@ exports.get_all_cards = async (customerId) => {
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
-        // let trialDays = 10;
-        // const trialEnds = Math.floor(moment().add(trialDays, 'days') / 1000);
-        // let startDateOfsubscription = Math.floor(moment().add(1, 'months').add(trialDays - 1, 'days') / 1000);
-        let startDateOfsubscription = Math.floor(moment().add(1, 'months').subtract(1, 'days') / 1000);
+        let trialDays = 10;
+        let trialDaysInDate = moment().add(trialDays, 'days');
+        const trialEnds = Math.floor(moment().add(trialDays, 'days') / 1000);
+        let startDateOfsubscription = Math.floor(moment().add(1, 'months').add(trialDays - 1, 'days') / 1000);
+        // let startDateOfsubscription = Math.floor(moment().add(1, 'months').subtract(1, 'days') / 1000);
+
         const response = await stripe.subscriptions.create({
             customer: params.customerId,
             payment_behavior: 'allow_incomplete',
@@ -319,11 +321,11 @@ exports.create_subscription = async (params) => {
             collection_method: "charge_automatically",
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
+            trial_end: trialEnds,
             billing_cycle_anchor: startDateOfsubscription,
-            // trial_end: trialEnds,
             // trial_period_days: trialDays,
-            // proration_behavior : 'create_prorations',
-            proration_behavior : 'none',
+            proration_behavior : 'create_prorations',
+            // proration_behavior : 'none',
         });
         return response;
     } catch (err) {

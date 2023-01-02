@@ -31,9 +31,19 @@ module.exports = function (Subscription) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
         let token = await create_token({cardNumber, expMonth, expYear, cvc, name: fullName});
+        if(token.statusCode == 402 || token.statusCode == 404) {
+          let error = new Error(token.raw.message || "Card error..!!");
+          error.status = 404;
+          throw error;
+        }
 
         // Create Card
         let card = await create_card({customerId: customer.id, tokenId: token.id});
+        if(card.statusCode == 402 || card.statusCode == 404) {
+          let error = new Error(card.raw.message || "Card error..!!");
+          error.status = 404;
+          throw error;
+        }
 
         if(card) {
           await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
@@ -54,9 +64,19 @@ module.exports = function (Subscription) {
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
         let token = await create_token({ cardNumber, expMonth, expYear, cvc });
+        if(token.statusCode == 402 || token.statusCode == 404) {
+          let error = new Error(token.raw.message || "Card error..!!");
+          error.status = 404;
+          throw error;
+        }
         
         // Create Card
         let card = await create_card({ customerId: customer.id, tokenId: token.id });
+        if(card.statusCode == 402 || card.statusCode == 404) {
+          let error = new Error(card.raw.message || "Card error..!!");
+          error.status = 404;
+          throw error;
+        }
         if( card ) {
           const paymentMethods = await stripe.customers.listPaymentMethods(
             customer.id,
@@ -65,9 +85,7 @@ module.exports = function (Subscription) {
 
           // SetupIntent
           const setupIntent = await create_setup_intent(customer.id, paymentMethods.data[0].id); // Create SetupIntent
-          
           await attach_payment_method(setupIntent.payment_method, customer.id); // Attach payment method to customer
-          
           // await confirm_setup_intent(setupIntent.id, card.id); // Confirm SetupIntent 
 
           // Update Customer
@@ -76,13 +94,16 @@ module.exports = function (Subscription) {
 
           // Create Subscription
           const intervalValue = plan == "monthly" ? "month" : "year";
+          const getCreatorTrialPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator-Trial", interval: intervalValue }});
           const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
           const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
           const priceArray = [
-            { price: getCreatorPriceId.priceId, quantity: 1 },
+            { price: getCreatorTrialPriceId.priceId, quantity: 1 },
+            { price: getCreatorPriceId.priceId, quantity: 0 },
             { price: getChampionPriceId.priceId, quantity: 0 },
           ];
           const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
+          console.log(subscription, 'subscription');
           await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, subscriptionId: subscription.id });
 
           // Successful Return
@@ -92,6 +113,7 @@ module.exports = function (Subscription) {
     }
     catch(err) {
       console.log(err);
+      throw Error(err);
     }
   }
 
