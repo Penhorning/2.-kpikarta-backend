@@ -34,8 +34,14 @@
       "required": true
     },
     "subscriptionId": {
-      "type": "string",
-      "required": true
+      "type": "string"
+    },
+    "trialActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "trialEnds": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -77,10 +83,6 @@
           "arg": "cvc",
           "type": "string",
           "required": true
-        },
-        {
-          "arg": "plan",
-          "type": "string"
         }
       ],
       "returns": {
@@ -255,6 +257,26 @@
       "http": {
         "path": "/get-prices",
         "verb": "get"
+      }
+    },
+    "createSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-subscription",
+        "verb": "post"
       }
     }
   }

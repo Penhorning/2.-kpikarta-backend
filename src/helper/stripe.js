@@ -321,11 +321,11 @@ exports.create_subscription = async (params) => {
             collection_method: "charge_automatically",
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
-            trial_end: trialEnds,
-            billing_cycle_anchor: startDateOfsubscription,
+            // trial_end: trialEnds,
+            // billing_cycle_anchor: startDateOfsubscription,
             // trial_period_days: trialDays,
-            proration_behavior : 'create_prorations',
-            // proration_behavior : 'none',
+            // proration_behavior : 'create_prorations',
+            proration_behavior : 'none',
         });
         return response;
     } catch (err) {

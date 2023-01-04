@@ -23,7 +23,7 @@ const {
 const moment = require('moment');
 
 module.exports = function (Subscription) {
-  Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
+  Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc) => {
     // PLAN - Monthly/Yearly
     try {
       const findUser = await Subscription.findOne({where: { userId }});
@@ -47,7 +47,9 @@ module.exports = function (Subscription) {
 
         if(card) {
           await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-          await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+          if (findUser.subscriptionId) {
+            await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+          }
           await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
           return "Card saved successfully";
         }
@@ -57,7 +59,7 @@ module.exports = function (Subscription) {
           frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
         });
 
-        // Create Cutomer on Stripe
+        // Create Customer on Stripe
         let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
         // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
@@ -78,33 +80,10 @@ module.exports = function (Subscription) {
           throw error;
         }
         if( card ) {
-          const paymentMethods = await stripe.customers.listPaymentMethods(
-            customer.id,
-            {type: 'card'}
-          );
-
-          // SetupIntent
-          const setupIntent = await create_setup_intent(customer.id, paymentMethods.data[0].id); // Create SetupIntent
-          await attach_payment_method(setupIntent.payment_method, customer.id); // Attach payment method to customer
-          // await confirm_setup_intent(setupIntent.id, card.id); // Confirm SetupIntent 
-
+          console.log(new Date(moment().add(10, 'days')).getMilliseconds(), 'milli');
           // Update Customer
           await update_customer_by_id({ customerId: customer.id, data: { default_source: card.id } });
-          await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-
-          // Create Subscription
-          const intervalValue = plan == "monthly" ? "month" : "year";
-          const getCreatorTrialPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator-Trial", interval: intervalValue }});
-          const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
-          const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
-          const priceArray = [
-            { price: getCreatorTrialPriceId.priceId, quantity: 1 },
-            { price: getCreatorPriceId.priceId, quantity: 0 },
-            { price: getChampionPriceId.priceId, quantity: 0 },
-          ];
-          const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
-          console.log(subscription, 'subscription');
-          await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, subscriptionId: subscription.id });
+          await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
 
           // Successful Return
           return "Card saved successfully";
@@ -157,36 +136,95 @@ module.exports = function (Subscription) {
     }
   }
 
+  Subscription.createSubscription = async (userId, plan) => {
+    try {
+      // PLAN - Monthly/Yearly
+
+      const subscriptionData = await Subscription.findOne({ where: { userId }}); // Fetching card details
+      const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }}); // Fetching user details for companyId
+      const allUsersOfCompany = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }}); // All users of same company
+
+      let userRoleMapping = {
+        Creator: 0,
+        Champion: 0,
+      };
+
+      for( let i = 0; i < allUsersOfCompany.length; i++ ) {
+        let currentUser = allUsersOfCompany[i];
+        let currentLicense = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId } });
+        if (userRoleMapping.hasOwnProperty(currentLicense.name)) {
+          userRoleMapping[currentLicense.name] = userRoleMapping[currentLicense.name] + 1;
+        }
+      }
+
+      // Create Payment methods
+      const paymentMethods = await stripe.customers.listPaymentMethods(
+        subscriptionData.customerId,
+        { type: 'card' }
+      );
+
+      // SetupIntent
+      const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
+      await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
+      // await confirm_setup_intent(setupIntent.id, card.id); // Confirm SetupIntent 
+
+      // Create Subscription
+      const intervalValue = plan == "monthly" ? "month" : "year";
+      // const getCreatorTrialPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator-Trial", interval: intervalValue }});
+      const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
+      const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
+      const priceArray = [
+        // { price: getCreatorTrialPriceId.priceId, quantity: 1 },
+        { price: getCreatorPriceId.priceId, quantity: userRoleMapping.Creator },
+        { price: getChampionPriceId.priceId, quantity: userRoleMapping.Champion },
+      ];
+      const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
+      await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
+      await Subscription.update({ id: subscriptionData.id } , { subscriptionId: subscription.id });
+
+      return "Subscription created successfully..!!";
+
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
   Subscription.updateSubscription = async (userId, licenseType, type) => {
     try {
       // LicenseType - Creator/Champion
       // Type - Add/Remove
       const findUser = await Subscription.findOne({ where: { userId }});
-      const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
-      const itemsData = subscriptionDetails.items.data;
 
-      let pricingArr = [];
-      for( let i = 0; i < itemsData.length; i++ ) {
-        let currentItem = itemsData[i];
-        const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-
-        if ( findPricing.licenseType == licenseType ) {
-          pricingArr.push({
-            id: currentItem.id,
-            price: currentItem.price.id, 
-            quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
-          });
-        } else {
-          pricingArr.push({
-            id: currentItem.id,
-            price: currentItem.price.id, 
-            quantity: currentItem.quantity
-          });
-        }
-      };
-
-      let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'create_prorations' });
-      return response;
+      if ( findUser.trialActive ) {
+        const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
+        const itemsData = subscriptionDetails.items.data;
+  
+        let pricingArr = [];
+        for( let i = 0; i < itemsData.length; i++ ) {
+          let currentItem = itemsData[i];
+          const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
+  
+          if ( findPricing.licenseType == licenseType ) {
+            pricingArr.push({
+              id: currentItem.id,
+              price: currentItem.price.id, 
+              quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
+            });
+          } else {
+            pricingArr.push({
+              id: currentItem.id,
+              price: currentItem.price.id, 
+              quantity: currentItem.quantity
+            });
+          }
+        };
+  
+        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'none' });
+        return response;
+      } else {
+        return { message: "User is on trial period..!!", data: null };
+      }
 
     } catch (err) {
       console.log(err);
@@ -197,55 +235,60 @@ module.exports = function (Subscription) {
     try {
       const findUser = await Subscription.findOne({ where: { userId }});
       const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
-      const itemsData = subscriptionDetails.items.data;
 
-      let userArr = {};
-      let userArray = [];
-      let interval = "";
-
-      for( let i = 0; i < itemsData.length; i++ ) {
-        let currentItem = itemsData[i];
-        const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-        interval = currentItem.plan.interval;
-        userArr["interval"] = currentItem.plan.interval + "ly";
-
-        if ( findPricing.licenseType == "Creator" ) {
-          let newObj = {
-            user: "Creator",
-            quantity: currentItem.quantity,
-            unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-            total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-            currency: currentItem.price.currency
-          };
-          userArray.push(newObj);
-        } else {
-          let newObj = {
-            user: "Champion",
-            quantity: currentItem.quantity,
-            unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-            total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-            currency: currentItem.price.currency
-          };
-          userArray.push(newObj);
-        }
-      };
-
-      // Finding Spectators from Application Database
-      const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
-      const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-      const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
-      let newObj = {
-        user: "Spectators",
-        quantity: findSpectatorsList.length,
-        unit_amount: 0,
-        total_amount: "Free",
-        currency: "usd"
-      };
-      userArray.push(newObj);
-      
-      userArr["userDetails"] = userArray;
-
-      return userArr;
+      if (subscriptionDetails) {
+        const itemsData = subscriptionDetails.items.data;
+  
+        let userArr = {};
+        let userArray = [];
+        let interval = "";
+  
+        for( let i = 0; i < itemsData.length; i++ ) {
+          let currentItem = itemsData[i];
+          const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
+          interval = currentItem.plan.interval;
+          userArr["interval"] = currentItem.plan.interval + "ly";
+  
+          if ( findPricing.licenseType == "Creator" ) {
+            let newObj = {
+              user: "Creator",
+              quantity: currentItem.quantity,
+              unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+              total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+              currency: currentItem.price.currency
+            };
+            userArray.push(newObj);
+          } else {
+            let newObj = {
+              user: "Champion",
+              quantity: currentItem.quantity,
+              unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+              total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+              currency: currentItem.price.currency
+            };
+            userArray.push(newObj);
+          }
+        };
+  
+        // Finding Spectators from Application Database
+        const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+        const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
+        const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
+        let newObj = {
+          user: "Spectators",
+          quantity: findSpectatorsList.length,
+          unit_amount: 0,
+          total_amount: "Free",
+          currency: "usd"
+        };
+        userArray.push(newObj);
+        
+        userArr["userDetails"] = userArray;
+  
+        return { message: "Data found..!!", data: userArr };
+      } else {
+        return { message: "No Data found..!!", data: null };
+      }
     } catch (err) {
       console.log(err);
       throw Error(err);
