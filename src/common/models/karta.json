@@ -162,6 +162,33 @@
         "verb": "post"
       }
     },
+    "getAllPublic": {
+      "accepts": [
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "catalogs",
+        "type": "karta"
+      },
+      "http": {
+        "path": "/get-all-public",
+        "verb": "post"
+      }
+    },
     "delete": {
       "accepts": [
         {

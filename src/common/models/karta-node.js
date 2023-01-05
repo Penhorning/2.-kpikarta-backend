@@ -12,7 +12,7 @@ module.exports = function (Kartanode) {
       localField: 'kartaDetailId',
       foreignField: '_id',
       as: 'karta'
-    },
+    }
   }
   const UNWIND_KARTA = {
     $unwind: {
@@ -65,7 +65,7 @@ module.exports = function (Kartanode) {
         event_options: {
           created: null,
           updated: updatedData,
-          removed: null,
+          removed: null
         }
       }
       let oldOptions = {};
@@ -390,6 +390,29 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Update kpi nodes
+  Kartanode.updateKpiNodes = (nodes, next) => {
+    if (nodes.length > 0) {
+      nodes.forEach((item, index) => {
+        let updateQuery = { "achieved_value": item.achieved_value, "target": item.target };
+        if (item.hasOwnProperty("node_formula")) {
+          updateQuery.node_formula = item.node_formula; 
+        }
+        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, updateQuery, (err, result) => {
+          if (err) {
+            console.log('error while update kpi nodes', err);
+            return next(err);
+          }
+          if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
+        });
+      });
+    } else {
+      let error = new Error("Please send nodes array");
+      error.status = 400;
+      next(error);
+    }
+  }
+  
   // Update nodes and adjust weightage of all the other child nodes
   async function updateNodeAndAssignWeightage (kartaId, nodeData) {
     await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
