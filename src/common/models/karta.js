@@ -330,6 +330,16 @@ module.exports = function(Karta) {
     }
   }
 
+  // View previous month karta new
+  Karta.viewKartaDetailsNew = async (type, number, kartaId, versionId) => {
+    try {
+
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
   // View Previous month karta
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
