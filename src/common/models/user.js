@@ -506,6 +506,12 @@ module.exports = function(User) {
               $regex: searchQuery,
               $options: 'i'
             }
+          },
+          {
+            'company.name': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
           }
         ]
       }

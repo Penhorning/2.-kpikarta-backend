@@ -36,6 +36,14 @@ module.exports = function(Karta) {
           }
       }
   }
+  const ALL_USER_LOOKUP = {
+    $lookup: {
+      from: 'user',
+      localField: 'userId',
+      foreignField: '_id',
+      as: 'user'
+    }
+  }
   const UNWIND_USER = {
       $unwind: "$user"
   }
@@ -256,6 +264,46 @@ module.exports = function(Karta) {
         },
         SEARCH_MATCH,
         USER_LOOKUP(findBy, type),
+        UNWIND_USER,
+        SORT,
+        FACET(page, limit)
+      ]).toArray((err, result) => {
+        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
+  }
+
+  // Get all public kartas
+  Karta.getAllPublic = (searchQuery, page, limit, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+
+    let query = { type: "public" }
+
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
+
+    Karta.getDataSource().connector.connect(function (err, db) {
+      const KartaCollection = db.collection('karta');
+      KartaCollection.aggregate([
+        {
+          $match: query
+        },
+        SEARCH_MATCH,
+        ALL_USER_LOOKUP,
         UNWIND_USER,
         SORT,
         FACET(page, limit)

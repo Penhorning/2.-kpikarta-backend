@@ -322,7 +322,8 @@ exports.create_subscription = async (params) => {
             billing_cycle_anchor: startDateOfsubscription,
             // trial_end: trialEnds,
             // trial_period_days: trialDays,
-            proration_behavior : 'none'
+            // proration_behavior : 'create_prorations',
+            proration_behavior : 'none',
         });
         return response;
     } catch (err) {

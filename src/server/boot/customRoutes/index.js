@@ -56,22 +56,4 @@ module.exports = function (app) {
             }
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });
-
-    // Get suggestion by phase
-    app.post("/api/suggestion-by-phase", async (req, res) => {
-        let { userId, phaseId } = req.body;
-
-        try {
-            let result;
-            let userRresult = await req.app.models.suggestion.findOne({ where: { userId, phaseId } });
-            if (userRresult) result = userRresult;
-            else {
-                let globalRresult = await req.app.models.suggestion.findOne({ where: { phaseId } });
-                result = globalRresult;
-            }
-            res.json(result);
-        } catch(err) {
-            res.json(err);
-        }
-    });
 };
