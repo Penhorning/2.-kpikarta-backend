@@ -517,8 +517,13 @@ module.exports = function(Karta) {
     Karta.afterRemote('prototype.patchAttributes', function(context, instance, next) {
       const req = context.req;
       if (req.body.updatedAt) {
-        sales_update_user({ sforceId: instance.karta_sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
-        next();
+        Karta.app.models.user.findOne({ where: { "id": instance.userId }}, (err, userData) => {
+          if (err) {
+            next(err);
+          }
+          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
+          next();
+        });
       } else next();
     });
 };
