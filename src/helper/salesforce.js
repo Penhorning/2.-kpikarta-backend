@@ -2,8 +2,8 @@ const jsforce = require('jsforce');
 const conn = new jsforce.Connection();
 const moment = require('moment');
 const salesForceInfo = {
-    username: "tarun.kethwalia@otssolutions.com",
-    password: "otssolutions18",
+    username: process.env.SALESFORCE_USERNAME,
+    password: process.env.SALESFORCE_PASSWORD,
     token: "LxSfZRr4Roea0U5YLuMXRgImf",
     contactModel: "Contact",
     userModel: "KPIUser__c",
