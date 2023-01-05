@@ -23,7 +23,7 @@ const {
 const moment = require('moment');
 
 module.exports = function (Subscription) {
-  Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc) => {
+  Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     // PLAN - Monthly/Yearly
     try {
       const findUser = await Subscription.findOne({where: { userId }});
@@ -80,9 +80,9 @@ module.exports = function (Subscription) {
           throw error;
         }
         if( card ) {
-          console.log(new Date(moment().add(10, 'days')).getMilliseconds(), 'milli');
           // Update Customer
           await update_customer_by_id({ customerId: customer.id, data: { default_source: card.id } });
+          await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
           await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
 
           // Successful Return
@@ -179,7 +179,6 @@ module.exports = function (Subscription) {
         { price: getChampionPriceId.priceId, quantity: userRoleMapping.Champion },
       ];
       const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
-      await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
       await Subscription.update({ id: subscriptionData.id } , { subscriptionId: subscription.id });
 
       return "Subscription created successfully..!!";
@@ -392,12 +391,10 @@ module.exports = function (Subscription) {
         const priceDetails = await get_price_by_id(priceMapping[i].priceId);
         priceObj[priceDetails.recurring.interval] = priceDetails.metadata.unit_amount
       }
-
       return priceObj;
-
     } catch(err) {
       console.log(err);
-      return err;
+      throw Error(err);
     }
   }
 };
