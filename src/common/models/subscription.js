@@ -233,60 +233,98 @@ module.exports = function (Subscription) {
   Subscription.getSubscribedUsers = async (userId) => {
     try {
       const findUser = await Subscription.findOne({ where: { userId }});
-      const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
+      if (findUser) {
+      
+        const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
+        if(subscriptionDetails) {
+          const itemsData = subscriptionDetails.items.data;
+    
+          let userArr = {};
+          let userArray = [];
+          let interval = "";
+    
+          for( let i = 0; i < itemsData.length; i++ ) {
+            let currentItem = itemsData[i];
+            const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
+            interval = currentItem.plan.interval;
+            userArr["interval"] = currentItem.plan.interval + "ly";
+    
+            if ( findPricing.licenseType == "Creator" ) {
+              let newObj = {
+                user: "Creator",
+                quantity: currentItem.quantity,
+                unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+                total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+                currency: currentItem.price.currency
+              };
+              userArray.push(newObj);
+            } else {
+              let newObj = {
+                user: "Champion",
+                quantity: currentItem.quantity,
+                unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
+                total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
+                currency: currentItem.price.currency
+              };
+              userArray.push(newObj);
+            }
+          };
+    
+          // Finding Spectators from Application Database
+          const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+          const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
+          const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
+          let newObj = {
+            user: "Spectators",
+            quantity: findSpectatorsList.length,
+            unit_amount: 0,
+            total_amount: "Free",
+            currency: "usd"
+          };
+          userArray.push(newObj);
+          userArr["userDetails"] = userArray;
+          return { message: "Data found..!!", data: userArr };
+        } else {
+          return { message: "No Data found..!!", data: null };
+        }
+      } else {
 
-      if (subscriptionDetails) {
-        const itemsData = subscriptionDetails.items.data;
-  
-        let userArr = {};
-        let userArray = [];
-        let interval = "";
-  
-        for( let i = 0; i < itemsData.length; i++ ) {
-          let currentItem = itemsData[i];
-          const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-          interval = currentItem.plan.interval;
-          userArr["interval"] = currentItem.plan.interval + "ly";
-  
-          if ( findPricing.licenseType == "Creator" ) {
-            let newObj = {
-              user: "Creator",
-              quantity: currentItem.quantity,
-              unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-              total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-              currency: currentItem.price.currency
-            };
-            userArray.push(newObj);
-          } else {
-            let newObj = {
-              user: "Champion",
-              quantity: currentItem.quantity,
-              unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-              total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-              currency: currentItem.price.currency
-            };
-            userArray.push(newObj);
+        // Finding Registered Users from Application Database
+        const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+        const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": findUserDetails.companyId }});
+        let userObj = {};
+        let tracker = {
+          Creator: {
+            user: "Creator",
+            quantity: 0,
+            unit_amount: "N/A",
+            total_amount: "N/A",
+            currency: "N/A"
+          },
+          Champion: {
+            user: "Champion",
+            quantity: 0,
+            unit_amount: "N/A",
+            total_amount: "N/A",
+            currency: "N/A"
+          },
+          Spectator: {
+            user: "Spectator",
+            quantity: 0,
+            unit_amount: "N/A",
+            total_amount: "N/A",
+            currency: "N/A"
           }
         };
-  
-        // Finding Spectators from Application Database
-        const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
-        const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-        const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
-        let newObj = {
-          user: "Spectators",
-          quantity: findSpectatorsList.length,
-          unit_amount: 0,
-          total_amount: "Free",
-          currency: "usd"
-        };
-        userArray.push(newObj);
-        
-        userArr["userDetails"] = userArray;
-  
-        return { message: "Data found..!!", data: userArr };
-      } else {
-        return { message: "No Data found..!!", data: null };
+        for(let i = 0; i < findRegisteredUserDetails.length; i++) {
+          let currentUser = findRegisteredUserDetails[i];
+          const licenseId = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId }});
+          tracker[licenseId.name] = {...tracker[licenseId.name], quantity: tracker[licenseId.name].quantity + 1 };
+        }
+
+        let userDetails = Object.keys(tracker).map(x => tracker[x]);
+        userObj["userDetails"] = userDetails;
+        return { message: "Data found..!!", data: userObj };
       }
     } catch (err) {
       console.log(err);
@@ -297,12 +335,14 @@ module.exports = function (Subscription) {
   Subscription.getInvoices = async (userId) => {
     try {
       const subscriptionDetails = await Subscription.findOne({ where: { userId }});
-      let invoices = await get_invoices( subscriptionDetails.customerId );
-      if ( invoices.data.length > 0 ) {
-        return invoices;
-      } else {
-        return [];
-      }
+      if(subscriptionDetails) {
+        let invoices = await get_invoices( subscriptionDetails.customerId );
+        if ( invoices.data.length > 0 ) {
+          return invoices;
+        } else {
+          return [];
+        }
+      } else return [];
     } catch (err) {
       console.log(err);
       throw Error(err);
