@@ -169,7 +169,33 @@ module.exports = function (Kartanode) {
         if (err) {
           console.log('> error while updating the node sharedTo property ', err);
           next(err);
-        } else next(null, "Node shared successfully!");
+        } else {
+          Kartanode.findOne({where: { id: nodeId }}, (err, node) => {
+            if (err) {
+              console.log('> error while fetching the node data ', err);
+              next(err);
+            }   
+
+            // Prepare notification collection data
+            let notificationData = [];
+            for(let i = 0; i < userIds.length; i++) {
+              let notificationObj = {
+                title: `${Kartanode.app.currentUser.fullName} shared the node ${node.name}`,
+                type: "karta_node_shared",
+                contentId: nodeId,
+                userId: userIds[i].userId
+              };
+              notificationData.push(notificationObj);
+            }
+  
+            // Insert data in notification collection
+            Kartanode.app.models.notification.create(notificationData, err => {
+              if (err) console.log('> error while inserting data in notification collection', err);
+            });
+            
+            next(null, "Node shared successfully!");
+          });
+        }
       });
     } else {
       let error = new Error("Please send an userId array");
@@ -808,7 +834,27 @@ module.exports = function (Kartanode) {
     const req = context.req;
     if (req.body.contributorId) {
       Kartanode.update({ "_id": instance.id, $set: { "assigned_date": new Date() } }, (err, result) => {
-        next(err, result);
+        if (err) {
+          console.log('> error while updating the node data ', err);
+          next(err);
+        }   
+        // Prepare notification collection data
+        let notificationObj = {
+          title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
+          type: "contributor_added",
+          contentId: instance.id,
+          userId: req.body.contributorId
+        };
+
+        // Insert data in notification collection
+        Kartanode.app.models.notification.create(notificationObj, err => {
+          if (err) {
+            console.log('> error while inserting data in notification collection', err);
+            next(err);
+          }
+        });
+        
+        next(null, result);
       });
     } else next();
   });
