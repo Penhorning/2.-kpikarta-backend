@@ -222,10 +222,18 @@
         {
           "arg": "limit",
           "type": "number"
+        },
+        {
+          "arg": "previousId",
+          "type": "string"
+        },
+        {
+          "arg": "nextId",
+          "type": "string"
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "invoices",
         "type": "array"
       },
       "http": {

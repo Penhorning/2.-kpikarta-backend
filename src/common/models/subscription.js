@@ -1,5 +1,7 @@
 "use strict";
-const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+// const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+const stripe = require("stripe")("sk_test_51LuW5cSGltNYnTVRwbilCUIn5u4puvslqLb92mluDWYyF4bsm3PY2eyMKdKXT59CEST68nS3o08oK1YYXNcKdCtA00ZgArs8ha");
+const https = require('https');
 const { 
   create_customer, 
   update_customer_by_id, 
@@ -18,7 +20,9 @@ const {
   get_product_by_id,
   get_invoices,
   get_invoices_for_admin,
-  get_invoices_for_admin_chart
+  get_invoices_for_admin_chart,
+  create_payment_intent,
+  confirm_payment_intent
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -46,22 +50,40 @@ module.exports = function (Subscription) {
         }
 
         if(card) {
-          await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-          if (findUser.subscriptionId) {
-            await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+          // Confirm a payment from the Card
+          const paymentIntent = await create_payment_intent(customer.id, card.id);
+          if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
+            let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
+            error.status = 404;
+            throw error;
           }
-          await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
-          return "Card saved successfully";
+
+          if (paymentIntent.status == "succeeded") {
+            // Update Customer & Subscription
+            await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
+            if (findUser.subscriptionId) {
+              await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+            }
+            await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
+  
+            // Successful Return
+            return {message: "Card saved successfully", data: null};
+
+          } else {
+            let error = new Error(paymentIntent.raw.message || "Card error..!!");
+            error.status = 404;
+            throw error;
+          }
         }
       } else {
         // Creating Test Clock for testing
-        const testClock = await stripe.testHelpers.testClocks.create({
-          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        });
+        // const testClock = await stripe.testHelpers.testClocks.create({
+        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        // });
 
         // Create Customer on Stripe
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -82,11 +104,27 @@ module.exports = function (Subscription) {
         if( card ) {
           // Update Customer
           await update_customer_by_id({ customerId: customer.id, data: { default_source: card.id } });
-          await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-          await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
 
-          // Successful Return
-          return "Card saved successfully";
+          // Confirm a payment from the Card
+          const paymentIntent = await create_payment_intent(customer.id, card.id);
+          if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
+            let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
+            error.status = 404;
+            throw error;
+          }
+
+          if (paymentIntent.status == "succeeded") {
+            // Create Subscription and update user plan
+            await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
+            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
+  
+            // Successful Return
+            return {message: "Card saved successfully", data: null};
+          } else {
+            let error = new Error(paymentIntent.raw.message || "Card error..!!");
+            error.status = 404;
+            throw error;
+          }
         }
       }
     }
@@ -349,18 +387,19 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.getInvoicesForAdmin = async (page, limit) => {
+  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
     try {
       page = parseInt(page, 10) || 1;
-      limit = parseInt(limit, 10) || 100;
+      limit = parseInt(limit, 10) || 10;
 
-      let invoices = await get_invoices_for_admin(page, limit);
+      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId);
       if ( invoices.data && invoices.data.length > 0 ) {
 
-        let newArr = []; 
+        let newArr = [];
         for( let i = 0; i < invoices.data.length; i++) {
           let inv = invoices.data[i];
           let newObj = {
+            id: inv.id,
             planName: inv.lines.data[0].plan.nickname,
             price: inv.total,
             paymentDate : moment(inv.created * 1000),
@@ -377,11 +416,23 @@ module.exports = function (Subscription) {
           }
 
           newArr.push(newObj);
-        }
+        };
 
-        return newArr;
+        let finalData = [{
+            metadata: [{
+              total: invoices.total_count || 0,
+              page: page || 0,
+              count: newArr.length
+            }],
+            data: newArr
+        }];
+
+        return finalData;
       } else {
-        return [];
+        return [{
+          metadata: [],
+          data: []
+        }];
       }
     } catch (err) {
       console.log(err);

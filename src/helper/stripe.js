@@ -1,5 +1,6 @@
 'use strict';
-const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+// const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+const stripe = require("stripe")("sk_test_51LuW5cSGltNYnTVRwbilCUIn5u4puvslqLb92mluDWYyF4bsm3PY2eyMKdKXT59CEST68nS3o08oK1YYXNcKdCtA00ZgArs8ha");
 const moment = require('moment');
 
 //---------------- PRICE APIS ----------------
@@ -168,7 +169,7 @@ exports.create_customer = async (params) => {
                 state: 'CA',
                 country: 'US',
             },
-            test_clock: params.clock
+            // test_clock: params.clock
         });
         return response;
     } catch (err) {
@@ -238,6 +239,43 @@ exports.confirm_setup_intent = async (setupIntentId, cardId) => {
             { payment_method: cardId }
         );
         return setupIntent;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+//----------------
+
+// ----------------- PAYMENT INTENT APIS --------------------
+exports.create_payment_intent = async (customerId, cardId) => {
+    try {
+        const paymentIntent = await stripe.paymentIntents.create({
+            customer: customerId,
+            amount: 1,
+            currency: 'usd',
+            description: "Card verification payment",
+            payment_method_types: ['card'],
+            payment_method: cardId,
+            confirm: true,
+            off_session: true
+        });
+        return paymentIntent;
+    } catch ( err ) {
+        console.log(err);
+        return err;
+    }
+} 
+
+exports.confirm_payment_intent = async (paymentIntentId, cardId, returnUrl) => {
+    try {
+        const paymentIntent = await stripe.paymentIntents.confirm(
+            paymentIntentId,
+            {
+                payment_method: cardId,
+                return_url: returnUrl
+            }
+        );
+        return paymentIntent;
     } catch (err) {
         console.log(err);
         return err;
@@ -345,6 +383,7 @@ exports.get_subscription_plan_by_id = async (subscriptionId) => {
     }
 }
 
+// UPDATE SUBSCRIPTION
 exports.update_subscription = async (subscriptionId, data) => {
     try {
         const subscription = await stripe.subscriptions.update(
@@ -421,14 +460,18 @@ exports.get_invoices = async (customerId) => {
 }
 
 // GET INVOICES FOR ADMIN
-exports.get_invoices_for_admin = async (page, limit) => {
+exports.get_invoices_for_admin = async (page, limit, previousId, nextId) => {
     try {
         let query = {
             // query: 'status>\'paid\'',
             // page,
             status: "paid", 
-            limit
+            limit,
+            expand: ["total_count"]
         };
+
+        previousId ? query["ending_before"] = previousId : null;
+        nextId ? query["starting_after"] = nextId : null;
         const invoices = await stripe.invoices.list(query);
         // const invoices = await stripe.invoices.search(query);
         return invoices;
