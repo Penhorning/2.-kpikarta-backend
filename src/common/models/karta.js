@@ -322,8 +322,51 @@ module.exports = function(Karta) {
       }
       else {
         Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
-            if (err) console.log('> error while deleting karta', err);
-            next(null, "Karta deleted successfully..!!");
+            if (err) {
+              console.log('> error while deleting karta', err);
+              next(err);
+            }
+
+            Karta.getDataSource().connector.connect(function (err, db) {
+              const KartaNodeCollection = db.collection('karta_node');
+              KartaNodeCollection.aggregate([
+                {
+                  $match: {
+                    "kartaDetailId": Karta.getDataSource().ObjectID(kartaId),
+                    "contributorId": { $exists: true }
+                  }
+                }
+              ]).toArray((err, result) => {
+                if(err) {
+                  console.log('> error while finding karta contributors', err);
+                  next(err);
+                }
+                Karta.findOne({ where: { id: kartaId }}, (err, karta) => {
+                  if (err) {
+                    console.log('> error while finding karta details', err);
+                    next(err);
+                  }
+                  // Prepare notification collection data
+                  let notificationData = [];
+                  for(let i = 0; i < result.length; i++) {
+                    if(Karta.app.currentUser.id !== result[i].contributorId) {
+                      let notificationObj = {
+                        title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
+                        type: "karta_deleted",
+                        contentId: kartaId,
+                        userId: result[i].contributorId
+                      };
+                      notificationData.push(notificationObj);
+                    }
+                  };
+                  // Insert data in notification collection
+                  Karta.app.models.notification.create(notificationData, err => {
+                    if (err) console.log('> error while inserting data in notification collection', err);
+                  });
+                  next(null, "Karta deleted successfully..!!");
+                });
+              });
+            });
         });
       }
     })
