@@ -34,8 +34,14 @@
       "required": true
     },
     "subscriptionId": {
-      "type": "string",
-      "required": true
+      "type": "string"
+    },
+    "trialActive": {
+      "type": "boolean",
+      "default": true
+    },
+    "trialEnds": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -80,7 +86,8 @@
         },
         {
           "arg": "plan",
-          "type": "string"
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {
@@ -215,10 +222,18 @@
         {
           "arg": "limit",
           "type": "number"
+        },
+        {
+          "arg": "previousId",
+          "type": "string"
+        },
+        {
+          "arg": "nextId",
+          "type": "string"
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "invoices",
         "type": "array"
       },
       "http": {
@@ -255,6 +270,26 @@
       "http": {
         "path": "/get-prices",
         "verb": "get"
+      }
+    },
+    "createSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-subscription",
+        "verb": "post"
       }
     }
   }
