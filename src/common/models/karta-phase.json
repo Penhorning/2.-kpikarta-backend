@@ -28,6 +28,10 @@
       "type": "boolean",
       "default": false
     },
+    "is_child": {
+      "type": "boolean",
+      "default": false
+    },
     "is_deleted": {
       "type": "boolean",
       "default": false
@@ -76,5 +80,28 @@
       "permission": "ALLOW"
     }
   ],
-  "methods": {}
+  "methods": {
+    "delete": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "phaseId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/delete",
+        "verb": "post"
+      }
+    }
+  }
 }
