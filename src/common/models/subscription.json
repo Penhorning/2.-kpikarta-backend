@@ -295,6 +295,17 @@
         "path": "/create-subscription",
         "verb": "post"
       }
+    },
+    "getPricesForAdmin": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-admin-plans",
+        "verb": "get"
+      }
     }
   }
 }

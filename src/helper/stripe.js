@@ -169,7 +169,7 @@ exports.create_customer = async (params) => {
                 state: 'CA',
                 country: 'US',
             },
-            // test_clock: params.clock
+            test_clock: params.clock
         });
         return response;
     } catch (err) {
