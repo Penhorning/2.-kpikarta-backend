@@ -306,6 +306,30 @@
         "path": "/get-admin-plans",
         "verb": "get"
       }
+    },
+    "updatePlansByAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        },
+        {
+          "arg": "amount",
+          "type": "string"
+        },
+        {
+          "arg": "name",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plans",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-admin-plans",
+        "verb": "post"
+      }
     }
   }
 }

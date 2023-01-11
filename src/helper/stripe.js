@@ -38,6 +38,20 @@ exports.get_price_by_id = async (priceId) => {
         return err;
     }
 }
+
+// UPDATE PRICE
+exports.update_price_by_id = async (priceId, data) => {
+    try {
+        const price = await stripe.prices.update(
+            priceId,
+            data
+        );
+        return price;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
 //----------------
 
 
