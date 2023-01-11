@@ -12,18 +12,16 @@ const {
   create_product, 
   update_subscription, 
   create_setup_intent, 
-  confirm_setup_intent, 
   get_all_cards,
   attach_payment_method,
   get_subscription_plan_by_id,
   get_price_by_id,
-  get_product_by_id,
   get_invoices,
   get_invoices_for_admin,
   get_invoices_for_admin_chart,
   create_payment_intent,
-  confirm_payment_intent,
-  create_refund
+  create_refund,
+  update_price_by_id
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -71,7 +69,7 @@ module.exports = function (Subscription) {
             // Update Customer & Subscription
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
             if (findUser.subscriptionId) {
-              await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+              await update_subscription(findUser.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
             }
             await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
   
@@ -221,11 +219,9 @@ module.exports = function (Subscription) {
       // SetupIntent
       const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
       await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
-      // await confirm_setup_intent(setupIntent.id, card.id); // Confirm SetupIntent 
 
       // Create Subscription
       const intervalValue = plan == "monthly" ? "month" : "year";
-      // const getCreatorTrialPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator-Trial", interval: intervalValue }});
       const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
       const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
       const priceArray = [
@@ -274,7 +270,7 @@ module.exports = function (Subscription) {
           }
         };
   
-        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'none' });
+        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'create_prorations' });
         return response;
       } else {
         return { message: "User is on trial period..!!", data: null };
@@ -523,10 +519,54 @@ module.exports = function (Subscription) {
           name: priceDetails.nickname,
           price: priceDetails.metadata.unit_amount,
           createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
-          status: priceDetails.active
+          status: priceDetails.active,
+          priceId: priceDetails.id
         });
       }
       return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.updatePlansByAdmin = async (priceId, amount, name) => {
+    try {
+      // ALGO
+      // 1. Find the Price details in DB
+      const priceMapping = await Subscription.app.models.price_mapping.findOne({ where: { priceId }});
+
+      // 2. Create a new price for that product in Stripe
+      const newPrice = await create_price(name, priceMapping.productId, amount, priceMapping.interval);
+
+      // 3. Update the new priceId for every subscription on stripe
+      const subscriptionsList = await Subscription.find({ trialActive: false , status: true });
+      for ( let i = 0; i < subscriptionsList.length; i++ ) {
+        let currentSubscription = subscriptionsList[i];
+        const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
+
+        let updatedItems = [];
+        for( let j = 0; j < getSubscriptionDetails.length; j++ ) {
+          if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
+            updatedItems.push({
+              id: getSubscriptionDetails.items.data[j].id,
+              price: newPrice.id
+            });
+          }
+        }
+
+        if ( updatedItems.length > 0 ) {
+          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'create_prorations' });
+
+          // 4. Update the new priceid in DB
+          await Subscription.update({ id: currentSubscription.id }, { priceId: newPrice.id });
+        }
+      };
+
+      // 5. Deactivate the old price in stripe
+      await update_price_by_id(price, { active: false });
+
+      return "Price updated successfully..!!";
     } catch(err) {
       console.log(err);
       throw Error(err);
