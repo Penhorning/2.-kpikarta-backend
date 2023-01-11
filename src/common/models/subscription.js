@@ -91,8 +91,8 @@ module.exports = function (Subscription) {
         });
 
         // Create Customer on Stripe
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -500,6 +500,31 @@ module.exports = function (Subscription) {
       for(let i = 0; i < priceMapping.length; i++ ) {
         const priceDetails = await get_price_by_id(priceMapping[i].priceId);
         priceObj[priceDetails.recurring.interval] = priceDetails.metadata.unit_amount
+      }
+      return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getPricesForAdmin = async () => {
+    try {
+      const priceMapping = await Subscription.app.models.price_mapping.find({});
+      let priceObj = [];
+      for(let i = 0; i < priceMapping.length; i++ ) {
+        const priceDetails = await get_price_by_id(priceMapping[i].priceId);
+        if ( priceDetails.statusCode >= 400 || priceDetails.statusCode < 500 ) {
+          let error = new Error(priceDetails.raw.message || "Plans fetching error..!!");
+          error.status = 404;
+          throw error;
+        }
+        priceObj.push({
+          name: priceDetails.nickname,
+          price: priceDetails.metadata.unit_amount,
+          createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
+          status: priceDetails.active
+        });
       }
       return priceObj;
     } catch(err) {
