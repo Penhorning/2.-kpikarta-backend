@@ -169,7 +169,7 @@ exports.create_customer = async (params) => {
                 state: 'CA',
                 country: 'US',
             },
-            // test_clock: params.clock
+            test_clock: params.clock
         });
         return response;
     } catch (err) {
@@ -346,12 +346,6 @@ exports.get_all_cards = async (customerId) => {
 // CREATE SUBSCRIPTION
 exports.create_subscription = async (params) => {
     try {
-        let trialDays = 10;
-        let trialDaysInDate = moment().add(trialDays, 'days');
-        const trialEnds = Math.floor(moment().add(trialDays, 'days') / 1000);
-        let startDateOfsubscription = Math.floor(moment().add(1, 'months').add(trialDays - 1, 'days') / 1000);
-        // let startDateOfsubscription = Math.floor(moment().add(1, 'months').subtract(1, 'days') / 1000);
-
         const response = await stripe.subscriptions.create({
             customer: params.customerId,
             payment_behavior: 'allow_incomplete',
@@ -359,9 +353,6 @@ exports.create_subscription = async (params) => {
             collection_method: "charge_automatically",
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
-            // trial_end: trialEnds,
-            // billing_cycle_anchor: startDateOfsubscription,
-            // trial_period_days: trialDays,
             // proration_behavior : 'create_prorations',
             proration_behavior : 'none',
         });
@@ -388,7 +379,7 @@ exports.update_subscription = async (subscriptionId, data) => {
     try {
         const subscription = await stripe.subscriptions.update(
             subscriptionId,
-            data
+            data,
         );
         return subscription;
     } catch (err) {
@@ -493,6 +484,21 @@ exports.get_invoices_for_admin_chart = async (startDate, endDate) => {
         };
         const invoices = await stripe.invoices.list(query);
         return invoices;
+    } catch ( err ) {
+        console.log(err);
+        return err;
+    }
+}
+//----------------
+
+// ----------------- REFUND APIS --------------------
+// CREATE REFUND
+exports.create_refund = async (paymentIntentId) => {
+    try {
+        const refund = await stripe.refunds.create({
+            payment_intent: paymentIntentId
+        });
+        return refund;
     } catch ( err ) {
         console.log(err);
         return err;

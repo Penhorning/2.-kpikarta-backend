@@ -180,4 +180,6 @@ app.middleware('session', session({
 
 // Cron jobs
 const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
+const { createSubscriptionCron } = require('../helper/cronJobs/createSubscriptionCron.js');
 sendTargetAlertsCron(app);
+// createSubscriptionCron(app);

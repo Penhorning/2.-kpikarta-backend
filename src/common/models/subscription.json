@@ -38,10 +38,14 @@
     },
     "trialActive": {
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "trialEnds": {
       "type": "string"
+    },
+    "status": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
