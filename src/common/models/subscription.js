@@ -470,7 +470,7 @@ module.exports = function (Subscription) {
           return a.created - b.created;
         });
         for (let i = 0; i < invoices.data.length; i++ ) {
-          let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
+          let date = moment(invoices.data[i].created * 1000).format("MM-DD-yyyy");
           if( invoice_obj[date] ) {
             invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
           } else {
