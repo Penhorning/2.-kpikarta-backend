@@ -321,12 +321,21 @@ module.exports = function(Karta) {
         return next(err);
       }
       else {
+        // Delete nodes
         Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
             if (err) {
               console.log('> error while deleting karta', err);
               next(err);
             }
-
+            // Delete phases
+            Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+              if (err) {
+                console.log('> error while deleting phase', err);
+                return next(err);
+              }
+              next(null, "Karta deleted successfully!");
+            });
+            
             Karta.getDataSource().connector.connect(function (err, db) {
               const KartaNodeCollection = db.collection('karta_node');
               KartaNodeCollection.aggregate([
@@ -592,16 +601,43 @@ module.exports = function(Karta) {
 /* =============================REMOTE HOOKS=========================================================== */
     Karta.afterRemote('create', function(context, karta, next) {
       // Create Version
-      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (err, result) => {
-        if (err) {
-          console.log('> error while creating karta version', err);
+      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (versionErr, versionResult) => {
+        if (versionErr) {
+          console.log('> error while creating karta version', versionErr);
           return next(err);
         } else {
-          Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
-            if (err) {
-              console.log('> error while updating newly crated karta', err);
+          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, selfCopyCount: 0, sharedCopyCount: 0 }, (kartaErr, kartaResult) => {
+            if (kartaErr) {
+              console.log('> error while updating newly crated karta', kartaErr);
               return next(err);
-            } else next();
+            } else {
+              // Get all phases
+              Karta.app.models.karta_phase.find({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, (phaseErr, phaseResult) => {
+                if (phaseErr) {
+                  console.log('> error while fetching all global phases', phaseErr);
+                  return next(err);
+                } else {
+                  let phases = [];
+                  phaseResult.forEach(element => {
+                    phases.push({
+                      "name": element.name,
+                      "global_name": element.name,
+                      "is_global": true,
+                      "phaseId": element.id,
+                      "kartaId": karta.id,
+                      "userId": karta.userId
+                    });
+                  });
+                  // Create a copy of global phases for current karta
+                  Karta.app.models.karta_phase.create(phases, (phaseErr2, phaseResult2) => {
+                    if (phaseErr2) {
+                      console.log('> error while creating all global phases', phaseErr2);
+                      return next(err);
+                    } else next();
+                  });
+                }
+              });
+            }
           });
         }
       });

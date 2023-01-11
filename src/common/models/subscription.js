@@ -22,7 +22,8 @@ const {
   get_invoices_for_admin,
   get_invoices_for_admin_chart,
   create_payment_intent,
-  confirm_payment_intent
+  confirm_payment_intent,
+  create_refund
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -59,6 +60,14 @@ module.exports = function (Subscription) {
           }
 
           if (paymentIntent.status == "succeeded") {
+            // Payment Refund
+            const refundData = await create_refund(paymentIntent.id); 
+            if(refundData.statusCode == 402 || refundData.statusCode == 404) {
+              let error = new Error(refundData.raw.message || "Refund Payment error..!!");
+              error.status = 404;
+              throw error;
+            }
+
             // Update Customer & Subscription
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
             if (findUser.subscriptionId) {
@@ -77,13 +86,13 @@ module.exports = function (Subscription) {
         }
       } else {
         // Creating Test Clock for testing
-        // const testClock = await stripe.testHelpers.testClocks.create({
-        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        // });
+        const testClock = await stripe.testHelpers.testClocks.create({
+          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        });
 
         // Create Customer on Stripe
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -114,9 +123,17 @@ module.exports = function (Subscription) {
           }
 
           if (paymentIntent.status == "succeeded") {
+            // Payment Refund
+            const refundData = await create_refund(paymentIntent.id); 
+            if(refundData.statusCode == 402 || refundData.statusCode == 404) {
+              let error = new Error(refundData.raw.message || "Refund Payment error..!!");
+              error.status = 404;
+              throw error;
+            }
+
             // Create Subscription and update user plan
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
+            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -233,7 +250,7 @@ module.exports = function (Subscription) {
       // Type - Add/Remove
       const findUser = await Subscription.findOne({ where: { userId }});
 
-      if ( findUser.trialActive ) {
+      if ( !findUser.trialActive && findUser.status ) {
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
         const itemsData = subscriptionDetails.items.data;
   
@@ -270,7 +287,7 @@ module.exports = function (Subscription) {
 
   Subscription.getSubscribedUsers = async (userId) => {
     try {
-      const findUser = await Subscription.findOne({ where: { userId }});
+      const findUser = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true } }});
       if (findUser) {
       
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
@@ -326,7 +343,6 @@ module.exports = function (Subscription) {
           return { message: "No Data found..!!", data: null };
         }
       } else {
-
         // Finding Registered Users from Application Database
         const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
         const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": findUserDetails.companyId }});
@@ -335,23 +351,23 @@ module.exports = function (Subscription) {
           Creator: {
             user: "Creator",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           },
           Champion: {
             user: "Champion",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           },
           Spectator: {
             user: "Spectator",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           }
         };
         for(let i = 0; i < findRegisteredUserDetails.length; i++) {
@@ -450,6 +466,9 @@ module.exports = function (Subscription) {
 
       if(invoices && invoices.data && invoices.data.length) {
         let invoice_obj = {};
+        invoices.data = invoices.data.sort((a,b) => {
+          return a.created - b.created;
+        });
         for (let i = 0; i < invoices.data.length; i++ ) {
           let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
           if( invoice_obj[date] ) {
