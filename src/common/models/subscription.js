@@ -91,8 +91,8 @@ module.exports = function (Subscription) {
         });
 
         // Create Customer on Stripe
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
