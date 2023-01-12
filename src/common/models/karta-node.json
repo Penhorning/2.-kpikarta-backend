@@ -325,6 +325,23 @@
         "verb": "post"
       }
     },
+    "getNodesDetails": {
+      "accepts": [
+        {
+          "arg": "nodeIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "nodes",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-nodes-details",
+        "verb": "post"
+      }
+    },
     "updateKpiNodes": {
       "accepts": [
         {
