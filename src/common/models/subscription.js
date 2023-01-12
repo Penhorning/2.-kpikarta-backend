@@ -530,6 +530,29 @@ module.exports = function (Subscription) {
     }
   }
 
+  Subscription.getPriceByIdForAdmin = async (priceId) => {
+    try {
+      const priceMapping = await Subscription.app.models.price_mapping.findOne({where: { priceId }});
+      const priceDetails = await get_price_by_id(priceMapping.priceId);
+      if ( priceDetails.statusCode >= 400 || priceDetails.statusCode < 500 ) {
+        let error = new Error(priceDetails.raw.message || "Plans fetching error..!!");
+        error.status = 404;
+        throw error;
+      }
+      let priceObj = {
+        name: priceDetails.nickname,
+        price: priceDetails.metadata.unit_amount,
+        createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
+        status: priceDetails.active,
+        priceId: priceDetails.id
+      };
+      return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
   Subscription.updatePlansByAdmin = async (priceId, amount, name) => {
     try {
       // ALGO

@@ -307,6 +307,22 @@
         "verb": "get"
       }
     },
+    "getPriceByIdForAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plan",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plan",
+        "verb": "post"
+      }
+    },
     "updatePlansByAdmin": {
       "accepts": [
         {
