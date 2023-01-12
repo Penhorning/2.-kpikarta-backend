@@ -430,9 +430,9 @@ module.exports = function (Kartanode) {
   Kartanode.updateKpiNodes = (nodes, next) => {
     if (nodes.length > 0) {
       nodes.forEach((item, index) => {
-        let updateQuery = { "achieved_value": item.achieved_value, "target": item.target };
+        let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
         if (item.hasOwnProperty("node_formula")) {
-          updateQuery.node_formula = item.node_formula;
+          updateQuery.node_formula.fields = item.node_formula.fields;
         }
         Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, updateQuery, (err, result) => {
           if (err) {
@@ -444,6 +444,19 @@ module.exports = function (Kartanode) {
       });
     } else {
       let error = new Error("Please send nodes array");
+      error.status = 400;
+      next(error);
+    }
+  }
+
+  // Get nodes details
+  Kartanode.getNodesDetails = (nodeIds, next) => {
+    if (nodeIds.length > 0) {
+      Kartanode.find({ where: { "_id": { $in: nodeIds } } }, (err, result) => {
+        next(err, result);
+      });
+    } else {
+      let error = new Error("Please send nodeIds array");
       error.status = 400;
       next(error);
     }
