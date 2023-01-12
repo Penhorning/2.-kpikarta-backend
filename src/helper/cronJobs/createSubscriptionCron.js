@@ -7,6 +7,7 @@ const { create_subscription, update_subscription } = require('../stripe');
 exports.createSubscriptionCron = (app) => {
     // CronJob for everyday at midnight
     cron.schedule('0 0 * * *', async () => {
+    // cron.schedule('*/5 * * * * *', async () => {
         try {
             const currentDate = moment().unix();
             const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false }});

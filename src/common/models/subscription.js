@@ -270,7 +270,7 @@ module.exports = function (Subscription) {
           }
         };
   
-        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'create_prorations' });
+        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'none' });
         return response;
       } else {
         return { message: "User is on trial period..!!", data: null };
@@ -564,12 +564,12 @@ module.exports = function (Subscription) {
 
       // 3. Update the new priceId for every subscription on stripe
       const subscriptionsList = await Subscription.find({ trialActive: false , status: true });
+
       for ( let i = 0; i < subscriptionsList.length; i++ ) {
         let currentSubscription = subscriptionsList[i];
         const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
-
         let updatedItems = [];
-        for( let j = 0; j < getSubscriptionDetails.length; j++ ) {
+        for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
           if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
             updatedItems.push({
               id: getSubscriptionDetails.items.data[j].id,
@@ -577,17 +577,15 @@ module.exports = function (Subscription) {
             });
           }
         }
-
         if ( updatedItems.length > 0 ) {
-          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'create_prorations' });
-
+          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
           // 4. Update the new priceid in DB
-          await Subscription.update({ id: currentSubscription.id }, { priceId: newPrice.id });
+          await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
         }
       };
 
       // 5. Deactivate the old price in stripe
-      await update_price_by_id(price, { active: false });
+      await update_price_by_id(priceId, { active: false });
 
       return "Price updated successfully..!!";
     } catch(err) {
