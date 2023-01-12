@@ -12,17 +12,16 @@ const {
   create_product, 
   update_subscription, 
   create_setup_intent, 
-  confirm_setup_intent, 
   get_all_cards,
   attach_payment_method,
   get_subscription_plan_by_id,
   get_price_by_id,
-  get_product_by_id,
   get_invoices,
   get_invoices_for_admin,
   get_invoices_for_admin_chart,
   create_payment_intent,
-  confirm_payment_intent
+  create_refund,
+  update_price_by_id
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -59,10 +58,18 @@ module.exports = function (Subscription) {
           }
 
           if (paymentIntent.status == "succeeded") {
+            // Payment Refund
+            const refundData = await create_refund(paymentIntent.id); 
+            if(refundData.statusCode == 402 || refundData.statusCode == 404) {
+              let error = new Error(refundData.raw.message || "Refund Payment error..!!");
+              error.status = 404;
+              throw error;
+            }
+
             // Update Customer & Subscription
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
             if (findUser.subscriptionId) {
-              await update_subscription({ subcriptionId: findUser.subscriptionId, data: { default_source: card.id } });
+              await update_subscription(findUser.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
             }
             await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
   
@@ -77,13 +84,13 @@ module.exports = function (Subscription) {
         }
       } else {
         // Creating Test Clock for testing
-        // const testClock = await stripe.testHelpers.testClocks.create({
-        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        // });
+        const testClock = await stripe.testHelpers.testClocks.create({
+          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        });
 
         // Create Customer on Stripe
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -114,9 +121,17 @@ module.exports = function (Subscription) {
           }
 
           if (paymentIntent.status == "succeeded") {
+            // Payment Refund
+            const refundData = await create_refund(paymentIntent.id); 
+            if(refundData.statusCode == 402 || refundData.statusCode == 404) {
+              let error = new Error(refundData.raw.message || "Refund Payment error..!!");
+              error.status = 404;
+              throw error;
+            }
+
             // Create Subscription and update user plan
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().add(10, 'days').unix() });
+            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -204,11 +219,9 @@ module.exports = function (Subscription) {
       // SetupIntent
       const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
       await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
-      // await confirm_setup_intent(setupIntent.id, card.id); // Confirm SetupIntent 
 
       // Create Subscription
       const intervalValue = plan == "monthly" ? "month" : "year";
-      // const getCreatorTrialPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator-Trial", interval: intervalValue }});
       const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
       const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
       const priceArray = [
@@ -233,7 +246,7 @@ module.exports = function (Subscription) {
       // Type - Add/Remove
       const findUser = await Subscription.findOne({ where: { userId }});
 
-      if ( findUser.trialActive ) {
+      if ( !findUser.trialActive && findUser.status ) {
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
         const itemsData = subscriptionDetails.items.data;
   
@@ -270,7 +283,7 @@ module.exports = function (Subscription) {
 
   Subscription.getSubscribedUsers = async (userId) => {
     try {
-      const findUser = await Subscription.findOne({ where: { userId }});
+      const findUser = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true } }});
       if (findUser) {
       
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
@@ -326,7 +339,6 @@ module.exports = function (Subscription) {
           return { message: "No Data found..!!", data: null };
         }
       } else {
-
         // Finding Registered Users from Application Database
         const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
         const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": findUserDetails.companyId }});
@@ -335,23 +347,23 @@ module.exports = function (Subscription) {
           Creator: {
             user: "Creator",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           },
           Champion: {
             user: "Champion",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           },
           Spectator: {
             user: "Spectator",
             quantity: 0,
-            unit_amount: "N/A",
-            total_amount: "N/A",
-            currency: "N/A"
+            unit_amount: null,
+            total_amount: null,
+            currency: null
           }
         };
         for(let i = 0; i < findRegisteredUserDetails.length; i++) {
@@ -450,8 +462,11 @@ module.exports = function (Subscription) {
 
       if(invoices && invoices.data && invoices.data.length) {
         let invoice_obj = {};
+        invoices.data = invoices.data.sort((a,b) => {
+          return a.created - b.created;
+        });
         for (let i = 0; i < invoices.data.length; i++ ) {
-          let date = moment(invoices.data[i].created * 1000).format("DD-MM-yyyy");
+          let date = moment(invoices.data[i].created * 1000).format("MM-DD-yyyy");
           if( invoice_obj[date] ) {
             invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
           } else {
@@ -483,6 +498,96 @@ module.exports = function (Subscription) {
         priceObj[priceDetails.recurring.interval] = priceDetails.metadata.unit_amount
       }
       return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getPricesForAdmin = async () => {
+    try {
+      const priceMapping = await Subscription.app.models.price_mapping.find({});
+      let priceObj = [];
+      for(let i = 0; i < priceMapping.length; i++ ) {
+        const priceDetails = await get_price_by_id(priceMapping[i].priceId);
+        if ( priceDetails.statusCode >= 400 || priceDetails.statusCode < 500 ) {
+          let error = new Error(priceDetails.raw.message || "Plans fetching error..!!");
+          error.status = 404;
+          throw error;
+        }
+        priceObj.push({
+          name: priceDetails.nickname,
+          price: priceDetails.metadata.unit_amount,
+          createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
+          status: priceDetails.active,
+          priceId: priceDetails.id
+        });
+      }
+      return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.getPriceByIdForAdmin = async (priceId) => {
+    try {
+      const priceMapping = await Subscription.app.models.price_mapping.findOne({where: { priceId }});
+      const priceDetails = await get_price_by_id(priceMapping.priceId);
+      if ( priceDetails.statusCode >= 400 || priceDetails.statusCode < 500 ) {
+        let error = new Error(priceDetails.raw.message || "Plans fetching error..!!");
+        error.status = 404;
+        throw error;
+      }
+      let priceObj = {
+        name: priceDetails.nickname,
+        price: priceDetails.metadata.unit_amount,
+        createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
+        status: priceDetails.active,
+        priceId: priceDetails.id
+      };
+      return priceObj;
+    } catch(err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
+  Subscription.updatePlansByAdmin = async (priceId, amount, name) => {
+    try {
+      // ALGO
+      // 1. Find the Price details in DB
+      const priceMapping = await Subscription.app.models.price_mapping.findOne({ where: { priceId }});
+
+      // 2. Create a new price for that product in Stripe
+      const newPrice = await create_price(name, priceMapping.productId, amount, priceMapping.interval);
+
+      // 3. Update the new priceId for every subscription on stripe
+      const subscriptionsList = await Subscription.find({ trialActive: false , status: true });
+
+      for ( let i = 0; i < subscriptionsList.length; i++ ) {
+        let currentSubscription = subscriptionsList[i];
+        const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
+        let updatedItems = [];
+        for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+          if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
+            updatedItems.push({
+              id: getSubscriptionDetails.items.data[j].id,
+              price: newPrice.id
+            });
+          }
+        }
+        if ( updatedItems.length > 0 ) {
+          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
+          // 4. Update the new priceid in DB
+          await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
+        }
+      };
+
+      // 5. Deactivate the old price in stripe
+      await update_price_by_id(priceId, { active: false });
+
+      return "Price updated successfully..!!";
     } catch(err) {
       console.log(err);
       throw Error(err);

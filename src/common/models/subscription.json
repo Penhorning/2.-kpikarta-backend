@@ -38,10 +38,14 @@
     },
     "trialActive": {
       "type": "boolean",
-      "default": true
+      "default": false
     },
     "trialEnds": {
       "type": "string"
+    },
+    "status": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -289,6 +293,57 @@
       },
       "http": {
         "path": "/create-subscription",
+        "verb": "post"
+      }
+    },
+    "getPricesForAdmin": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-admin-plans",
+        "verb": "get"
+      }
+    },
+    "getPriceByIdForAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plan",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plan",
+        "verb": "post"
+      }
+    },
+    "updatePlansByAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        },
+        {
+          "arg": "amount",
+          "type": "string"
+        },
+        {
+          "arg": "name",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plans",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-admin-plans",
         "verb": "post"
       }
     }
