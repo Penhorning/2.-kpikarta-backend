@@ -346,6 +346,22 @@
         "path": "/update-admin-plans",
         "verb": "post"
       }
+    },
+    "cancelSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "subscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-subscription",
+        "verb": "post"
+      }
     }
   }
 }
