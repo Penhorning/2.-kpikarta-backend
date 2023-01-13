@@ -429,15 +429,21 @@ module.exports = function (Kartanode) {
   // Update kpi nodes
   Kartanode.updateKpiNodes = (nodes, next) => {
     if (nodes.length > 0) {
-      nodes.forEach((item, index) => {
+      nodes.forEach(async (item, index) => {
         let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
+        // If node has formula
         if (item.hasOwnProperty("node_formula")) {
+          // Find node details with it's original formula
+          const nodeData = await Kartanode.findOne({ where: { "_id": item.id, "contributorId": Kartanode.app.currentUser.id } });
+          // Assign it's original formula
+          updateQuery.node_formula = nodeData.node_formula.__data;
+          // Update only fields values
           updateQuery.node_formula.fields = item.node_formula.fields;
         }
-        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, updateQuery, (err, result) => {
+        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
           if (err) {
             console.log('error while update kpi nodes', err);
-            return next(err);
+            next(err);
           }
           if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
         });
