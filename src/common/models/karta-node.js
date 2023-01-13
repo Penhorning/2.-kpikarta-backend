@@ -252,7 +252,7 @@ module.exports = function (Kartanode) {
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
     userId = Kartanode.getDataSource().ObjectID(userId);
-    let completedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributorId": userId, "target.0.value": { $gt: 0 }, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count(completedQuery, (err, result) => {
@@ -312,7 +312,7 @@ module.exports = function (Kartanode) {
     let status_query = {};
     if (statusType) {
       if (statusType === "completed") {
-        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
+        status_query = { "target.0.value": { $gt: 0 }, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       } else if (statusType === "in_progress") {
         status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       }
@@ -379,7 +379,7 @@ module.exports = function (Kartanode) {
           $match: query
         },
         {
-          $match: { "target.0.value": { $gt: 0 }, "is_deleted": false }
+          $match: { "is_deleted": false }
         },
         {
           $match: status_query
