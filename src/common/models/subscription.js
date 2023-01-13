@@ -21,7 +21,8 @@ const {
   get_invoices_for_admin_chart,
   create_payment_intent,
   create_refund,
-  update_price_by_id
+  update_price_by_id,
+  cancel_user_subscription
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -89,8 +90,8 @@ module.exports = function (Subscription) {
         });
 
         // Create Customer on Stripe
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -130,8 +131,11 @@ module.exports = function (Subscription) {
             }
 
             // Create Subscription and update user plan
+            const trialData = await Subscription.app.models.trial_period.findOne({});
+            const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
+            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true });
+            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -145,7 +149,7 @@ module.exports = function (Subscription) {
     }
     catch(err) {
       console.log(err);
-      throw Error(err);
+      throw err;
     }
   }
 
@@ -590,7 +594,32 @@ module.exports = function (Subscription) {
       return "Price updated successfully..!!";
     } catch(err) {
       console.log(err);
-      throw Error(err);
+      throw err;
+    }
+  }
+
+  Subscription.cancelSubscription = async (userId) => {
+    try {
+      // Find user's subscription details
+      const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+      if( subscriptionDetails ) {
+        const cancelSubscription = await cancel_user_subscription(subscriptionDetails.subscriptionId);
+        if ( cancelSubscription.statusCode >= 400 || cancelSubscription.statusCode < 500 ) {
+          let error = new Error(priceDetails.raw.message || "Subscription cancellation error..!!");
+          error.status = 404;
+          throw error;
+        }
+
+        await Subscription.update({ id: subscriptionDetails.id }, { status: false, subscriptionId: "deactivated" });
+        return "Subscription deactivated successfully..!!";
+      } else {
+        let error = new Error("User not found with a subscription");
+        error.status = 404;
+        throw error;
+      }
+    } catch (err) {
+      console.log(err);
+      throw err;
     }
   }
 };

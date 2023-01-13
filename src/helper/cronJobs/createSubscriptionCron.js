@@ -6,9 +6,10 @@ const { create_subscription, update_subscription } = require('../stripe');
 
 exports.createSubscriptionCron = (app) => {
     // CronJob for everyday at midnight
-    cron.schedule('0 0 * * *', async () => {
-    // cron.schedule('*/5 * * * * *', async () => {
+    // cron.schedule('0 0 * * *', async () => {
+    cron.schedule('*/10 * * * * *', async () => {
         try {
+            // Start subscription for the users whose trial is over
             const currentDate = moment().unix();
             const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false }});
             if ( subscribedUsers.length > 0 ) {
@@ -51,6 +52,12 @@ exports.createSubscriptionCron = (app) => {
                     await update_subscription(subscription.id, { items: updatedItems, proration_behavior: 'none' });
                 } 
                 console.log("Subscriptions started successfully..!!");
+            }
+
+            // Start subscription for the those users who recently got activated again by Admin
+            const recentlyActivatedUsers = await app.models.subscription.find({ where: { status: true, subscriptionId: "deactivated" }});
+            if (recentlyActivatedUsers.length > 0) {
+                console.log("Work in progress");
             }
         } catch (err) {
             console.log(`==========>>>>> WHILE CREATING SUBSCRIPTIONS (${new Date()}) = Someting went wrong `, err);

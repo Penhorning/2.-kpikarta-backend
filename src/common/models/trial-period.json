@@ -1,0 +1,19 @@
+{
+  "name": "trial_period",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "properties": {
+    "days": {
+      "type": "number",
+      "required": true,
+      "default": 14
+    }
+  },
+  "validations": [],
+  "relations": {},
+  "acls": [],
+  "methods": {}
+}

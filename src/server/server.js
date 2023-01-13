@@ -184,4 +184,4 @@ const { createSubscriptionCron } = require('../helper/cronJobs/createSubscriptio
 const { profileStatusCron } = require('../helper/cronJobs/profileStatusCron.js');
 sendTargetAlertsCron(app);
 profileStatusCron(app);
-// createSubscriptionCron(app);
+createSubscriptionCron(app);

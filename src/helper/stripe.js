@@ -183,7 +183,7 @@ exports.create_customer = async (params) => {
                 state: 'CA',
                 country: 'US',
             },
-            test_clock: params.clock
+            // test_clock: params.clock
         });
         return response;
     } catch (err) {
@@ -402,9 +402,9 @@ exports.update_subscription = async (subscriptionId, data) => {
 }
 
 // CANCEL USER SUBSCRIPTION
-exports.cancel_user_subscription = async (params) => {
+exports.cancel_user_subscription = async (subscriptionId) => {
     try {
-        const response = await stripe.subscriptions.del( params.subscriptionId );
+        const response = await stripe.subscriptions.del( subscriptionId );
         return response;
     } catch (err) {
         console.log(err.response);
@@ -426,24 +426,22 @@ exports.get_all_subscription_plans = async (params) => {
 // ACTIVATE SUBSCRIPTION PLAN
 exports.activate_subscription_plan = async (params) => {
     try {
-        const planId = params.planId;
-        const response = await axios.post(`${BILLING_PLAN_URL}/${planId}/activate`, {}, { headers: REQUEST_HEADER });
-        return response;
+        // Not In Use
+        return null;
     } catch (err) {
-        console.log(err.response);
-        return err.response;
+        console.log(err);
+        return err;
     }
 }
 
 // DEACTIVATE SUBSCRIPTION PLAN
 exports.deactivate_subscription_plan = async (params) => {
     try {
-        const planId = params.planId;
-        const response = await axios.post(`${BILLING_PLAN_URL}/${planId}/deactivate`, {}, { headers: REQUEST_HEADER });
-        return response;
+        // Not In Use
+        return null;
     } catch (err) {
-        console.log(err.response);
-        return err.response;
+        console.log(err);
+        return err;
     }
 }
 //----------------
