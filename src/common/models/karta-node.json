@@ -85,8 +85,12 @@
         }
       ]
     },
+
     "achieved_value": {
       "type": "number"
+    },
+    "target_label": {
+      "type": "string"
     },
     "is_achieved_modified": {
       "type": "boolean"
