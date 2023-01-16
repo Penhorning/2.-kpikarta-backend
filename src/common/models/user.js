@@ -916,7 +916,8 @@ module.exports = function(User) {
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
-      User.findById(accessToken.userId.toString(), (err, user) => {
+      User.findById(accessToken.userId.toString(), { include: ['company', 'role', 'license'] }, (err, user) => {
+        if (err) return next(err);
         // Check if user is active or not
         if (!user.active) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
@@ -943,20 +944,15 @@ module.exports = function(User) {
         // User is verified, checking for twoFactor enabled or not
         else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
-            let mobileVerificationCode = keygen.number({length: 6});
+            let mobileVerificationCode = keygen.number({ length: 6 });
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
             });
           }
-          // Get company details
-          User.app.models.company.findById(user.companyId.toString(), (err, company) => {
-            if (err) {
-              console.log('> error while fetching company details', err);
-              return next(err);
-            }
-            context.result.company = company;
-            next();
-          });
+          // Setting includes
+          context.result = context.result.toJSON();
+          context.result.user = user;
+          next();
         }
       });
     } else next();
