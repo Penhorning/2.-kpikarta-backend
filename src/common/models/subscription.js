@@ -22,7 +22,8 @@ const {
   create_payment_intent,
   create_refund,
   update_price_by_id,
-  cancel_user_subscription
+  cancel_user_subscription,
+  delete_card
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -42,7 +43,7 @@ module.exports = function (Subscription) {
         }
 
         // Create Card
-        let card = await create_card({customerId: customer.id, tokenId: token.id});
+        let card = await create_card({customerId: findUser.customerId, tokenId: token.id});
         if(card.statusCode == 402 || card.statusCode == 404) {
           let error = new Error(card.raw.message || "Card error..!!");
           error.status = 404;
@@ -50,8 +51,9 @@ module.exports = function (Subscription) {
         }
 
         if(card) {
+          const previousCardId = findUser.cardId;
           // Confirm a payment from the Card
-          const paymentIntent = await create_payment_intent(customer.id, card.id);
+          const paymentIntent = await create_payment_intent(findUser.customerId, card.id, 1);
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
@@ -69,10 +71,13 @@ module.exports = function (Subscription) {
 
             // Update Customer & Subscription
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-            if (findUser.subscriptionId) {
+            if (findUser.subscriptionId && findUser.status ) {
               await update_subscription(findUser.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
             }
-            await Subscription.update({ where: { userId }}, { tokenId: token.id, cardId: card.id });
+            await Subscription.update({ userId }, { tokenId: token.id, cardId: card.id });
+
+            // Delete the Previous Card
+            await delete_card(findUser.customerId, previousCardId);
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -90,8 +95,8 @@ module.exports = function (Subscription) {
         });
 
         // Create Customer on Stripe
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
+        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -114,7 +119,7 @@ module.exports = function (Subscription) {
           await update_customer_by_id({ customerId: customer.id, data: { default_source: card.id } });
 
           // Confirm a payment from the Card
-          const paymentIntent = await create_payment_intent(customer.id, card.id);
+          const paymentIntent = await create_payment_intent(customer.id, card.id, 1);
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
@@ -134,8 +139,8 @@ module.exports = function (Subscription) {
             const trialData = await Subscription.app.models.trial_period.findOne({});
             const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true });
-            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
+            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true });
+            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -274,7 +279,7 @@ module.exports = function (Subscription) {
           }
         };
   
-        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, cancel_at_period_end: false, proration_behavior: 'none' });
+        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, proration_behavior: 'none' });
         return response;
       } else {
         return { message: "User is on trial period..!!", data: null };
@@ -287,9 +292,8 @@ module.exports = function (Subscription) {
 
   Subscription.getSubscribedUsers = async (userId) => {
     try {
-      const findUser = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true } }});
+      const findUser = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true }, status: true }});
       if (findUser) {
-      
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
         if(subscriptionDetails) {
           const itemsData = subscriptionDetails.items.data;
@@ -402,6 +406,8 @@ module.exports = function (Subscription) {
       throw Error(err);
     }
   }
+
+  // ------------------- ADMIN PANEL APIS -------------------
 
   Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
     try {
@@ -602,7 +608,24 @@ module.exports = function (Subscription) {
     try {
       // Find user's subscription details
       const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+      
       if( subscriptionDetails ) {
+        // Make the remaining payment before subscription cancellation
+        const subscriptionStripeDetails = await get_subscription_plan_by_id(subscriptionDetails.subscriptionId);
+        const amountInCents = subscriptionStripeDetails.latest_invoice.amount_due ? Number(subscriptionStripeDetails.latest_invoice.amount_due) : null;
+
+        // Calculating amount based on Usage
+
+        if(amountInCents) {
+          const paymentIntent = await create_payment_intent(subscriptionDetails.customerId, subscriptionDetails.cardId, amountInCents );
+          if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
+            let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
+            error.status = 404;
+            throw error;
+          }
+          // if (paymentIntent.status == "succeeded") {}
+        }
+
         const cancelSubscription = await cancel_user_subscription(subscriptionDetails.subscriptionId);
         if ( cancelSubscription.statusCode >= 400 || cancelSubscription.statusCode < 500 ) {
           let error = new Error(priceDetails.raw.message || "Subscription cancellation error..!!");
@@ -612,6 +635,7 @@ module.exports = function (Subscription) {
 
         await Subscription.update({ id: subscriptionDetails.id }, { status: false, subscriptionId: "deactivated" });
         return "Subscription deactivated successfully..!!";
+
       } else {
         let error = new Error("User not found with a subscription");
         error.status = 404;
