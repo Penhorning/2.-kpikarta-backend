@@ -32,8 +32,8 @@ module.exports = function (app) {
                           let twilio_data = {
                             type: 'sms',
                             to: user.mobile.e164Number,
-                            from: "+16063667831",
-                            body: `${mobileVerificationCode} is your code for KPI Karta Login.`
+                            from: process.env.TWILIO_MESSAGINGSERVICE_SID,
+                            body: `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`
                           }
                           req.app.models.Twilio.send(twilio_data, function (err, data) {
                             console.log('> sending code to mobile number:', user.mobile.e164Number);
@@ -54,5 +54,13 @@ module.exports = function (app) {
             });
             }
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
+    });
+
+    // Stripe webhook url
+    app.post("/webhook", (req, res) => {
+        req.app.models.subscription.update({ subscriptionId: req.body.data.object.id, customerId: req.body.data.object.customer }, { nextSubscriptionDate: req.body.data.object.current_period_end, currentSubscriptionDate: req.body.data.object.current_period_start }, (err) => {
+            if (err) return console.log('> error while updating subscription on webhook..!!');
+            res.send("webhook working..!!");
+        });
     });
 };

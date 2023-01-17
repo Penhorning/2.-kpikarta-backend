@@ -409,14 +409,14 @@ module.exports = function (Subscription) {
 
   // ------------------- ADMIN PANEL APIS -------------------
 
-  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId, startDate, endDate) => {
+  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
     try {
       page = parseInt(page, 10) || 1;
       limit = parseInt(limit, 10) || 10;
-      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
-      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
+      // startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+      // endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
-      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId, startDate, endDate);
+      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId);
       if ( invoices.data && invoices.data.length > 0 ) {
 
         let newArr = [];
@@ -616,10 +616,15 @@ module.exports = function (Subscription) {
         const subscriptionStripeDetails = await get_subscription_plan_by_id(subscriptionDetails.subscriptionId);
         const amountInCents = subscriptionStripeDetails.latest_invoice.amount_due ? Number(subscriptionStripeDetails.latest_invoice.amount_due) : null;
 
-        // Calculating amount based on Usage
-
         if(amountInCents) {
-          const paymentIntent = await create_payment_intent(subscriptionDetails.customerId, subscriptionDetails.cardId, amountInCents );
+          // Calculating amount based on Usage
+          const startSubscription = moment(moment.unix(subscriptionDetails.nextSubscriptionDate));
+          const endSubscription = moment(moment.unix(subscriptionDetails.currentSubscriptionDate));
+          let oneDayAmount = amountInCents / startSubscription.diff(endSubscription, 'days');
+          let currDate = moment();
+          const amountToBePaid = oneDayAmount * startSubscription.diff(currDate, 'days');
+          
+          const paymentIntent = await create_payment_intent(subscriptionDetails.customerId, subscriptionDetails.cardId, amountToBePaid );
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
