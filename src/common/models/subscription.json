@@ -46,6 +46,12 @@
     "status": {
       "type": "boolean",
       "default": false
+    },
+    "currentSubscriptionDate": {
+      "type": "string"
+    },
+    "nextSubscriptionDate": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -232,14 +238,6 @@
         },
         {
           "arg": "nextId",
-          "type": "string"
-        },
-        {
-          "arg": "startDate",
-          "type": "string"
-        },
-        {
-          "arg": "endDate",
           "type": "string"
         }
       ],

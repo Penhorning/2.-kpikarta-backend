@@ -477,18 +477,18 @@ exports.get_invoices = async (customerId) => {
 }
 
 // GET INVOICES FOR ADMIN
-exports.get_invoices_for_admin = async (page, limit, previousId, nextId, startDate, endDate) => {
+exports.get_invoices_for_admin = async (page, limit, previousId, nextId) => {
     try {
         let query = {
             // query: 'status>\'paid\'',
             // page,
             status: "paid", 
             limit,
-            expand: ["total_count"],
-            created: {
-                gte: startDate,
-                lte: endDate
-            },
+            // expand: ["total_count"],
+            // created: {
+            //     gte: startDate,
+            //     lte: endDate
+            // },
         };
 
         previousId ? query["ending_before"] = previousId : null;

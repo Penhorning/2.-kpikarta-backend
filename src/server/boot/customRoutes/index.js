@@ -53,4 +53,12 @@ module.exports = function (app) {
             }
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });
+
+    // Stripe webhook url
+    app.post("/webhook", (req, res) => {
+        req.app.models.subscription.update({ subscriptionId: req.body.data.object.id, customerId: req.body.data.object.customer }, { nextSubscriptionDate: req.body.data.object.current_period_end, currentSubscriptionDate: req.body.data.object.current_period_start }, (err) => {
+            if (err) return console.log('> error while updating subscription on webhook..!!');
+            res.send("webhook working..!!");
+        });
+    });
 };
