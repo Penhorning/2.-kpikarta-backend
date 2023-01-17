@@ -90,8 +90,7 @@
         },
         {
           "arg": "plan",
-          "type": "string",
-          "required": true
+          "type": "string"
         }
       ],
       "returns": {
@@ -233,6 +232,14 @@
         },
         {
           "arg": "nextId",
+          "type": "string"
+        },
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
           "type": "string"
         }
       ],
