@@ -32,7 +32,7 @@ module.exports = function (app) {
                           let twilio_data = {
                             type: 'sms',
                             to: user.mobile.e164Number,
-                            from: "+16063667831",
+                            from: process.env.TWILIO_MESSAGINGSERVICE_SID,
                             body: `${mobileVerificationCode} is your code for KPI Karta Login.`
                           }
                           req.app.models.Twilio.send(twilio_data, function (err, data) {
