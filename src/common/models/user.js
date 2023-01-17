@@ -945,7 +945,7 @@ module.exports = function(User) {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
             let mobileVerificationCode = keygen.number({ length: 6 });
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
-              sendSMS(user.mobile.e164Number, `${mobileVerificationCode} is your code for KPI Karta Login.`)
+              sendSMS(user.mobile.e164Number, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
               .then(() => {}).catch(err => {});
             });
           }

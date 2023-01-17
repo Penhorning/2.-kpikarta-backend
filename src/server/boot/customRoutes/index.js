@@ -33,7 +33,7 @@ module.exports = function (app) {
                             type: 'sms',
                             to: user.mobile.e164Number,
                             from: process.env.TWILIO_MESSAGINGSERVICE_SID,
-                            body: `${mobileVerificationCode} is your code for KPI Karta Login.`
+                            body: `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`
                           }
                           req.app.models.Twilio.send(twilio_data, function (err, data) {
                             console.log('> sending code to mobile number:', user.mobile.e164Number);
