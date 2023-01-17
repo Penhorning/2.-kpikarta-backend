@@ -409,12 +409,14 @@ module.exports = function (Subscription) {
 
   // ------------------- ADMIN PANEL APIS -------------------
 
-  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
+  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId, startDate, endDate) => {
     try {
       page = parseInt(page, 10) || 1;
       limit = parseInt(limit, 10) || 10;
+      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
-      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId);
+      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId, startDate, endDate);
       if ( invoices.data && invoices.data.length > 0 ) {
 
         let newArr = [];

@@ -233,6 +233,14 @@
         {
           "arg": "nextId",
           "type": "string"
+        },
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
+          "type": "string"
         }
       ],
       "returns": {

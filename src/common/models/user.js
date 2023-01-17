@@ -745,13 +745,31 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
+      // Blocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
           next(err, true);
         });
-      } else {
+      } 
+      // Blocking the whole company with members
+      else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
-          next(err, true);
+          if (err) {
+            let error = new Error("User not found..!!");
+            error.status = 404;
+            next(error);
+          }
+          // Starting the Subscription
+          User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
+            if (err) {
+              let error = new Error("Subscription not found..!!");
+              error.status = 404;
+              next(error);
+            }
+            User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
+              next(err, true);
+            });
+          })
         });
       }
     });
