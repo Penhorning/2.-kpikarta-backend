@@ -252,7 +252,7 @@ module.exports = function (Kartanode) {
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
     userId = Kartanode.getDataSource().ObjectID(userId);
-    let completedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributorId": userId, "target.0.value": { $gt: 0 }, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count(completedQuery, (err, result) => {
@@ -312,7 +312,7 @@ module.exports = function (Kartanode) {
     let status_query = {};
     if (statusType) {
       if (statusType === "completed") {
-        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
+        status_query = { "target.0.value": { $gt: 0 }, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       } else if (statusType === "in_progress") {
         status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       }
@@ -379,7 +379,7 @@ module.exports = function (Kartanode) {
           $match: query
         },
         {
-          $match: { "target.0.value": { $gt: 0 }, "is_deleted": false }
+          $match: { "is_deleted": false }
         },
         {
           $match: status_query
@@ -429,21 +429,40 @@ module.exports = function (Kartanode) {
   // Update kpi nodes
   Kartanode.updateKpiNodes = (nodes, next) => {
     if (nodes.length > 0) {
-      nodes.forEach((item, index) => {
-        let updateQuery = { "achieved_value": item.achieved_value, "target": item.target };
+      nodes.forEach(async (item, index) => {
+        let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
+        // If node has formula
         if (item.hasOwnProperty("node_formula")) {
-          updateQuery.node_formula = item.node_formula;
+          // Find node details with it's original formula
+          const nodeData = await Kartanode.findOne({ where: { "_id": item.id, "contributorId": Kartanode.app.currentUser.id } });
+          // Assign it's original formula
+          updateQuery.node_formula = nodeData.node_formula.__data;
+          // Update only fields values
+          updateQuery.node_formula.fields = item.node_formula.fields;
         }
-        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, updateQuery, (err, result) => {
+        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
           if (err) {
             console.log('error while update kpi nodes', err);
-            return next(err);
+            next(err);
           }
           if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
         });
       });
     } else {
       let error = new Error("Please send nodes array");
+      error.status = 400;
+      next(error);
+    }
+  }
+
+  // Get nodes details
+  Kartanode.getNodesDetails = (nodeIds, next) => {
+    if (nodeIds.length > 0) {
+      Kartanode.find({ where: { "_id": { $in: nodeIds } } }, (err, result) => {
+        next(err, result);
+      });
+    } else {
+      let error = new Error("Please send nodeIds array");
       error.status = 400;
       next(error);
     }

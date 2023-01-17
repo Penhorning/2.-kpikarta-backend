@@ -82,7 +82,7 @@
     },
     "role": {
       "type": "belongsTo",
-      "model": "role",
+      "model": "Role",
       "foreignKey": "roleId",
       "options": {
         "nestRemoting": true
