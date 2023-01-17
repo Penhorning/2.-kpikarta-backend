@@ -484,7 +484,7 @@ exports.get_invoices_for_admin = async (page, limit, previousId, nextId) => {
             // page,
             status: "paid", 
             limit,
-            // expand: ["total_count"],
+            expand: ["total_count"],
             // created: {
             //     gte: startDate,
             //     lte: endDate
