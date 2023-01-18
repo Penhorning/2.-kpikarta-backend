@@ -422,14 +422,12 @@ module.exports = function (Subscription) {
         let newArr = [];
         for( let i = 0; i < invoices.data.length; i++) {
           let inv = invoices.data[i];
-          const subscriptionDetails = await get_subscription_plan_by_id(inv.subscription);
           let newObj = {
             id: inv.id,
             planName: inv.lines.data[0].plan.nickname,
             price: inv.total,
             paymentDate : moment(inv.created * 1000),
             status: inv.status,
-            duration: subscriptionDetails.plan.interval
           };
 
           let SubscriptionData = await Subscription.findOne({ where: { customerId: inv.customer }});
@@ -534,7 +532,8 @@ module.exports = function (Subscription) {
           price: priceDetails.metadata.unit_amount,
           createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
           status: priceDetails.active,
-          priceId: priceDetails.id
+          priceId: priceDetails.id,
+          duration: priceDetails.recurring.interval
         });
       }
       return priceObj;
@@ -665,18 +664,17 @@ module.exports = function (Subscription) {
         "Free": 0,
         "Paid": 0
       };
-      let allLicense = await Subscription.app.models.license.find({});
-      if( allLicense.length > 0 ) {
-        for(let i = 0; i < allLicense.length; i++ ) {
-          let currentLicense = allLicense[i];
-          let users = await Subscription.app.models.user.find({ where: { licenseId: currentLicense.id }});
-          if(currentLicense.name == "Spectator") {
-            userCount["Free"] = users.length;
-          } else {
-            userCount["Paid"] = userCount["Paid"] + users.length;
-          }
-        }
-      }
+
+      // Fetching paid licenses
+      let paidLicense = await Subscription.app.models.license.find({ where: { or: [ {"name": "Creator"} , {"name": "Champion"} ] } });
+      paidLicense = paidLicense.map(item => item.id);
+      userCount["Paid"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: paidLicense } }, { exists: true }] });      
+
+      // Fetching free licenses
+      let freeLicense = await Subscription.app.models.license.find({ where: { "name": "Spectator" } });
+      freeLicense = freeLicense.map(item => item.id);
+      userCount["Free"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: freeLicense } }, { exists: true }] });      
+
       return userCount;
     } catch(err) {
       console.log(err);
