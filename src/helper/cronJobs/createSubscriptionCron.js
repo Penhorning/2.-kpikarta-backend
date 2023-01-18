@@ -19,7 +19,7 @@ exports.createSubscriptionCron = (app) => {
                     let priceMapper = {};
                     let currentSubscribedUser = subscribedUsers[i];
                     const userData = await app.models.user.findOne({ where: { "id": currentSubscribedUser.userId }});
-                    const findRegisteredUserDetails = await app.models.user.find({ where: { "companyId": userData.companyId }});
+                    const findRegisteredUserDetails = await app.models.user.find({ where: { "companyId": userData.companyId, is_deleted: false }});
                     let userTracker = {
                         "Creator": {name: "Creator", quantity: 0 },
                         "Champion": {name: "Champion", quantity: 0 },
