@@ -3,7 +3,11 @@
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
-    "validateUpsert": true
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "color_setting",
+      "allowExtendedOperators": true
+    }
   },
   "mixins": {
     "TimeStamp": {
@@ -84,6 +88,33 @@
       },
       "http": {
         "path": "/by-user",
+        "verb": "post"
+      }
+    },
+    "toggleGlobal": {
+      "accepts": [
+        {
+          "arg": "colorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "is_global",
+          "type": "boolean",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/toggle-global",
         "verb": "post"
       }
     }
