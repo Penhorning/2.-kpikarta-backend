@@ -614,24 +614,25 @@ module.exports = function (Subscription) {
       if( subscriptionDetails ) {
         // Make the remaining payment before subscription cancellation
         const subscriptionStripeDetails = await get_subscription_plan_by_id(subscriptionDetails.subscriptionId);
-        console.log(subscriptionStripeDetails, 'subscriptionStripeDetails');
-        const amountInCents = subscriptionStripeDetails.latest_invoice.amount_due ? Number(subscriptionStripeDetails.latest_invoice.amount_due) : null;
 
-        if(amountInCents) {
-          // Calculating amount based on Usage
-          const startSubscription = moment(moment.unix(subscriptionDetails.nextSubscriptionDate));
-          const endSubscription = moment(moment.unix(subscriptionDetails.currentSubscriptionDate));
-          let oneDayAmount = amountInCents / startSubscription.diff(endSubscription, 'days');
-          let currDate = moment();
-          const amountToBePaid = oneDayAmount * startSubscription.diff(currDate, 'days');
-          
-          const paymentIntent = await create_payment_intent(subscriptionDetails.customerId, subscriptionDetails.cardId, amountToBePaid );
-          if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
-            let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
-            error.status = 404;
-            throw error;
+        if(subscriptionStripeDetails.latest_invoice) {
+          const amountInCents = subscriptionStripeDetails.latest_invoice.amount_due ? Number(subscriptionStripeDetails.latest_invoice.amount_due) : null;
+          if(amountInCents) {
+            // Calculating amount based on Usage
+            const startSubscription = moment(moment.unix(subscriptionDetails.nextSubscriptionDate));
+            const endSubscription = moment(moment.unix(subscriptionDetails.currentSubscriptionDate));
+            let oneDayAmount = amountInCents / startSubscription.diff(endSubscription, 'days');
+            let currDate = moment();
+            const amountToBePaid = oneDayAmount * startSubscription.diff(currDate, 'days');
+            
+            const paymentIntent = await create_payment_intent(subscriptionDetails.customerId, subscriptionDetails.cardId, amountToBePaid );
+            if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
+              let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
+              error.status = 404;
+              throw error;
+            }
+            // if (paymentIntent.status == "succeeded") {}
           }
-          // if (paymentIntent.status == "succeeded") {}
         }
 
         const cancelSubscription = await cancel_user_subscription(subscriptionDetails.subscriptionId);
