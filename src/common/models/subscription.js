@@ -609,7 +609,7 @@ module.exports = function (Subscription) {
   Subscription.cancelSubscription = async (userId) => {
     try {
       // Find user's subscription details
-      const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+      const subscriptionDetails = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true }, status: true }});
       
       if( subscriptionDetails ) {
         // Make the remaining payment before subscription cancellation
@@ -644,9 +644,10 @@ module.exports = function (Subscription) {
         return "Subscription deactivated successfully..!!";
 
       } else {
-        let error = new Error("User not found with a subscription");
-        error.status = 404;
-        throw error;
+        return "User not found with a subscription..!!";
+        // let error = new Error("User not found with a subscription");
+        // error.status = 404;
+        // throw error;
       }
     } catch (err) {
       console.log(err);
