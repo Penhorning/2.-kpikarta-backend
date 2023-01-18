@@ -427,7 +427,7 @@ module.exports = function (Subscription) {
             planName: inv.lines.data[0].plan.nickname,
             price: inv.total,
             paymentDate : moment(inv.created * 1000),
-            status: inv.status
+            status: inv.status,
           };
 
           let SubscriptionData = await Subscription.findOne({ where: { customerId: inv.customer }});
@@ -532,7 +532,8 @@ module.exports = function (Subscription) {
           price: priceDetails.metadata.unit_amount,
           createdAt: moment(priceDetails.created * 1000).format("DD-MM-YYYY"),
           status: priceDetails.active,
-          priceId: priceDetails.id
+          priceId: priceDetails.id,
+          duration: priceDetails.recurring.interval
         });
       }
       return priceObj;
@@ -652,6 +653,30 @@ module.exports = function (Subscription) {
         // throw error;
       }
     } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  Subscription.getUserCount = async () => {
+    try {
+      let userCount = {
+        "Free": 0,
+        "Paid": 0
+      };
+
+      // Fetching paid licenses
+      let paidLicense = await Subscription.app.models.license.find({ where: { or: [ {"name": "Creator"} , {"name": "Champion"} ] } });
+      paidLicense = paidLicense.map(item => item.id);
+      userCount["Paid"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: paidLicense } }, { exists: true }] });      
+
+      // Fetching free licenses
+      let freeLicense = await Subscription.app.models.license.find({ where: { "name": "Spectator" } });
+      freeLicense = freeLicense.map(item => item.id);
+      userCount["Free"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: freeLicense } }, { exists: true }] });      
+
+      return userCount;
+    } catch(err) {
       console.log(err);
       throw err;
     }
