@@ -614,6 +614,7 @@ module.exports = function (Subscription) {
       if( subscriptionDetails ) {
         // Make the remaining payment before subscription cancellation
         const subscriptionStripeDetails = await get_subscription_plan_by_id(subscriptionDetails.subscriptionId);
+        console.log(subscriptionStripeDetails, 'subscriptionStripeDetails');
         const amountInCents = subscriptionStripeDetails.latest_invoice.amount_due ? Number(subscriptionStripeDetails.latest_invoice.amount_due) : null;
 
         if(amountInCents) {
