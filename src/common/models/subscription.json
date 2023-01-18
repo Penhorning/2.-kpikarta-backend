@@ -34,8 +34,24 @@
       "required": true
     },
     "subscriptionId": {
-      "type": "string",
-      "required": true
+      "type": "string"
+    },
+    "trialActive": {
+      "type": "boolean",
+      "default": false
+    },
+    "trialEnds": {
+      "type": "string"
+    },
+    "status": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentSubscriptionDate": {
+      "type": "string"
+    },
+    "nextSubscriptionDate": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -215,10 +231,18 @@
         {
           "arg": "limit",
           "type": "number"
+        },
+        {
+          "arg": "previousId",
+          "type": "string"
+        },
+        {
+          "arg": "nextId",
+          "type": "string"
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "invoices",
         "type": "array"
       },
       "http": {
@@ -254,6 +278,104 @@
       },
       "http": {
         "path": "/get-prices",
+        "verb": "get"
+      }
+    },
+    "createSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-subscription",
+        "verb": "post"
+      }
+    },
+    "getPricesForAdmin": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-admin-plans",
+        "verb": "get"
+      }
+    },
+    "getPriceByIdForAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plan",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plan",
+        "verb": "post"
+      }
+    },
+    "updatePlansByAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        },
+        {
+          "arg": "amount",
+          "type": "string"
+        },
+        {
+          "arg": "name",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plans",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-admin-plans",
+        "verb": "post"
+      }
+    },
+    "cancelSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "subscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-subscription",
+        "verb": "post"
+      }
+    },
+    "getUserCount": {
+      "accepts": [],
+      "returns": {
+        "arg": "count",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-user-count",
         "verb": "get"
       }
     }

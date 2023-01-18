@@ -102,14 +102,24 @@ module.exports = function (Kartanode) {
       weightage: node.weightage,
       phaseId: phase.id
     }
-    if (phase.name === "Goal") data.kartaId = kartaId;
-    if (phase.name !== "Goal" && parent) {
+    if (phase.global_name === "Goal") data.kartaId = kartaId;
+    if (phase.global_name !== "Goal" && parent) {
       data.parentId = parent.id;
       data.kartaDetailId = kartaId;
     }
 
-    if (phase.name === "KPI") {
+    if (phase.global_name === "KPI") {
       data.node_type = node.node_type || "measure";
+      if (node.node_type === "metrics") {
+        data.node_formula = {
+          fields: [],
+          formula: ""
+        }
+        for (let i=0; i<node.node_formula.fields.length; i++) {
+          data.node_formula.fields.push({ "fieldName": node.node_formula.fields[i].fieldName, "fieldValue": 0 });
+        }
+        data.node_formula.formula = node.node_formula.formula;
+      }
       data.target = node.target || [{ frequency: 'monthly', value: 0, percentage: 0 }];
       data.achieved_value = 0;
       data.is_achieved_modified = false;
@@ -129,11 +139,10 @@ module.exports = function (Kartanode) {
   // Add node by inventory
   Kartanode.addNodeByInventory = async (kartaId, node, parent, nodeType, next) => {
     
-    // Get all phases
-    const phases = await Kartanode.app.models.karta_phase.find({});
+    // Get all phases of current karta
+    const phases = await Kartanode.app.models.karta_phase.find({ kartaId, "is_deleted": false });
     // Find phase index
     const findIndex = (phaseId) => {
-      // return phases.map(item => item.id.toString()).indexOf(phaseId.toString());
       for (let i=0; i<phases.length; i++) {
         if (phases[i].id.toString() === phaseId.toString()) return i;
       }
@@ -141,12 +150,13 @@ module.exports = function (Kartanode) {
 
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
       let index = 0;
-      if (parentData) index = 1; 
+      if (parentData) index = 1;
       const phase = phases[findIndex(phaseId) + index];
+      // Create node
       const result = await createNode(kartaId, nodeData, parentData, phase);
-      if (parentData) {
-        await reAdjustWeightage(kartaId, parentData.id, phase.id);
-      }
+      // Adjust weightage
+      if (parentData) await reAdjustWeightage(kartaId, parentData.id, phase.id);
+      // Create further children nodes
       if (nodeData.children && nodeData.children.length > 0) {
         for (let i = 0; i < nodeData.children.length; i++) {
           await setCreateNodeParam(nodeData.children[i], result, phase.id);
@@ -169,7 +179,33 @@ module.exports = function (Kartanode) {
         if (err) {
           console.log('> error while updating the node sharedTo property ', err);
           next(err);
-        } else next(null, "Node shared successfully!");
+        } else {
+          Kartanode.findOne({where: { id: nodeId }}, (err, node) => {
+            if (err) {
+              console.log('> error while fetching the node data ', err);
+              next(err);
+            }   
+
+            // Prepare notification collection data
+            let notificationData = [];
+            for(let i = 0; i < userIds.length; i++) {
+              let notificationObj = {
+                title: `${Kartanode.app.currentUser.fullName} shared the node ${node.name}`,
+                type: "karta_node_shared",
+                contentId: nodeId,
+                userId: userIds[i].userId
+              };
+              notificationData.push(notificationObj);
+            }
+  
+            // Insert data in notification collection
+            Kartanode.app.models.notification.create(notificationData, err => {
+              if (err) console.log('> error while inserting data in notification collection', err);
+            });
+            
+            next(null, "Node shared successfully!");
+          });
+        }
       });
     } else {
       let error = new Error("Please send an userId array");
@@ -216,7 +252,7 @@ module.exports = function (Kartanode) {
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
     userId = Kartanode.getDataSource().ObjectID(userId);
-    let completedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
+    let completedQuery = { "contributorId": userId, "target.0.value": { $gt: 0 }, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
     Kartanode.count(completedQuery, (err, result) => {
@@ -276,7 +312,7 @@ module.exports = function (Kartanode) {
     let status_query = {};
     if (statusType) {
       if (statusType === "completed") {
-        status_query = { $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
+        status_query = { "target.0.value": { $gt: 0 }, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       } else if (statusType === "in_progress") {
         status_query = { $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } }
       }
@@ -343,7 +379,7 @@ module.exports = function (Kartanode) {
           $match: query
         },
         {
-          $match: { "target.0.value": { $gt: 0 }, "is_deleted": false }
+          $match: { "is_deleted": false }
         },
         {
           $match: status_query
@@ -390,6 +426,48 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Update kpi nodes
+  Kartanode.updateKpiNodes = (nodes, next) => {
+    if (nodes.length > 0) {
+      nodes.forEach(async (item, index) => {
+        let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
+        // If node has formula
+        if (item.hasOwnProperty("node_formula")) {
+          // Find node details with it's original formula
+          const nodeData = await Kartanode.findOne({ where: { "_id": item.id, "contributorId": Kartanode.app.currentUser.id } });
+          // Assign it's original formula
+          updateQuery.node_formula = nodeData.node_formula.__data;
+          // Update only fields values
+          updateQuery.node_formula.fields = item.node_formula.fields;
+        }
+        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
+          if (err) {
+            console.log('error while update kpi nodes', err);
+            next(err);
+          }
+          if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
+        });
+      });
+    } else {
+      let error = new Error("Please send nodes array");
+      error.status = 400;
+      next(error);
+    }
+  }
+
+  // Get nodes details
+  Kartanode.getNodesDetails = (nodeIds, next) => {
+    if (nodeIds.length > 0) {
+      Kartanode.find({ where: { "_id": { $in: nodeIds } } }, (err, result) => {
+        next(err, result);
+      });
+    } else {
+      let error = new Error("Please send nodeIds array");
+      error.status = 400;
+      next(error);
+    }
+  }
+  
   // Update nodes and adjust weightage of all the other child nodes
   async function updateNodeAndAssignWeightage (kartaId, nodeData) {
     await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
@@ -398,7 +476,7 @@ module.exports = function (Kartanode) {
     createHistory(kartaId, nodeData, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) });
     // Check if children exists or not
     if (nodeData.children && nodeData.children.length > 0) {
-      for (let children of nodeData.children) updateNodeAndAssignWeightage(children);
+      for (let children of nodeData.children) updateNodeAndAssignWeightage(kartaId, children);
     }
   }
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
@@ -785,7 +863,27 @@ module.exports = function (Kartanode) {
     const req = context.req;
     if (req.body.contributorId) {
       Kartanode.update({ "_id": instance.id, $set: { "assigned_date": new Date() } }, (err, result) => {
-        next(err, result);
+        if (err) {
+          console.log('> error while updating the node data ', err);
+          next(err);
+        }   
+        // Prepare notification collection data
+        let notificationObj = {
+          title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
+          type: "contributor_added",
+          contentId: instance.id,
+          userId: req.body.contributorId
+        };
+
+        // Insert data in notification collection
+        Kartanode.app.models.notification.create(notificationObj, err => {
+          if (err) {
+            console.log('> error while inserting data in notification collection', err);
+            next(err);
+          }
+        });
+        
+        next(null, result);
       });
     } else next();
   });

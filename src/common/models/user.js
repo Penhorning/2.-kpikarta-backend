@@ -234,20 +234,27 @@ module.exports = function(User) {
     });
   }
   // Send SMS
-  const sendSMS = (user, message) => {
+  const sendSMS = (number, message) => {
     try {
       let smsOptions = {
         type: 'sms',
-        to: user.mobile.e164Number,
-        from: "+16063667831",
+        from: process.env.TWILIO_MESSAGINGSERVICE_SID,
+        to: number,
         body: message
       };
-      User.app.models.Twilio.send(smsOptions, (err, data) => {
-        console.log('> sending code to mobile number:', user.mobile.e164Number);
-        if (err) console.log('> error while sending code to mobile number', err);
-      });
+      return new Promise((resolve, reject) => {
+        User.app.models.Twilio.send(smsOptions, (err, data) => {
+          console.log('> sending code to mobile number:', number);
+          if (err) {
+            console.log('> error while sending code to mobile number', err);
+            reject(err);
+          }
+          resolve("success");
+        })
+      })
     } catch (error) {
       console.error("> error in SMS function", error);
+      return { success: true, msg: error };
     }
   }
 
@@ -287,7 +294,7 @@ module.exports = function(User) {
     const password = generatePassword();
     
     // Create user
-    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, "paymentVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -661,27 +668,19 @@ module.exports = function(User) {
   // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
     let mobileVerificationCode = keygen.number({length: 6});
-    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, err => {
+    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
       if (err) return next(err);
       else {
         let mobileNumber;
         if (type == "updateProfile") mobileNumber = mobile.e164Number;
         else mobileNumber = User.app.currentUser.mobile.e164Number;
-        let twilio_data = {
-          type: 'sms',
-          to: mobileNumber,
-          from: "+16063667831",
-          body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-        }
-        User.app.models.Twilio.send(twilio_data, function (err, data) {
-          console.log('> sending code to mobile number:', mobileNumber);
-          if (err) {
-            console.log('> error while sending code to mobile number', err);
-            let error = err;
-            error.status = 500;
-            return next(error);
-          }
-          next(null, 'sent');
+        sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
+        .then(() => {
+          next(null, "sent");
+        }).catch(err => {
+          let error = err;
+          error.status = 500;
+          return next(error);
         });
       }
     });
@@ -745,13 +744,31 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
+      // Blocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
           next(err, true);
         });
-      } else {
+      } 
+      // Blocking the whole company with members
+      else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
-          next(err, true);
+          if (err) {
+            let error = new Error("User not found..!!");
+            error.status = 404;
+            next(error);
+          }
+          // Starting the Subscription
+          User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
+            if (err) {
+              let error = new Error("Subscription not found..!!");
+              error.status = 404;
+              next(error);
+            }
+            User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
+              next(err, true);
+            });
+          })
         });
       }
     });
@@ -916,7 +933,8 @@ module.exports = function(User) {
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
-      User.findById(accessToken.userId.toString(), (err, user) => {
+      User.findById(accessToken.userId.toString(), { include: ['company', 'role', 'license'] }, (err, user) => {
+        if (err) return next(err);
         // Check if user is active or not
         if (!user.active) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
@@ -943,20 +961,16 @@ module.exports = function(User) {
         // User is verified, checking for twoFactor enabled or not
         else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
-            let mobileVerificationCode = keygen.number({length: 6});
+            let mobileVerificationCode = keygen.number({ length: 6 });
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
-              sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
+              sendSMS(user.mobile.e164Number, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
+              .then(() => {}).catch(err => {});
             });
           }
-          // Get company details
-          User.app.models.company.findById(user.companyId.toString(), (err, company) => {
-            if (err) {
-              console.log('> error while fetching company details', err);
-              return next(err);
-            }
-            context.result.company = company;
-            next();
-          });
+          // Setting includes
+          context.result = context.result.toJSON();
+          context.result.user = user;
+          next();
         }
       });
     } else next();
