@@ -28,4 +28,18 @@ module.exports = function(Colorsetting) {
             }
         });
     }
+    // Toggle global color setting
+    Colorsetting.toggleGlobal = (colorId, userId, is_global, next) => {
+        Colorsetting.update({ "_id": colorId, userId }, { is_global }, function (err, result) {
+            if (err) {
+                let error = err;
+                error.status = 500;
+                return next(error);
+            } else {
+                Colorsetting.update({ "_id": { ne: colorId }, userId }, { "is_global": false }, function (err, result) {
+                    next (err, result);
+                });
+            }
+        });
+    }
 };
