@@ -9,9 +9,15 @@ module.exports = function (Kartanode) {
   const KARTA_LOOKUP = {
     $lookup: {
       from: 'karta',
-      localField: 'kartaDetailId',
-      foreignField: '_id',
+      let: {
+        karta_id: "$kartaDetailId"
+      },
       pipeline: [
+        { 
+          $match: { 
+            $expr: { $eq: ["$_id", "$$karta_id"] }
+          } 
+        },
         {
           $project: { "name": 1, "userId": 1 }
         }
