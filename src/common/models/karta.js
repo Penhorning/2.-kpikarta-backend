@@ -280,7 +280,7 @@ module.exports = function(Karta) {
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-    let query = { type: "public" }
+    let query = { "type": "public", "is_deleted": false }
 
     const SEARCH_MATCH = {
       $match: {
