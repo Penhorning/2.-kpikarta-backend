@@ -170,7 +170,7 @@ module.exports = function(Karta) {
       // Prepare data for updating in the sharedTo field
       let data = [];
       for (let i = 0; i < newEmails.length; i++) {
-        data.push({ email: newEmails[i] });
+        data.push({ email: newEmails[i], accessType });
       }
 
       Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {

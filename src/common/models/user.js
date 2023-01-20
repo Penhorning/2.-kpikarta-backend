@@ -388,7 +388,11 @@ module.exports = function(User) {
         let creatorId = user.creatorId || user.id;
         let query = { "companyId": user.companyId, creatorId, "_id": { $ne: userId } };
 
-        if (type === "all") query = { "companyId": user.companyId };
+        let exclude_spectator_billingStaff_query = {};
+        if (type === "all") {
+          query = { "companyId": user.companyId };
+          exclude_spectator_billingStaff_query = { "Role.name" : { $ne: "billing_staff" }, "license.name": { $ne: "Spectator" } };
+        }
         else if (type === "members" && user.departmentId) {
           query = { "companyId": user.companyId, "departmentId": user.departmentId, creatorId, "_id": { $ne: userId } }; 
         }
@@ -435,6 +439,9 @@ module.exports = function(User) {
             UNWIND_LICENSE,
             ROLE_LOOKUP,
             UNWIND_ROLE,
+            {
+              $match: exclude_spectator_billingStaff_query
+            },
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
