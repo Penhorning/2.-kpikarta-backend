@@ -11,6 +11,11 @@ module.exports = function (Kartanode) {
       from: 'karta',
       localField: 'kartaDetailId',
       foreignField: '_id',
+      pipeline: [
+        {
+          $project: { "name": 1, "userId": 1 }
+        }
+      ],
       as: 'karta'
     }
   }
@@ -217,7 +222,7 @@ module.exports = function (Kartanode) {
   // Get unique creators by contributorId
   Kartanode.kpiCreators = (userId, next) => {
 
-    userId = Kartanode.getDataSource().ObjectID(userId);
+    userId = convertIdToBSON(userId);
     
     Kartanode.getDataSource().connector.connect(function (err, db) {
       const kartaNodeCollection = db.collection('karta_node');
@@ -251,7 +256,7 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    userId = Kartanode.getDataSource().ObjectID(userId);
+    userId = convertIdToBSON(userId);
     let completedQuery = { "contributorId": userId, "target.0.value": { $gt: 0 }, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
@@ -296,17 +301,19 @@ module.exports = function (Kartanode) {
     let query;
 
     // Filter nodes by creator's id
-    let creator_query = {}, kartaCreators = [];
+    let creator_query = {};
     if (kartaCreatorIds && kartaCreatorIds.length > 0) {
-      kartaCreatorIds.map(id => {
-        kartaCreators.push(Kartanode.getDataSource().ObjectID(id));
-      });
-      creator_query = { "karta.userId" : { $in: kartaCreators } };
+      kartaCreatorIds = kartaCreatorIds.map(id => convertIdToBSON(id));
+      creator_query = { "karta.userId" : { $in: kartaCreatorIds } };
     }
 
     // Find shared or assigned nodes
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
-    else query = { "contributorId": Kartanode.getDataSource().ObjectID(userId) };
+    else query = { "contributorId": convertIdToBSON(userId) };
+
+    // Fetch all kpis of creator
+    let all_kpi_query = {};
+    if (kpiType === "all") all_kpi_query = { "karta.userId": convertIdToBSON(userId) };
 
     // Filter nodes by completed, in-progress and all
     let status_query = {};
@@ -417,6 +424,9 @@ module.exports = function (Kartanode) {
         },
         {
           $match: creator_query
+        },
+        {
+          $match: all_kpi_query
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
@@ -787,7 +797,7 @@ module.exports = function (Kartanode) {
     if (kartaId) {
       // Find details of current karta
       const karta = await Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } });
-      // Find children of current karta
+      // Find children of current parent node
       const childrens = await Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } });
       // If children exists
       if (childrens.length > 0) {

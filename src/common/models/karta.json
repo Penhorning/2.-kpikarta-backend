@@ -38,7 +38,8 @@
     "sharedTo": {
       "type": [
         {
-          "email": "string"
+          "email": "string",
+          "accessType": "string"
         }
       ]
     },
