@@ -668,12 +668,12 @@ module.exports = function (Subscription) {
       // Fetching paid licenses
       let paidLicense = await Subscription.app.models.license.find({ where: { or: [ {"name": "Creator"} , {"name": "Champion"} ] } });
       paidLicense = paidLicense.map(item => item.id);
-      userCount["Paid"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: paidLicense } }, { exists: true }] });      
+      userCount["Paid"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: paidLicense } }, { exists: true }], is_deleted: false });      
 
       // Fetching free licenses
       let freeLicense = await Subscription.app.models.license.find({ where: { "name": "Spectator" } });
       freeLicense = freeLicense.map(item => item.id);
-      userCount["Free"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: freeLicense } }, { exists: true }] });      
+      userCount["Free"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: freeLicense } }, { exists: true }], is_deleted: false });      
 
       return userCount;
     } catch(err) {
