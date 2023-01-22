@@ -9,8 +9,19 @@ module.exports = function (Kartanode) {
   const KARTA_LOOKUP = {
     $lookup: {
       from: 'karta',
-      localField: 'kartaDetailId',
-      foreignField: '_id',
+      let: {
+        karta_id: "$kartaDetailId"
+      },
+      pipeline: [
+        { 
+          $match: { 
+            $expr: { $eq: ["$_id", "$$karta_id"] }
+          } 
+        },
+        {
+          $project: { "name": 1, "userId": 1 }
+        }
+      ],
       as: 'karta'
     }
   }
@@ -32,7 +43,37 @@ module.exports = function (Kartanode) {
   // Convert string id to bson
   const convertIdToBSON = (id) => {
     return Kartanode.getDataSource().ObjectID(id);
-  } 
+  }
+
+  // Get all phases of karta
+  const getAllPhases = async (kartaId) => {
+    let sortedPhases = [];
+    const phases = await Kartanode.app.models.karta_phase.find({ where: { kartaId, "is_deleted": false } });
+    // Find sub phase
+    const findSubPhase = (phaseArray, phaseId) => {
+      let childPhase = phaseArray.find(item => {
+        if (item.parentId) return item.parentId.toString() === phaseId.toString();
+      });
+      if (childPhase) {
+        sortedPhases.push(childPhase);
+        phaseArray.splice(phaseArray.findIndex(item => item.id.toString() === childPhase.id.toString()) , 1);
+        findSubPhase(phaseArray, childPhase.id);
+      }
+    }
+    // Iterate phases
+    for (let phase of phases) {
+      sortedPhases.push(phase);
+      findSubPhase(phases, phase.id);
+    }
+    return sortedPhases;
+  }
+
+  // Find phase index
+  const findPhaseIndex = (phaseArray, phaseId) => {
+    for (let i=0; i<phaseArray.length; i++) {
+      if (phaseArray[i].id.toString() === phaseId.toString()) return i;
+    }
+  }
 
   // Delete child nodes
   const deleteChildNodes = (params) => {
@@ -138,20 +179,14 @@ module.exports = function (Kartanode) {
 
   // Add node by inventory
   Kartanode.addNodeByInventory = async (kartaId, node, parent, nodeType, next) => {
-    
-    // Get all phases of current karta
-    const phases = await Kartanode.app.models.karta_phase.find({ kartaId, "is_deleted": false });
-    // Find phase index
-    const findIndex = (phaseId) => {
-      for (let i=0; i<phases.length; i++) {
-        if (phases[i].id.toString() === phaseId.toString()) return i;
-      }
-    }
 
+    // Get all phases
+    const phases = await getAllPhases(kartaId);
+    
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
       let index = 0;
       if (parentData) index = 1;
-      const phase = phases[findIndex(phaseId) + index];
+      const phase = phases[findPhaseIndex(phases, phaseId) + index];
       // Create node
       const result = await createNode(kartaId, nodeData, parentData, phase);
       // Adjust weightage
@@ -167,7 +202,7 @@ module.exports = function (Kartanode) {
     if (nodeType === "branch" && parent) await setCreateNodeParam(node, parent, parent.phaseId);
     else if (nodeType === "branch" && !parent) await setCreateNodeParam(node, null, phases[0].id);
     else {
-      const phase = phases[findIndex(parent.phaseId) + 1];
+      const phase = phases[findPhaseIndex(phases, parent.phaseId) + 1];
       await createNode(kartaId, node, parent, phase);
     }
   }
@@ -217,7 +252,7 @@ module.exports = function (Kartanode) {
   // Get unique creators by contributorId
   Kartanode.kpiCreators = (userId, next) => {
 
-    userId = Kartanode.getDataSource().ObjectID(userId);
+    userId = convertIdToBSON(userId);
     
     Kartanode.getDataSource().connector.connect(function (err, db) {
       const kartaNodeCollection = db.collection('karta_node');
@@ -251,7 +286,7 @@ module.exports = function (Kartanode) {
 
   // Get kpi stats by contributorId
   Kartanode.kpiStats = (userId, next) => {
-    userId = Kartanode.getDataSource().ObjectID(userId);
+    userId = convertIdToBSON(userId);
     let completedQuery = { "contributorId": userId, "target.0.value": { $gt: 0 }, "is_deleted": false, $expr: { $lte: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
     let inCompletedQuery = { "contributorId": userId, "is_deleted": false, $expr: { $gt: [ { "$arrayElemAt": ["$target.value", 0] }, "$achieved_value" ] } };
 
@@ -296,17 +331,19 @@ module.exports = function (Kartanode) {
     let query;
 
     // Filter nodes by creator's id
-    let creator_query = {}, kartaCreators = [];
+    let creator_query = {};
     if (kartaCreatorIds && kartaCreatorIds.length > 0) {
-      kartaCreatorIds.map(id => {
-        kartaCreators.push(Kartanode.getDataSource().ObjectID(id));
-      });
-      creator_query = { "karta.userId" : { $in: kartaCreators } };
+      kartaCreatorIds = kartaCreatorIds.map(id => convertIdToBSON(id));
+      creator_query = { "karta.userId" : { $in: kartaCreatorIds } };
     }
 
     // Find shared or assigned nodes
     if (kpiType === "shared") query = { "sharedTo.userId": userId };
-    else query = { "contributorId": Kartanode.getDataSource().ObjectID(userId) };
+    else query = { "contributorId": convertIdToBSON(userId) };
+
+    // Fetch all kpis of creator
+    let all_kpi_query = {};
+    if (kpiType === "all") all_kpi_query = { "karta.userId": convertIdToBSON(userId) };
 
     // Filter nodes by completed, in-progress and all
     let status_query = {};
@@ -418,6 +455,9 @@ module.exports = function (Kartanode) {
         {
           $match: creator_query
         },
+        {
+          $match: all_kpi_query
+        },
         FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
@@ -476,7 +516,13 @@ module.exports = function (Kartanode) {
     createHistory(kartaId, nodeData, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) });
     // Check if children exists or not
     if (nodeData.children && nodeData.children.length > 0) {
-      for (let children of nodeData.children) updateNodeAndAssignWeightage(kartaId, children);
+      for (let children of nodeData.children) {
+        // Get all phases
+        const phases = await getAllPhases(kartaId);
+        const phaseId = phases[findPhaseIndex(phases, nodeData.phaseId) + 1].id;
+        children.phaseId = phaseId;
+        updateNodeAndAssignWeightage(kartaId, children);
+      }
     }
   }
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
@@ -787,7 +833,7 @@ module.exports = function (Kartanode) {
     if (kartaId) {
       // Find details of current karta
       const karta = await Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } });
-      // Find children of current karta
+      // Find children of current parent node
       const childrens = await Kartanode.find({ where: { "_id": { ne: currentNodeId }, "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } });
       // If children exists
       if (childrens.length > 0) {
