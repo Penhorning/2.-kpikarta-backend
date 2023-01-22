@@ -867,21 +867,24 @@ module.exports = function (Kartanode) {
           console.log('> error while updating the node data ', err);
           next(err);
         }   
-        // Prepare notification collection data
-        let notificationObj = {
-          title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
-          type: "contributor_added",
-          contentId: instance.id,
-          userId: req.body.contributorId
-        };
 
-        // Insert data in notification collection
-        Kartanode.app.models.notification.create(notificationObj, err => {
-          if (err) {
-            console.log('> error while inserting data in notification collection', err);
-            next(err);
-          }
-        });
+        if(Kartanode.app.currentUser.id.toString() !== req.body.contributorId.toString()) {
+          // Prepare notification collection data
+          let notificationObj = {
+            title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
+            type: "contributor_added",
+            contentId: instance.id,
+            userId: req.body.contributorId
+          };
+  
+          // Insert data in notification collection
+          Kartanode.app.models.notification.create(notificationObj, err => {
+            if (err) {
+              console.log('> error while inserting data in notification collection', err);
+              next(err);
+            }
+          });
+        }
         
         next(null, result);
       });
