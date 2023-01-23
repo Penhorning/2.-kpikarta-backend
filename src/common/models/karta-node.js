@@ -469,6 +469,7 @@ module.exports = function (Kartanode) {
   // Update kpi nodes
   Kartanode.updateKpiNodes = (nodes, next) => {
     if (nodes.length > 0) {
+      nodes = nodes.filter(item => item !== null);
       nodes.forEach(async (item, index) => {
         let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
         // If node has formula
