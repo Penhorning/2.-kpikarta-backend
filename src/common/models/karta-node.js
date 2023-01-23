@@ -343,7 +343,10 @@ module.exports = function (Kartanode) {
 
     // Fetch all kpis of creator
     let all_kpi_query = {};
-    if (kpiType === "all") all_kpi_query = { "karta.userId": convertIdToBSON(userId) };
+    if (kpiType === "all") {
+      query = {};
+      all_kpi_query = { "karta.userId": convertIdToBSON(userId), "node_type": { $exists: true }  };
+    }
 
     // Filter nodes by completed, in-progress and all
     let status_query = {};

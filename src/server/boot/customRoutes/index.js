@@ -21,6 +21,7 @@ module.exports = function (app) {
                 req.app.models.user.findById(user.id.toString(), { include: ['company', 'role', 'license'] }, (err, result) => {
                     if (err) return console.log('> error while fetching user details');
                     user_data.companyLogo = result.company().logo || "";
+                    user_data.companyId = result.company().id || "";
                     user_data.role = result.role().name || "";
                     user_data.license = result.license().name || "";
                     user_data.profilePic = user.profilePic || "";
@@ -46,7 +47,7 @@ module.exports = function (app) {
                           });
                         });
                     }
-                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
+                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
                 });
             } else {
                 req.user.updateAttributes({emailVerified: true}, (err) => {
