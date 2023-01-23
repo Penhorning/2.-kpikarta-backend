@@ -31,6 +31,7 @@ module.exports = function (Subscription) {
   Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     // PLAN - Monthly/Yearly
     try {
+      const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
       const findUser = await Subscription.findOne({where: { userId }});
       if(findUser) {
         // Create a token
@@ -139,8 +140,16 @@ module.exports = function (Subscription) {
             const trialData = await Subscription.app.models.trial_period.findOne({});
             const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true });
-            await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: moment().subtract(2, 'days').unix(), trialActive: true });
+            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId });
+            await Subscription.create({ 
+              userId, 
+              customerId: customer.id, 
+              cardId: card.id, 
+              tokenId: token.id, 
+              trialEnds: moment().subtract(2, 'days').unix(), 
+              trialActive: true,
+              companyId: userDetails.companyId
+            });
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -158,9 +167,9 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.getCards = async (userId) => {
+  Subscription.getCards = async (companyId) => {
     try {
-      let userDetails = await Subscription.findOne({ where: { userId }});
+      let userDetails = await Subscription.findOne({ where: { companyId }});
       if (userDetails) {
         let cardDetails = await get_all_cards( userDetails.customerId );
         if (cardDetails) {
@@ -290,9 +299,9 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.getSubscribedUsers = async (userId) => {
+  Subscription.getSubscribedUsers = async (companyId) => {
     try {
-      const findUser = await Subscription.findOne({ where: { userId, subscriptionId: { exists: true }, status: true }});
+      const findUser = await Subscription.findOne({ where: { companyId, subscriptionId: { exists: true }, status: true }});
       if (findUser) {
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
         if(subscriptionDetails) {
@@ -330,9 +339,8 @@ module.exports = function (Subscription) {
           };
     
           // Finding Spectators from Application Database
-          const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
           const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-          const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": findUserDetails.companyId }});
+          const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": companyId }});
           let newObj = {
             user: "Spectators",
             quantity: findSpectatorsList.length,
@@ -348,8 +356,7 @@ module.exports = function (Subscription) {
         }
       } else {
         // Finding Registered Users from Application Database
-        const findUserDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
-        const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": findUserDetails.companyId }});
+        const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": companyId }});
         let userObj = {};
         let tracker = {
           Creator: {
@@ -390,9 +397,9 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.getInvoices = async (userId) => {
+  Subscription.getInvoices = async (companyId) => {
     try {
-      const subscriptionDetails = await Subscription.findOne({ where: { userId }});
+      const subscriptionDetails = await Subscription.findOne({ where: { companyId }});
       if(subscriptionDetails) {
         let invoices = await get_invoices( subscriptionDetails.customerId );
         if ( invoices.data.length > 0 ) {
@@ -643,7 +650,7 @@ module.exports = function (Subscription) {
           throw error;
         }
 
-        await Subscription.update({ id: subscriptionDetails.id }, { status: false, subscriptionId: "deactivated" });
+        await Subscription.update({ userId, status: true }, { status: false, subscriptionId: "deactivated" });
         return "Subscription deactivated successfully..!!";
 
       } else {

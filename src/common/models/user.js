@@ -203,6 +203,7 @@ module.exports = function(User) {
       'Role': 1,
       'company': 1,
       'department': 1,
+      'creatorId': 1,
       'active': 1,
       'updatedAt': 1,
       'createdAt': 1
@@ -385,12 +386,16 @@ module.exports = function(User) {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         userId = User.getDataSource().ObjectID(userId);
         
-        let creatorId = user.creatorId || user.id;
-        let query = { "companyId": user.companyId, creatorId, "_id": { $ne: userId } };
+        // let creatorId = user.creatorId || user.id;
+        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
 
-        if (type === "all") query = { "companyId": user.companyId };
+        // let exclude_spectator_billingStaff_query = {};
+        if (type === "all") {
+          query = { "companyId": user.companyId };
+          // exclude_spectator_billingStaff_query = { "Role.name" : { $ne: "billing_staff" }, "license.name": { $ne: "Spectator" } };
+        }
         else if (type === "members" && user.departmentId) {
-          query = { "companyId": user.companyId, "departmentId": user.departmentId, creatorId, "_id": { $ne: userId } }; 
+          query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } }; 
         }
 
         if (start && end) {
@@ -435,6 +440,9 @@ module.exports = function(User) {
             UNWIND_LICENSE,
             ROLE_LOOKUP,
             UNWIND_ROLE,
+            // {
+            //   $match: exclude_spectator_billingStaff_query
+            // },
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,

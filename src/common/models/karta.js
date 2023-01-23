@@ -60,6 +60,7 @@ module.exports = function(Karta) {
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Copy Karta Functions Starts----------------
+  // Might face issue while copying because phase is not updating while creating this new history - Debug event_options
   async function createCopyKartaHistory(oldVersionHistory, newVersion, newKarta) {
     for ( let k = 0; k < oldVersionHistory.length; k++ ) {
       let history_data = {
@@ -76,7 +77,7 @@ module.exports = function(Karta) {
     }
   }
 
-  async function createCopyKartaNodes(newVersion, newKarta) {
+  async function createCopyKartaNodes(newVersion, newKarta, phaseMapping) {
     await Karta.app.models.karta_node.remove({ or: [{ kartaId: newKarta.id }, { kartaDetailId: newKarta.id }] });
 
     // Retrieving history of the newly created karta for particular version
@@ -170,7 +171,7 @@ module.exports = function(Karta) {
       // Prepare data for updating in the sharedTo field
       let data = [];
       for (let i = 0; i < newEmails.length; i++) {
-        data.push({ email: newEmails[i] });
+        data.push({ email: newEmails[i], accessType });
       }
 
       Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
@@ -280,7 +281,7 @@ module.exports = function(Karta) {
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-    let query = { type: "public" }
+    let query = { "type": "public", "is_deleted": false }
 
     const SEARCH_MATCH = {
       $match: {
@@ -333,7 +334,6 @@ module.exports = function(Karta) {
                 console.log('> error while deleting phase', err);
                 return next(err);
               }
-              next(null, "Karta deleted successfully!");
             });
             
             Karta.getDataSource().connector.connect(function (err, db) {
@@ -355,24 +355,30 @@ module.exports = function(Karta) {
                     console.log('> error while finding karta details', err);
                     next(err);
                   }
-                  // Prepare notification collection data
-                  let notificationData = [];
-                  for(let i = 0; i < result.length; i++) {
-                    if(Karta.app.currentUser.id !== result[i].contributorId) {
-                      let notificationObj = {
-                        title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
-                        type: "karta_deleted",
-                        contentId: kartaId,
-                        userId: result[i].contributorId
-                      };
-                      notificationData.push(notificationObj);
-                    }
-                  };
-                  // Insert data in notification collection
-                  Karta.app.models.notification.create(notificationData, err => {
-                    if (err) console.log('> error while inserting data in notification collection', err);
-                  });
-                  next(null, "Karta deleted successfully..!!");
+
+                  if(result.length > 0) {
+                    // Prepare notification collection data
+                    let notificationData = [];
+                    for(let i = 0; i < result.length; i++) {
+                      if(Karta.app.currentUser.id.toString() !== result[i].contributorId.toString()) {
+                        let notificationObj = {
+                          title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
+                          type: "karta_deleted",
+                          contentId: kartaId,
+                          userId: result[i].contributorId
+                        };
+                        notificationData.push(notificationObj);
+                      }
+                    };
+                    // Insert data in notification collection
+                    Karta.app.models.notification.create(notificationData, err => {
+                      if (err) console.log('> error while inserting data in notification collection', err);
+                    });
+
+                    next(null, "Karta deleted successfully..!!");
+                  } else {
+                    next(null, "Karta deleted successfully..!!");
+                  }
                 });
               });
             });
@@ -394,35 +400,54 @@ module.exports = function(Karta) {
        }
        const newKarta = await Karta.create(newObj);
 
-       // Fetching version details of that karta
-       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id, id: kartaDetails.versionId }});
-       let lastHistoryOfKartaVersion = "";
-       let finalVersionId = "";
+       //Creating new Phases for new karta
+       let phaseMapping = {};
+       const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId }});
+       if (getPhases.length > 0) {
+        for ( let x = 0; x < getPhases.length; x++ ) {
+          let currentPhase = {
+            ...getPhases[x].__data,
+            kartaId: newKarta.id,
+          };
+          delete currentPhase.id;
+          currentPhase["parentId"] ? currentPhase["parentId"] = phaseMapping[currentPhase["parentId"]] : null;
+          const newPhase = await Karta.app.models.karta_phase.create(currentPhase);
+          phaseMapping[getPhases[x].id] = newPhase.id;
+        }
+       }
 
-       // Looping through each version of that karta till latest version 
-       for ( let i = 0; i < versionDetails.length; i++ ) {
-        const currentVersion = versionDetails[i];
-        const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
-        const oldVersionHistory = await Karta.app.models.karta_history.find({ where: { versionId: currentVersion.id, kartaId }});
+       // Creating a new Version for new Karta 
+       const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
+       await Karta.update({ "id": newKarta.id }, { versionId: newVersion.id });
 
-        // Creating Karta History for new Karta
-        await createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
-
-        // Creating Karta Nodes for new karta based on history
-        let data = await createCopyKartaNodes(newVersion, newKarta);
-        if ( data.length > 0 ) {
-          lastHistoryOfKartaVersion = data[0];
-          finalVersionId = data[1];
+       // Creating Copy of Karta Nodes
+       const kartaNodeMapping = {};
+       const kartaNodes = await Karta.app.models.karta_node.find({ where: { or: [{ "kartaId": kartaId }, { "kartaDetailId": kartaId } ], is_deleted: false } });
+       if ( kartaNodes.length > 0 ) {
+        for( let i = 0; i < kartaNodes.length; i++ ) {
+          let currentNode = kartaNodes[i].__data;
+          let newKartaNode = {
+            ...currentNode,
+            phaseId: phaseMapping[currentNode.phaseId],
+            versionId: newVersion.id,
+          };
+          delete newKartaNode.id;
+          delete newKartaNode.children;
+          delete newKartaNode.phase;
+          newKartaNode["kartaId"] ? newKartaNode["kartaId"] = newKarta.id : newKartaNode["kartaDetailId"] = newKarta.id;
+          const newNode = await Karta.app.models.karta_node.create(newKartaNode);
+          kartaNodeMapping[currentNode.id.toString()] = newNode.id.toString();
         }
 
-        await Karta.app.models.karta_history.remove({ kartaId: newKarta.id, versionId: newVersion.id })
-      }
-
-      if ( lastHistoryOfKartaVersion && finalVersionId ) {
-        await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
-        await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
-      }
-
+        for (let j = 0; j < kartaNodes.length; j++ ) {
+          let currentNode = kartaNodes[j].__data;
+          if(currentNode["parentId"]) {
+            await Karta.app.models.karta_node.update({"id": kartaNodeMapping[currentNode.id]}, {"parentId": kartaNodeMapping[currentNode.parentId]});
+          }
+        }
+       }
+      
+      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
       return "Karta copy created successfully..!!";
     }
     catch(err) {

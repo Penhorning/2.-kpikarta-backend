@@ -110,7 +110,7 @@ module.exports = function(Kartacatalog) {
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-    let query = { type: "public" }
+    let query = { "type": "public", "is_deleted": false }
 
     // Filter catalogs
     if (nodeTypes && nodeTypes.length > 0) {

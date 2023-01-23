@@ -21,6 +21,9 @@
       "type": "string",
       "required": true
     },
+    "companyId": {
+      "type": "string"
+    },
     "customerId": {
       "type": "string",
       "required": true
@@ -148,7 +151,7 @@
     "getCards": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string",
           "required": true
         }
@@ -192,7 +195,7 @@
     "getSubscribedUsers": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string",
           "required": true
         }
@@ -209,7 +212,7 @@
     "getInvoices": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string"
         }
       ],

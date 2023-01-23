@@ -36,7 +36,6 @@ module.exports = {
     "authPath": "/auth/linkedin",
     "callbackPath": "/auth/linkedin/callback",
     "successRedirect": "/auth/account",
-    "failureRedirect": process.env.FAILURE_REDIRECT,
     "scope": ["r_emailaddress", "r_liteprofile"]
   }
 }
