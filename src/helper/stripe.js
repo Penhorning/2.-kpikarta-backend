@@ -1,6 +1,5 @@
 'use strict';
-// const stripe = require("stripe")(process.env.STRIPE_API_KEY);
-const stripe = require("stripe")("sk_test_51LuW5cSGltNYnTVRwbilCUIn5u4puvslqLb92mluDWYyF4bsm3PY2eyMKdKXT59CEST68nS3o08oK1YYXNcKdCtA00ZgArs8ha");
+const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 const moment = require('moment');
 
 //---------------- PRICE APIS ----------------

@@ -434,6 +434,9 @@ module.exports = function(Karta) {
           delete newKartaNode.id;
           delete newKartaNode.children;
           delete newKartaNode.phase;
+          newKartaNode["contributorId"] ? delete newKartaNode["contributorId"] : null;
+          newKartaNode["notify_type"] ? delete newKartaNode["notify_type"] : null;
+          newKartaNode["notifyUserId"] ? delete newKartaNode["notifyUserId"] : null;
           newKartaNode["kartaId"] ? newKartaNode["kartaId"] = newKarta.id : newKartaNode["kartaDetailId"] = newKarta.id;
           const newNode = await Karta.app.models.karta_node.create(newKartaNode);
           kartaNodeMapping[currentNode.id.toString()] = newNode.id.toString();
