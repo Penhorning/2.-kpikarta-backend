@@ -1,7 +1,5 @@
 "use strict";
-// const stripe = require("stripe")(process.env.STRIPE_API_KEY);
-const stripe = require("stripe")("sk_test_51LuW5cSGltNYnTVRwbilCUIn5u4puvslqLb92mluDWYyF4bsm3PY2eyMKdKXT59CEST68nS3o08oK1YYXNcKdCtA00ZgArs8ha");
-const https = require('https');
+const stripe = require("stripe")(process.env.STRIPE_API_KEY);
 const { 
   create_customer, 
   update_customer_by_id, 
@@ -28,6 +26,27 @@ const {
 const moment = require('moment');
 
 module.exports = function (Subscription) {
+  // Find user who is not deleted
+  const FIND_ONLY_NOT_DELETED_USERS = {
+    $match: { $or: [ { "is_deleted" : { $exists: false } }, { "is_deleted" : false } ] }
+  }
+
+   // License lookup
+   const LICENSE_LOOKUP = {
+    $lookup: {
+      from: 'license',
+      localField: 'licenseId',
+      foreignField: '_id',
+      as: 'license'
+    },
+  }
+
+  const UNWIND_LICENSE = {
+    $unwind: {
+      path: "$license"
+    }
+  }
+
   Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     // PLAN - Monthly/Yearly
     try {
@@ -395,6 +414,63 @@ module.exports = function (Subscription) {
       console.log(err);
       throw Error(err);
     }
+  }
+
+  Subscription.getOfflineUsers = (userId, next) => {
+      Subscription.app.models.user.findById(userId, (err, user) => {
+        if (err) return next(err);
+        else {
+          userId = Subscription.getDataSource().ObjectID(userId);
+          let query = {};
+          user.departmentId ? query = { "companyId": user.companyId, "departmentId": user.departmentId } : query = { "companyId": user.companyId };
+
+          Subscription.getDataSource().connector.connect(function(err, db) {
+            const userCollection = db.collection('user');
+            userCollection.aggregate([
+              { 
+                $match: query
+              },
+              FIND_ONLY_NOT_DELETED_USERS,
+              LICENSE_LOOKUP,
+              UNWIND_LICENSE,
+            ]).toArray((err, result) => {
+
+              let userObj = {};
+              let tracker = {
+                Creator: {
+                  user: "Creator",
+                  quantity: 0,
+                  unit_amount: null,
+                  total_amount: null,
+                  currency: null
+                },
+                Champion: {
+                  user: "Champion",
+                  quantity: 0,
+                  unit_amount: null,
+                  total_amount: null,
+                  currency: null
+                },
+                Spectator: {
+                  user: "Spectator",
+                  quantity: 0,
+                  unit_amount: null,
+                  total_amount: null,
+                  currency: null
+                }
+              };
+
+              result.map( async x => {
+                tracker[x.license.name] = {...tracker[x.license.name], quantity: tracker[x.license.name].quantity + 1 };
+              })
+
+              let userDetails = Object.keys(tracker).map(x => tracker[x]);
+              userObj["userDetails"] = userDetails;
+              next(err, userObj);
+            });
+          });
+        }
+      });
   }
 
   Subscription.getInvoices = async (companyId) => {

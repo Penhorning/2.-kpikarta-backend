@@ -6,14 +6,21 @@ const { create_subscription, update_subscription } = require('../stripe');
 const { sendEmail } = require('../../helper/sendEmail');
 
 exports.createSubscriptionCron = (app) => {
-    // CronJob for everyday at midnight
+    
+    // CronJob for Starting Subscriptions after trial ends
     // cron.schedule('0 0 * * *', async () => {
     cron.schedule('*/2 * * * * *', async () => {
         try {
             // Start subscription for the users whose trial is over
             const currentDate = moment().unix();
-            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false }});
+            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: false }});
             if ( subscribedUsers.length > 0 ) {
+                let userIds = [];
+                for (let c = 0; c < subscribedUsers.length; c++ ) {
+                    userIds.push(subscribedUsers[c].userId);
+                };
+                await app.models.subscription.update({ "trialActive": true, "trialEnds": { lte: currentDate }, "status": false, "userId": { in: userIds} }, { "cronCheck": true });
+
                 for (let i = 0; i < subscribedUsers.length; i++ ) {
                     let finalItems = [];
                     let updatedItems = [];
@@ -40,7 +47,7 @@ exports.createSubscriptionCron = (app) => {
                     }
 
                     let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: finalItems });
-                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true });
+                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
 
                     for( let l = 0; l < subscription.items.data.length; l++ ) {
                         let currentPrice = subscription.items.data[l];
@@ -100,6 +107,7 @@ exports.createSubscriptionCron = (app) => {
         timezone: "Asia/Kolkata"
     });
 
+    // SEND WEB/EMAIL NOTIFICATION 3 DAYS BEFORE TRIAL ENDS
     // cron.schedule('*/5 * * * * *', async () => {
     cron.schedule('0 4 * * *', async () => {
         try {
