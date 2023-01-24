@@ -199,11 +199,15 @@ module.exports = function (Kartanode) {
       } else return;
     }
 
+    // Branch is dropping on existing karta, which have some nodes
     if (nodeType === "branch" && parent) await setCreateNodeParam(node, parent, parent.phaseId);
+    // Branch is dropping on blank karta, no nodes exits yet, so parent is null.
     else if (nodeType === "branch" && !parent) await setCreateNodeParam(node, null, phases[0].id);
     else {
       const phase = phases[findPhaseIndex(phases, parent.phaseId) + 1];
       await createNode(kartaId, node, parent, phase);
+      // Adjust weightage
+      await reAdjustWeightage(kartaId, parent.id, phase.id);
     }
   }
 

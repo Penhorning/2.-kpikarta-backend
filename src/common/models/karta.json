@@ -182,7 +182,7 @@
         }
       ],
       "returns": {
-        "arg": "catalogs",
+        "arg": "kartas",
         "type": "karta"
       },
       "http": {
