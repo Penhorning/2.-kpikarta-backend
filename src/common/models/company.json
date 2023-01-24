@@ -34,21 +34,15 @@
         "disableInclude": true
       }
     },
-    "departments": {
-      "type": "hasOne",
+    "department": {
+      "type": "belongsTo",
       "model": "department",
-      "foreignKey": "departmentId",
-      "options": {
-        "disableInclude": true
-      }
+      "foreignKey": "departmentId"
     },
-    "employeesRange": {
-      "type": "hasOne",
+    "employeeRange": {
+      "type": "belongsTo",
       "model": "employee_range",
-      "foreignKey": "employeeRangeId",
-      "options": {
-        "disableInclude": true
-      }
+      "foreignKey": "employeeRangeId"
     }
   },
   "acls": [
