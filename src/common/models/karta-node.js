@@ -621,12 +621,15 @@ module.exports = function (Kartanode) {
       }
       else if ( type == "month-over-month" || type == "year-over-year" ) { 
         // Month Over Month and Year Over Year Calculation
+        const currentMonthStartDate = moment().startOf('month');
+        const currentMonthEndDate = moment().endOf('month');
+        const previousMonthStartDate = moment().subtract(1, 'months').startOf('month');
+        const previousMonthEndDate = moment().subtract(1, 'months').endOf('month');
 
-        const currentYear = moment().year();
-        const currentMonth = moment().month() + 1;
-        const todayDate = moment().date();
-        const previousMonth = currentMonth == 1 ? currentMonth : currentMonth - 1;
-        const lastMonthLastDate = moment(`${currentYear-previousMonth}`, "YYYY-MM").daysInMonth();
+        const currentYearStartDate = moment().startOf('year');
+        const currentYearEndDate = moment().endOf('year');
+        const previousYearStartDate = moment().subtract(1, 'years').startOf('year');
+        const previousYearEndDate = moment().subtract(1, 'years').endOf('year');
         let currentMonthQuery;
         let previousMonthQuery;
 
@@ -635,8 +638,8 @@ module.exports = function (Kartanode) {
             event: "node_updated",
             kartaNodeId: nodeId,
             and: [
-              { "createdAt": { gte: new Date(new Date(`${currentYear}-${currentMonth}-01`).setUTCHours(0,0,0,0)) } },
-              { "createdAt": { lte: new Date(new Date(`${currentYear}-${currentMonth}-${todayDate}`).setUTCHours(23,59,59,999)) } }
+              { "createdAt": { gte: currentMonthStartDate } },
+              { "createdAt": { lte: currentMonthEndDate } }
             ]
           };
   
@@ -644,8 +647,8 @@ module.exports = function (Kartanode) {
             event: "node_updated",
             kartaNodeId: nodeId,
             and: [
-              { "createdAt": { gte: new Date(new Date(`${currentYear}-${previousMonth}-01`).setUTCHours(0,0,0,0)), } },
-              { "createdAt": { lte: new Date(new Date(`${currentYear}-${previousMonth}-${lastMonthLastDate}`).setUTCHours(23,59,59,999)) } }
+              { "createdAt": { gte: previousMonthStartDate } },
+              { "createdAt": { lte: previousMonthEndDate } }
             ]
           };
         } else if ( type == "year-over-year" ) {
@@ -653,8 +656,8 @@ module.exports = function (Kartanode) {
             event: "node_updated",
             kartaNodeId: nodeId,
             and: [
-              { "createdAt": { gte: new Date(new Date(`${currentYear-1}-01-01`).setUTCHours(0,0,0,0)) } },
-              { "createdAt": { lte: new Date(new Date(`${currentYear-1}-12-31`).setUTCHours(23,59,59,999)) } }
+              { "createdAt": { gte: currentYearStartDate } },
+              { "createdAt": { lte: currentYearEndDate } }
             ]
           };
   
@@ -662,8 +665,8 @@ module.exports = function (Kartanode) {
             event: "node_updated",
             kartaNodeId: nodeId,
             and: [
-              { "createdAt": { gte: new Date(new Date(`${currentYear}-01-01`).setUTCHours(0,0,0,0)), } },
-              { "createdAt": { lte: new Date(new Date(`${currentYear}-12-${todayDate}`).setUTCHours(23,59,59,999)) } }
+              { "createdAt": { gte: previousYearStartDate } },
+              { "createdAt": { lte: previousYearEndDate } }
             ]
           };
         }

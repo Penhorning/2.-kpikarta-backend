@@ -277,11 +277,11 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.updateSubscription = async (userId, licenseType, type) => {
+  Subscription.updateSubscription = async (companyId, licenseType, type) => {
     try {
       // LicenseType - Creator/Champion
       // Type - Add/Remove
-      const findUser = await Subscription.findOne({ where: { userId }});
+      const findUser = await Subscription.findOne({ where: { companyId }});
 
       if ( !findUser.trialActive && findUser.status ) {
         const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
