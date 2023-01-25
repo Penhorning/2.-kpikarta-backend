@@ -13,7 +13,7 @@ module.exports = function(Karta) {
   // User lookup with id or email
   const USER_LOOKUP = (findBy, type) => {
     let column = "_id";
-    if (type === "shared")  column = "email";
+    if (type === "shared") column = "email";
 
       return {
           $lookup: {
@@ -230,19 +230,11 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getAll = (findBy, searchQuery, type, page, limit, next) => {
+  Karta.getAll = (findBy, searchQuery, type, findType, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-
-    let query = {};
-    if (type === "shared") query = { "sharedTo.email": findBy, "is_deleted": false }
-    else {
-      findBy = Karta.getDataSource().ObjectID(findBy);
-      query = { "userId": findBy, "is_deleted": false }
-    }
-
     const SEARCH_MATCH = {
       $match: {
         $or: [
@@ -256,22 +248,57 @@ module.exports = function(Karta) {
       }
     }
 
-    Karta.getDataSource().connector.connect(function (err, db) {
-      const KartaCollection = db.collection('karta');
-      KartaCollection.aggregate([
-        {
-          $match: query
-        },
-        SEARCH_MATCH,
-        USER_LOOKUP(findBy, type),
-        UNWIND_USER,
-        SORT,
-        FACET(page, limit)
-      ]).toArray((err, result) => {
-        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
-        next(err, result);
+    // Find for champions only
+    if (findType === "contributor") {
+      Karta.app.models.karta_node.find({ where: { "contributorId": findBy, "is_deleted": false } }, (err, result) => {
+        if (err) next(err);
+        else {
+          let kartaIds = result.map(item => item.kartaDetailId);
+          Karta.getDataSource().connector.connect(function (err, db) {
+            const KartaCollection = db.collection('karta');
+            KartaCollection.aggregate([
+              {
+                $match: { "_id": { $in: kartaIds } }
+              },
+              SEARCH_MATCH,
+              ALL_USER_LOOKUP,
+              UNWIND_USER,
+              SORT,
+              FACET(page, limit)
+            ]).toArray((err, result) => {
+              if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+              next(err, result);
+            });
+          });
+        }
       });
-    });
+    }
+    // Find for Creators only
+    else {
+      let query = {};
+      if (type === "shared") query = { "sharedTo.email": findBy, "is_deleted": false }
+      else {
+        findBy = Karta.getDataSource().ObjectID(findBy);
+        query = { "userId": findBy, "is_deleted": false }
+      }
+  
+      Karta.getDataSource().connector.connect(function (err, db) {
+        const KartaCollection = db.collection('karta');
+        KartaCollection.aggregate([
+          {
+            $match: query
+          },
+          SEARCH_MATCH,
+          USER_LOOKUP(findBy, type),
+          UNWIND_USER,
+          SORT,
+          FACET(page, limit)
+        ]).toArray((err, result) => {
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          next(err, result);
+        });
+      });
+    }
   }
 
   // Get all public kartas
