@@ -172,7 +172,7 @@
     "updateSubscription": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string",
           "required": true
         },
