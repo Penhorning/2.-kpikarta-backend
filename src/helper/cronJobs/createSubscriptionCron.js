@@ -46,18 +46,16 @@ exports.createSubscriptionCron = (app) => {
                         finalItems.push({ price: priceData.priceId, quantity: 0 });
                     }
 
-                    let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: finalItems });
-                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
-
-                    for( let l = 0; l < subscription.items.data.length; l++ ) {
-                        let currentPrice = subscription.items.data[l];
+                    for( let x = 0; x < finalItems.length; x++ ) {
+                        let currentPrice = finalItems[x];
                         updatedItems.push({
-                            id: currentPrice.id,
-                            quantity: priceMapper[currentPrice.price.id]
-                        });
+                            price: currentPrice.price,
+                            quantity: priceMapper[currentPrice.price]
+                        })
                     }
-                    
-                    await update_subscription(subscription.id, { items: updatedItems, proration_behavior: 'none' });
+
+                    let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: updatedItems });
+                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
                 } 
                 console.log("Subscriptions started successfully..!!");
             }
