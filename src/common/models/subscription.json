@@ -59,6 +59,10 @@
     "cronCheck": {
       "type": "boolean",
       "default": false
+    },
+    "cardHolder": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],

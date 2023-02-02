@@ -1,5 +1,6 @@
 "use strict";
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+const { sendEmail } = require('../../helper/sendEmail');
 const { 
   create_customer, 
   update_customer_by_id, 
@@ -50,7 +51,7 @@ module.exports = function (Subscription) {
   Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     // PLAN - Monthly/Yearly
     try {
-      const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+      const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }, include: "company" });
       const findUser = await Subscription.findOne({where: { userId }});
       if(findUser) {
         // Create a token
@@ -159,7 +160,7 @@ module.exports = function (Subscription) {
             const trialData = await Subscription.app.models.trial_period.findOne({});
             const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId });
+            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId, cardHolder: true });
             await Subscription.create({ 
               userId, 
               customerId: customer.id, 
@@ -167,8 +168,20 @@ module.exports = function (Subscription) {
               tokenId: token.id, 
               trialEnds: moment().subtract(2, 'days').unix(), 
               trialActive: true,
-              companyId: userDetails.companyId
+              companyId: userDetails.companyId,
+              cardHolder: true
             });
+
+            const superAdmin = await Subscription.app.models.user.findOne({ where: { licenseId: { exists : false }, companyId: { exists : false } }});
+            const emailObj = {
+              subject: `A new user has signed up..!!`,
+              template: "admin-notify.ejs",
+              email: superAdmin.email,
+              user: userDetails,
+              admin: superAdmin,
+              company: userDetails.company().name
+            };
+            sendEmail(Subscription.app, emailObj, () => {});
   
             // Successful Return
             return {message: "Card saved successfully", data: null};

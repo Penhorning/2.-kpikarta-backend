@@ -16,8 +16,11 @@ module.exports = function(Kartahistory) {
     Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, next) => {
         const event_object = {
             "node_created": "created",
+            "phase_created": "created",
             "node_updated": "updated",
+            "phase_updated": "updated",
             "node_removed": "removed",
+            "phase_removed": "removed",
             "node_update_key_remove": "updated",
         }
 

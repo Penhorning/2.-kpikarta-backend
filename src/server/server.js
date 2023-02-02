@@ -185,3 +185,4 @@ const { profileStatusCron } = require('../helper/cronJobs/profileStatusCron.js')
 sendTargetAlertsCron(app);
 profileStatusCron(app);
 createSubscriptionCron(app);
+profileStatusCron(app);
