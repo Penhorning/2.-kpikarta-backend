@@ -347,7 +347,7 @@ module.exports = function (Kartanode) {
 
     // Fetch all kpis of creator
     let all_kpi_query = {};
-    if (kpiType === "all") {
+    if (kpiType === "created") {
       query = {};
       all_kpi_query = { "karta.userId": convertIdToBSON(userId), "node_type": { $exists: true }  };
     }
@@ -458,6 +458,31 @@ module.exports = function (Kartanode) {
         },
         {
           $unwind: "$karta.user"
+        },
+        {
+          $lookup: {
+            from: "user",
+            let: {
+                user_id: "$contributorId"
+            },
+            pipeline: [
+              { 
+                $match: { 
+                  $expr: { $eq: ["$_id", "$$user_id"] }
+                } 
+              },
+              {
+                $project: { "fullName": 1, "email": 1 }
+              }
+            ],
+            as: "contributor"
+          }
+        },
+        {
+          $unwind: {
+            path: "$contributor",
+            preserveNullAndEmptyArrays: true
+          }
         },
         {
           $match: creator_query
