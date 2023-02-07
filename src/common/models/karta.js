@@ -9,7 +9,7 @@ module.exports = function(Karta) {
     // Sort
     const SORT = {
       $sort: { createdAt: -1 }
-  }
+    }
   // User lookup with id or email
   const USER_LOOKUP = (findBy, type) => {
     let column = "_id";
