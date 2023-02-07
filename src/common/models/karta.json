@@ -53,6 +53,9 @@
     },
     "historyId": {
       "type": "string"
+    },
+    "sample": {
+      "type": "boolean"
     }
   },
   "validations": [],

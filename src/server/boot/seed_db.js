@@ -47,4 +47,59 @@ module.exports = function(app) {
       });
     });
   });
+
+  async function createDummyKarta() {
+    try {
+      const kartaDetails = await app.models.karta.findOne({ where: { or: [ { sample: true, name: "SAMPLE_KARTA" }, { sample: { exists: true }} ]}});
+      if(!kartaDetails) {
+        // Creating Karta
+        const sampleKarta = await app.models.karta.create({ name: "SAMPLE_KARTA", sample: true });
+        const sampleVersion = await app.models.karta_version.create({ "name" : "1", "kartaId": sampleKarta.id });
+        await app.models.karta.update({ "id" : sampleKarta.id }, { "versionId" : sampleVersion.id });
+
+        // Creating Karta Nodes
+        const globalPhases = await app.models.karta_phase.find({ where: { kartaId: { exists: false }}});
+        let parentId = "";
+        if(globalPhases.length > 0) {
+          for(let i = 0; i < globalPhases.length; i++) {
+            let currentPhase = globalPhases[i];
+            let data = {};
+            if(currentPhase.name == "Goal") {
+              data = {
+                name: "SAMPLE_GOAL",
+                phaseId: currentPhase.id,
+                kartaId: sampleKarta.id
+              };
+            } else {
+              data = {
+                name: "SAMPLE",
+                kartaDetailId: sampleKarta.id,
+                phaseId: currentPhase.id,
+                parentId: parentId,
+                weightage: 100
+              }
+              if(currentPhase.name == "KPI") {
+                data.node_type = "measure";
+                data.target = [{ frequency: 'monthly', value: 0, percentage: 0 }];
+                data.achieved_value = 0;
+                data.is_achieved_modified = false;
+                data.days_to_calculate = "all";
+                data.alert_type = "";
+                data.alert_frequency = "";
+                data.kpi_calc_period = 'monthly';
+              }
+            }
+
+            const createSampleNode = await app.models.karta_node.create(data);
+            parentId = createSampleNode.id;
+          }
+        }
+      }
+    } catch(err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  createDummyKarta();
 };

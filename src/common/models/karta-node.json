@@ -113,6 +113,9 @@
           "userId": "string"
         }
       ]
+    },
+    "sample": {
+      "type": "boolean"
     }
   },
   "validations": [],
