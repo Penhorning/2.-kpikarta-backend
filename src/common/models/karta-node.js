@@ -170,7 +170,8 @@ module.exports = function (Kartanode) {
       data.kpi_calc_period = node.kpi_calc_period;
       data.notifyUserId = node.notifyUserId || "";
     }
-    return await Kartanode.create(data);
+    let nodeData = await Kartanode.create(data);
+    return nodeData;
   }
 
 
@@ -182,28 +183,51 @@ module.exports = function (Kartanode) {
 
     // Get all phases
     const phases = await getAllPhases(kartaId);
+    const kartaDetails = await Kartanode.app.models.karta.findOne({where: {id: kartaId}});
     
-    const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
+    const setCreateNodeParam = async (nodeData, parentData, phaseId, check) => {
       let index = 0;
       if (parentData) index = 1;
       const phase = phases[findPhaseIndex(phases, phaseId) + index];
       // Create node
       const result = await createNode(kartaId, nodeData, parentData, phase);
+      if(check) {
+        // Create history of current node
+        let newData = {...result};
+        delete newData.id;
+        let history_data = {
+          event: "node_created",
+          kartaNodeId: result.id,
+          userId: Kartanode.app.currentUser.id,
+          versionId: kartaDetails.versionId,
+          kartaId: kartaId,
+          parentNodeId: result.parentId ? result.parentId : null,
+          historyType: 'main',
+          event_options: {
+            created: newData,
+            updated: null,
+            removed: null,
+          }
+        }
+        let response = await Kartanode.app.models.karta_history.create(history_data);
+        await Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": response.id });
+      }
       // Adjust weightage
       if (parentData) await reAdjustWeightage(kartaId, parentData.id, phase.id);
       // Create further children nodes
       if (nodeData.children && nodeData.children.length > 0) {
         for (let i = 0; i < nodeData.children.length; i++) {
-          await setCreateNodeParam(nodeData.children[i], result, phase.id);
+          await setCreateNodeParam(nodeData.children[i], result, phase.id, false);
         }
       } else return;
     }
 
     // Branch is dropping on existing karta, which have some nodes
-    if (nodeType === "branch" && parent) await setCreateNodeParam(node, parent, parent.phaseId);
+    if (nodeType === "branch" && parent) await setCreateNodeParam(node, parent, parent.phaseId, true);
     // Branch is dropping on blank karta, no nodes exits yet, so parent is null.
-    else if (nodeType === "branch" && !parent) await setCreateNodeParam(node, null, phases[0].id);
+    else if (nodeType === "branch" && !parent) await setCreateNodeParam(node, null, phases[0].id, true);
     else {
+      // Measue or metrix node is dropping on existing karta on the last action phase
       const phase = phases[findPhaseIndex(phases, parent.phaseId) + 1];
       await createNode(kartaId, node, parent, phase);
       // Adjust weightage
@@ -642,6 +666,7 @@ module.exports = function (Kartanode) {
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     try {
       await updateNodeAndAssignWeightage(kartaId, draggingNode);
+      // Readjust the weightage of previous parent's children
       await reAdjustWeightage(kartaId, previousDraggedParentId, previousDraggedPhaseId);
       return "Node updated successfully!";
     } catch (err) {
