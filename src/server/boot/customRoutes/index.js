@@ -52,7 +52,7 @@ module.exports = function (app) {
             } else {
                 req.user.updateAttributes({emailVerified: true}, (err) => {
                 res.redirect(`${process.env.WEB_URL}/sign-up?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}`);
-            });
+                });
             }
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });

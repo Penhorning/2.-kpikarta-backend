@@ -346,33 +346,6 @@
         "verb": "post"
       }
     },
-    "getRecentKPIs": {
-      "accepts": [
-        {
-          "arg": "page",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "limit",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "kpis",
-        "type": "karta_node"
-      },
-      "http": {
-        "path": "/recent-kpis",
-        "verb": "post"
-      }
-    },
     "updateKpiNodes": {
       "accepts": [
         {
