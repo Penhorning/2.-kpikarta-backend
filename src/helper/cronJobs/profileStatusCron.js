@@ -27,16 +27,18 @@ exports.profileStatusCron = (app) => {
                 ]).toArray((err, result) => {
                   if (err) throw err;
                   else {
-                    // for(let i = 0; i < result.length; i++) {
-                    //   const emailObj = {
-                    //     subject: `Profile Status`,
-                    //     template: "profile-reminder.ejs",
-                    //     email: result[i].email,
-                    //     user: result[i],
-                    //   };
-                    //   sendEmail(app, emailObj, () => {});
-                    // }
-                    console.log("contributorId", result);
+                    if(result.length > 0) {
+                      for(let i = 0; i < result.length; i++) {
+                        const emailObj = {
+                          subject: `Profile Status`,
+                          template: "profile-reminder.ejs",
+                          email: result[i].email,
+                          user: result[i],
+                        };
+                        sendEmail(app, emailObj, () => {});
+                      }
+                    }
+                    // console.log("contributorId", result);
                   }
                 });
               });

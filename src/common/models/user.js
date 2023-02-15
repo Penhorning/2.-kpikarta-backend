@@ -252,7 +252,7 @@ module.exports = function(User) {
           }
           resolve("success");
         })
-      })
+      });
     } catch (error) {
       console.error("> error in SMS function", error);
       return { success: true, msg: error };
@@ -1039,7 +1039,7 @@ module.exports = function(User) {
                 return next(err);
               }
               // Assign roleId, licenseId and companyId
-              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true }, err => {
                 if (err) {
                   console.log('> error while updating social user', err);
                   return next(err);
