@@ -63,6 +63,12 @@
     "cardHolder": {
       "type": "boolean",
       "default": false
+    },
+    "currentPlan": {
+      "type": "string"
+    },
+    "licenseId": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -176,7 +182,7 @@
     "updateSubscription": {
       "accepts": [
         {
-          "arg": "companyId",
+          "arg": "userId",
           "type": "string",
           "required": true
         },
@@ -313,10 +319,6 @@
       "accepts": [
         {
           "arg": "userId",
-          "type": "string"
-        },
-        {
-          "arg": "plan",
           "type": "string"
         }
       ],

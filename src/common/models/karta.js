@@ -501,6 +501,8 @@ module.exports = function(Karta) {
       // Find the latest Karta version history ----
       let GetKartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
       let kartaData = JSON.parse(JSON.stringify(GetKartaInfo[0]));
+
+      // Have to find history based on type and number
       const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaData.versionId } });
 
       // Find the requested Karta version history ----

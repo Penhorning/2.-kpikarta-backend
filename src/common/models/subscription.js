@@ -160,7 +160,7 @@ module.exports = function (Subscription) {
             const trialData = await Subscription.app.models.trial_period.findOne({});
             const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId, cardHolder: true });
+            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId, cardHolder: true, plan, licenseId: userDetails.licenseId });
             await Subscription.create({ 
               userId, 
               customerId: customer.id, 
@@ -169,7 +169,9 @@ module.exports = function (Subscription) {
               trialEnds: moment().subtract(2, 'days').unix(), 
               trialActive: true,
               companyId: userDetails.companyId,
-              cardHolder: true
+              cardHolder: true,
+              currentPlan: plan,
+              licenseId: userDetails.licenseId
             });
 
             const superAdmin = await Subscription.app.models.user.findOne({ where: { licenseId: { exists : false }, companyId: { exists : false } }});
@@ -239,48 +241,89 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.createSubscription = async (userId, plan) => {
+  Subscription.createSubscription = async (userId) => {
     try {
+      // 1. Get User Details and get Company Id
+      const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      // 2. Get Card Holder details from Subscription of that companyId
+      const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
+      // 3. Check if the company admin is on trial
+      if ( !cardHolder.trialActive && cardHolder.status ) {
+        // - else create user's subscription
+        let customer = await create_customer({ name: findUser.fullName, description: `Welcome to stripe, ${findUser.fullName}`, address: {} });
+        await update_customer_by_id({ customerId: customer.id, data: { default_source: cardHolder.cardId } });
+
+        await Subscription.create({ 
+          userId, 
+          customerId: customer.id, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
+        });
+      } else {
+        // - If on trial then create user subscription on trial basis
+        let customer = await create_customer({ name: findUser.fullName, description: `Welcome to stripe, ${findUser.fullName}`, address: {} });
+        await update_customer_by_id({ customerId: customer.id, data: { default_source: cardHolder.cardId } });
+
+        await Subscription.create({ 
+          userId, 
+          customerId: customer.id, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
+        });
+        return { message: "User is on trial period..!!", data: null };
+      }
       // PLAN - Monthly/Yearly
 
-      const subscriptionData = await Subscription.findOne({ where: { userId }}); // Fetching card details
-      const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }}); // Fetching user details for companyId
-      const allUsersOfCompany = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }}); // All users of same company
+      // const subscriptionData = await Subscription.findOne({ where: { userId }}); // Fetching card details
+      // const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }}); // Fetching user details for companyId
+      // const allUsersOfCompany = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }}); // All users of same company
 
-      let userRoleMapping = {
-        Creator: 0,
-        Champion: 0,
-      };
+      // let userRoleMapping = {
+      //   Creator: 0,
+      //   Champion: 0,
+      // };
 
-      for( let i = 0; i < allUsersOfCompany.length; i++ ) {
-        let currentUser = allUsersOfCompany[i];
-        let currentLicense = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId } });
-        if (userRoleMapping.hasOwnProperty(currentLicense.name)) {
-          userRoleMapping[currentLicense.name] = userRoleMapping[currentLicense.name] + 1;
-        }
-      }
+      // for( let i = 0; i < allUsersOfCompany.length; i++ ) {
+      //   let currentUser = allUsersOfCompany[i];
+      //   let currentLicense = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId } });
+      //   if (userRoleMapping.hasOwnProperty(currentLicense.name)) {
+      //     userRoleMapping[currentLicense.name] = userRoleMapping[currentLicense.name] + 1;
+      //   }
+      // }
 
-      // Create Payment methods
-      const paymentMethods = await stripe.customers.listPaymentMethods(
-        subscriptionData.customerId,
-        { type: 'card' }
-      );
+      // // Create Payment methods
+      // const paymentMethods = await stripe.customers.listPaymentMethods(
+      //   subscriptionData.customerId,
+      //   { type: 'card' }
+      // );
 
-      // SetupIntent
-      const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
-      await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
+      // // SetupIntent
+      // const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
+      // await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
 
-      // Create Subscription
-      const intervalValue = plan == "monthly" ? "month" : "year";
-      const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
-      const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
-      const priceArray = [
-        // { price: getCreatorTrialPriceId.priceId, quantity: 1 },
-        { price: getCreatorPriceId.priceId, quantity: userRoleMapping.Creator },
-        { price: getChampionPriceId.priceId, quantity: userRoleMapping.Champion },
-      ];
-      const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
-      await Subscription.update({ id: subscriptionData.id } , { subscriptionId: subscription.id });
+      // // Create Subscription
+      // const intervalValue = plan == "monthly" ? "month" : "year";
+      // const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
+      // const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
+      // const priceArray = [
+      //   // { price: getCreatorTrialPriceId.priceId, quantity: 1 },
+      //   { price: getCreatorPriceId.priceId, quantity: userRoleMapping.Creator },
+      //   { price: getChampionPriceId.priceId, quantity: userRoleMapping.Champion },
+      // ];
+      // const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
+      // await Subscription.update({ id: subscriptionData.id } , { subscriptionId: subscription.id });
 
       return "Subscription created successfully..!!";
 
@@ -290,41 +333,83 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.updateSubscription = async (companyId, licenseType, type) => {
+  Subscription.updateSubscription = async (userId, licenseType, type) => {
     try {
-      // LicenseType - Creator/Champion
-      // Type - Add/Remove
-      const findUser = await Subscription.findOne({ where: { companyId }});
+      // 1. Get User Details and get Company Id
+      const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      // 2. Get Card Holder details from Subscription of that companyId
+      const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
+      // 3. Check if the company admin is on trial
+      if ( !cardHolder.trialActive && cardHolder.status ) {
+        // - else create user's subscription
+        let customer = await create_customer({ name: findUser.fullName, description: `Welcome to stripe, ${findUser.fullName}`, address: {} });
+        await update_customer_by_id({ customerId: customer.id, data: { default_source: cardHolder.cardId } });
 
-      if ( !findUser.trialActive && findUser.status ) {
-        const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
-        const itemsData = subscriptionDetails.items.data;
-  
-        let pricingArr = [];
-        for( let i = 0; i < itemsData.length; i++ ) {
-          let currentItem = itemsData[i];
-          const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-  
-          if ( findPricing.licenseType == licenseType ) {
-            pricingArr.push({
-              id: currentItem.id,
-              price: currentItem.price.id, 
-              quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
-            });
-          } else {
-            pricingArr.push({
-              id: currentItem.id,
-              price: currentItem.price.id, 
-              quantity: currentItem.quantity
-            });
-          }
-        };
-  
-        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, proration_behavior: 'none' });
-        return response;
+        await Subscription.create({ 
+          userId, 
+          customerId: customer.id, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
+        });
       } else {
+        // - If on trial then create user subscription on trial basis
+        let customer = await create_customer({ name: findUser.fullName, description: `Welcome to stripe, ${findUser.fullName}`, address: {} });
+        await update_customer_by_id({ customerId: customer.id, data: { default_source: cardHolder.cardId } });
+
+        await Subscription.create({ 
+          userId, 
+          customerId: customer.id, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
+        });
         return { message: "User is on trial period..!!", data: null };
       }
+
+      // LicenseType - Creator/Champion
+      // Type - Add/Remove
+      // const findUser = await Subscription.findOne({ where: { companyId }});
+
+      // if ( !findUser.trialActive && findUser.status ) {
+      //   const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
+      //   const itemsData = subscriptionDetails.items.data;
+  
+      //   let pricingArr = [];
+      //   for( let i = 0; i < itemsData.length; i++ ) {
+      //     let currentItem = itemsData[i];
+      //     const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
+  
+      //     if ( findPricing.licenseType == licenseType ) {
+      //       pricingArr.push({
+      //         id: currentItem.id,
+      //         price: currentItem.price.id, 
+      //         quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
+      //       });
+      //     } else {
+      //       pricingArr.push({
+      //         id: currentItem.id,
+      //         price: currentItem.price.id, 
+      //         quantity: currentItem.quantity
+      //       });
+      //     }
+      //   };
+  
+      //   let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, proration_behavior: 'none' });
+      //   return response;
+      // } else {
+      //   return { message: "User is on trial period..!!", data: null };
+      // }
 
     } catch (err) {
       console.log(err);

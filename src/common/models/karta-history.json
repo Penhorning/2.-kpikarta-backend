@@ -53,6 +53,9 @@
     "undoCheck": {
       "type": "boolean",
       "default": false
+    },
+    "randomKey": {
+      "type": "string"
     }
   },
   "validations": [],
