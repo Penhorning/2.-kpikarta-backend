@@ -81,14 +81,20 @@ module.exports = function(Kartahistory) {
                 if(finalHistoryData[j].event == "node_created") {
                     nodeIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
                 } else if (finalHistoryData[j].event == "node_updated") {
-                    updatedNodeIds[j] = {key: finalHistoryData[j].kartaNodeId, value: finalHistoryData[j].event_options.updated};
+                    updatedNodeIds[j] = {
+                        key: finalHistoryData[j].kartaNodeId,
+                        value: finalHistoryData[j].event_options.updated
+                    };
                     nodeIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
                 } else if (finalHistoryData[j].event == "node_removed") {
                     delete nodeIds[finalHistoryData[j].kartaNodeId];
                 } else if (finalHistoryData[j].event == "phase_created") {
                     phaseIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
                 } else if (finalHistoryData[j].event == "phase_updated") {
-                    updatedPhaseIds[j] = {key: finalHistoryData[j].kartaNodeId, value: finalHistoryData[j].event_options.updated};
+                    updatedPhaseIds[j] = {
+                        key: finalHistoryData[j].kartaNodeId,
+                        value: finalHistoryData[j].event_options.updated
+                    };
                     phaseIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
                 } else if (finalHistoryData[j].event == "phase_removed") {
                     delete phaseIds[finalHistoryData[j].kartaNodeId];
@@ -105,7 +111,7 @@ module.exports = function(Kartahistory) {
             }
             await Kartahistory.app.models.karta_phase.update( { "id": {in: Object.keys(phaseIds)}, "is_deleted": true }, { "is_deleted": false } );
             for(let l in updatedPhaseIds) {
-                await Kartahistory.app.models.karta_phase.update( { "id": updatedPhaseIds[k].key.toString() }, updatedPhaseIds[k].value );
+                await Kartahistory.app.models.karta_phase.update( { "id": updatedPhaseIds[l].key.toString() }, updatedPhaseIds[l].value );
             }
 
             await Kartahistory.app.models.karta.update( { "id": kartaId }, { versionId, historyId: lastHistoryOfKartaVersion } );

@@ -2,7 +2,7 @@
 'use strict';
 var async = require('async');
 
-module.exports = function(app) {
+module.exports = async function(app) {
   function setupRole(role, users, done) {
     async.series([function(callback) {
       app.models.Role.create(role, function(err, created) {
@@ -51,7 +51,7 @@ module.exports = function(app) {
   async function createDummyKarta() {
     try {
       const kartaDetails = await app.models.karta.findOne({ where: { or: [ { sample: true, name: "SAMPLE_KARTA" }, { sample: { exists: true }} ]}});
-      if(!kartaDetails) {
+      if (!kartaDetails) {
         // Creating Karta
         const sampleKarta = await app.models.karta.create({ name: "SAMPLE_KARTA", sample: true });
         const sampleVersion = await app.models.karta_version.create({ "name" : "1", "kartaId": sampleKarta.id });
@@ -94,12 +94,50 @@ module.exports = function(app) {
             parentId = createSampleNode.id;
           }
         }
-      }
+      } else console.log('[DB] ADD KARTA: SAMPLE -> FAILED already exists');
     } catch(err) {
       console.log(err);
       throw err;
     }
   }
 
+  // Create global phase
+  async function createGlobalPhase(name) {
+    try {
+      let filter = { where: { name, "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } };
+      // Check if already global phase exists
+      const phase = await app.models.karta_phase.findOne(filter);
+      if (phase) console.log('[DB] ADD PHASE: ' + name + ' -> FAILED already exists');
+      else {
+        // If not exists, then create
+        const createdPhase = await app.models.karta_phase.create({ name });
+        console.log('[DB] ADD PHASE: ' + name + ' -> DONE');
+        // If phase created, then update old ids
+        const oldPhase = await app.models.karta_phase.findOne({ where: { "global_name": name, "is_global": true } });
+        if (oldPhase) {
+          // Updating suggestions phaseId
+          await app.models.suggestion.updateAll({ "phaseId": oldPhase.phaseId }, { "phaseId": createdPhase.id });
+          // Updating phases phaseId
+          const oldPhases = await app.models.karta_phase.find({ where: { "global_name": name, "is_global": true } });
+          if (oldPhases && oldPhases.length > 0) {
+            for (let phase of oldPhases) {
+              await app.models.karta_phase.update({ "_id": phase.id }, { "phaseId": createdPhase.id });
+              // Updating children's phase phaseId
+              await app.models.karta_phase.update({ "parentId": phase.id, "is_child": true }, { "phaseId": createdPhase.id });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
   createDummyKarta();
+  // Creating 7 global phases
+  const phases= ['Goal', 'Critical Success Factor', 'Phase', 'Segment', 'Approach', 'Action', 'KPI']
+  for (let phase of phases) {
+    await createGlobalPhase(phase);
+  }
 };

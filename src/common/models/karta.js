@@ -498,145 +498,170 @@ module.exports = function(Karta) {
   // View Previous month karta
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
-      // Find the latest Karta version history ----
-      let GetKartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
-      let kartaData = JSON.parse(JSON.stringify(GetKartaInfo[0]));
+      // Find the whole karta information including all nodes
+      const kartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
+      // Formatting data
+      let kartaData = JSON.parse(JSON.stringify(kartaInfo[0]));
+      // Find all the history of the current karta with current version id
+      const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId } });
 
-      // Have to find history based on type and number
-      const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaData.versionId } });
-
-      // Find the requested Karta version history ----
-      // Search Query
-      const searchQuery = { kartaId };
-      if ( type == "quarter" ) {
-        searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
-      } else if ( type == "month" ) {
-        searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
-      } else if ( type == "week" ) {
-        let cur_week_num = moment().isoWeek() - moment().subtract('days', moment().date() - 1).isoWeek() + 1;
-        let total_weeks = ( moment().week() - ( moment().month() * 4 ));
-        let week = cur_week_num - number;
-        week = week < 0 ? -week : week;
-        var queryDate = moment().add(week, 'weeks').endOf('week')
-        searchQuery["createdAt"] = { lte: queryDate }
+      // Prepare query according to requested parameters
+      const query = { kartaId };
+      if (type == "quarter" ) {
+        query["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
+      } else if (type == "month" ) {
+        query["createdAt"] = { lte: moment().month(number).endOf('month') }
+      } else if (type == "week" ) {
+        // let cur_week_num = moment().isoWeek() - moment().subtract(moment().date() - 1, 'days').isoWeek() + 1;
+        // let total_weeks = ( moment().week() - ( moment().month() * 4 ));
+        // let week = cur_week_num - number;
+        // week = week < 0 ? -week : week;
+        // var queryDate = moment().add(week, 'weeks').endOf('week')
+        console.log(moment().startOf('month'))
+        var queryDate = moment().startOf('month').add(number, 'weeks').endOf('week')
+        query["createdAt"] = { lte: queryDate }
       }
 
-      // Finding version which was created before the requested time
-      const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery });
-      if ( versionDetails.length > 0 ) {
+      // Find all versions which was created before the requested time
+      const versionDetails = await Karta.app.models.karta_version.find({ where: query });
+      if (versionDetails.length > 0) {
+        // Getting last version from that
         const requestedVersion = versionDetails[versionDetails.length - 1];
+        // Setting deleted flag for all child phases of current karta
+        // await Karta.app.models.karta_phase.updateAll( { kartaId, "is_child": true }, { "is_deleted": true } );
 
-        // Finding requested karta history before the requested time 
-        const requestedVersionHistory = await Karta.app.models.karta_history.find({ where: { ...searchQuery, versionId: requestedVersion.id } });
-        const lastHistoryObject = requestedVersionHistory[requestedVersionHistory.length - 1];
+        // Finding requested karta history before the requested time
+        const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": requestedVersion.id } });
+        // Getting last history event object from that
+        const lastHistoryObject = JSON.parse(JSON.stringify(requestedKartaHistory[requestedKartaHistory.length - 1]));
 
         // Comparing Latest Karta History with Requested Karta History
-        const historyIndex = latestVersionHistory.findIndex(x => {
-          if ( x.event == lastHistoryObject.event && JSON.stringify(x.kartaNodeId) == JSON.stringify(lastHistoryObject.kartaNodeId) ) {
-            if ( x.event == "node_created" || x.event == "node_removed" ) {
+        const historyIndex = latestKartaHistory.findIndex(x => {
+          // Find index of the last history object from the latest karta history
+          if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
+            // Return index of that directly, if node is created or removed
+            if (x.event == "node_created" || x.event == "node_removed" || x.event == "phase_created" || x.event == "phase_removed") {
               return x;
-            } else {
-              let newObj = {};
+            }
+            // If node is updated, then return the last updated history index
+            else if (x.event === "node_updated") {
+              const newObj = JSON.parse(JSON.stringify(x.old_options));
               let flagCheck = false;
-              Object.keys(x.old_options).forEach(key => {
-                newObj[key] = x.old_options[key];
-              });
 
-              if (Object.keys(lastHistoryObject.old_options).length == Object.keys(x.old_options).length) {
+              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
                 Object.keys(lastHistoryObject.old_options).forEach(key => {
-                  if ( newObj.hasOwnProperty(key) ) {
-                    if( typeof lastHistoryObject.old_options[key] == 'string' || typeof lastHistoryObject.old_options[key] == 'number' || typeof lastHistoryObject.old_options[key] == 'boolean'){
-                      newObj[key] == lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
-                    } else if ( typeof lastHistoryObject.old_options[key] == 'object' ) {
-                      Object.keys(newObj[key]).length == Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
+                  if (newObj.hasOwnProperty(key)) {
+                    if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
+                      newObj[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
+                    } else if (typeof lastHistoryObject.old_options[key] === 'object') {
+                      Object.keys(newObj[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
                     } else {
                       newObj[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
                     }
-                  } else {
-                    flagCheck = false;
-                  }
+                  } else flagCheck = false;
                 });
-              } else {
-                flagCheck = false;
-              }
-
-              if( flagCheck ){
-                return x;
-              }
+              } else flagCheck = false;
+              if (flagCheck) return x;
+            }
+            // If phase is updated, then return the last updated history index
+            else if (x.event === "phase_updated") {
+              let flagCheck = false;
+              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
+                if (lastHistoryObject.old_options.name === x.old_options.name) flagCheck = true;
+                else flagCheck = false;
+              } else flagCheck = false;
+              if (flagCheck) return x;
             }
           }
         });
 
         // Latest Karta History - Requested Karta History = History to Undo from main karta data 
-        const filteredHistory = latestVersionHistory.slice(historyIndex+1, latestVersionHistory.length);
+        const filteredHistory = latestKartaHistory.slice(historyIndex + 1, latestKartaHistory.length);
         
         // Performing Undo functionality on main kartaData
         let kartaNode = kartaData.node;
-        for ( let i = filteredHistory.length - 1; i >= 0; i-- ) {
+        let phaseIds = [];
+        let updatedPhaseIds = {};
+        for (let i = filteredHistory.length - 1; i >= 0; i--) {
           let currentHistoryObj = filteredHistory[i];
-          if ( currentHistoryObj.event == "node_created" ) {
+          // CHECKING FOR NODES
+          if (currentHistoryObj.event == "node_created") {
             function updateData(data) {
-              if ( data && JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
+              if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 return true;
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for(let j = 0; j < data.children.length; j++) {
-                      let value = updateData(data.children[j]);
-                      if (value) {
-                          delete data.children[j];
-                          break;
-                      }
-                    }
+              } else if (data && data.children && data.children.length > 0) {
+                for (let j = 0; j < data.children.length; j++) {
+                  let value = updateData(data.children[j]);
+                  if (value) {
+                    let tempChildren = data.children[j].children;
+                    delete data.children[j];
+                    data.children = [...tempChildren, data.children[j]];
+                    break;
                   }
+                }
               }
             }
             updateData(kartaNode);
-          } else if ( currentHistoryObj.event == "node_updated" ) {
+          } else if (currentHistoryObj.event == "node_updated") {
             function updateData(data) {
-              if ( data && JSON.stringify( data.id ) == JSON.stringify( currentHistoryObj.kartaNodeId ) ) {
+              if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 Object.keys(currentHistoryObj.old_options).map(x => {
-                  data[x] = currentHistoryObj.old_options[x];
+                  data[x] = JSON.parse(JSON.stringify(currentHistoryObj.old_options[x]));
                 });
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for( let j = 0; j < data.children.length; j++ ) {
-                      updateData(data.children[j]);
-                      break;
-                    }
-                  }
+              } else if (data && data.children && data.children.length > 0) {
+                for (let j = 0; j < data.children.length; j++) {
+                  updateData(data.children[j]);
+                }
               }
             }
             updateData(kartaNode);
-          } else if ( currentHistoryObj.event == "node_removed" ) {
+          } else if (currentHistoryObj.event == "node_removed") {
             function updateData(data) {
-              if (JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.parentNodeId) ) {
+              if (data && data.id.toString() === currentHistoryObj.parentNodeId.toString()) {
                 let tempNode = {
                   ...currentHistoryObj.event_options.removed,
                   id: currentHistoryObj.kartaNodeId
-                };
+                }
                 return data.children && data.children.length > 0 ? data.children.push(tempNode) : data['children'] = [tempNode];
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for(let j = 0; j < data.children.length; j++) {
-                      updateData(data.children[j]);
-                      break;
-                    }
-                  }
+              } else if (data && data.children && data.children.length > 0) {
+                for(let j = 0; j < data.children.length; j++) {
+                  updateData(data.children[j]);
+                  break;
+                }
               }
             }
             updateData(kartaNode);
           }
+          // CHECKING FOR PHASES
+          if (currentHistoryObj.event === "phase_created") {
+            phaseIds.push(currentHistoryObj.kartaNodeId.toString());
+          } else if (currentHistoryObj.event == "phase_updated") {
+            updatedPhaseIds[i] = {
+              key: filteredHistory[i].kartaNodeId,
+              value: filteredHistory[i].old_options
+            }
+            // phaseIds.push(currentHistoryObj.kartaNodeId.toString());
+          } else if (currentHistoryObj.event == "phase_removed") {
+            phaseIds = phaseIds.filter(item => item !== filteredHistory[i].kartaNodeId);
+          }
         }
 
+        // Getting phases
+        let phases = await Karta.app.models.karta_phase.find({ where: { kartaId, or: [ { "id": { nin: phaseIds } }, { "is_child": false } ] } });
+        // Updating phases properties
+        phases = phases.map(item => {
+          Object.values(updatedPhaseIds).forEach(el => {
+            if (el.key.toString() === item.id.toString()) item.name = el.value.name;
+          });
+          return item;
+        });
+
         // Remove null from children arrays
-        function nullRemover( data ) {
-          if( data && data.children ) {
-            data.children = data.children.filter( x => x!== null );
-            if ( data.children.length > 0 ) {
-              for(let i = 0; i < data.children.length; i++) {
+        function nullRemover(data) {
+          if (data && data.children) {
+            data.children = data.children.filter( x => (x !== null && x !== undefined) );
+            if (data.children.length > 0) {
+              for (let i = 0; i < data.children.length; i++) {
                 nullRemover(data.children[i]);
               }
             }
@@ -645,7 +670,7 @@ module.exports = function(Karta) {
         nullRemover(kartaNode);
         kartaData["node"] = kartaNode;
 
-        return { message: "Karta data found..!!", data: kartaData };
+        return { message: "Karta data found..!!", karta: { kartaData, phases } };
       } else {
         return { message: "Karta was not created before the requested timeframe..!!", data: null };
       }
