@@ -506,19 +506,13 @@ module.exports = function(Karta) {
       const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId } });
 
       // Prepare query according to requested parameters
-      const query = { kartaId };
-      if (type == "quarter" ) {
+      let query = { kartaId };
+      if (type == "quarter") {
         query["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
-      } else if (type == "month" ) {
+      } else if (type == "month") {
         query["createdAt"] = { lte: moment().month(number).endOf('month') }
-      } else if (type == "week" ) {
-        // let cur_week_num = moment().isoWeek() - moment().subtract(moment().date() - 1, 'days').isoWeek() + 1;
-        // let total_weeks = ( moment().week() - ( moment().month() * 4 ));
-        // let week = cur_week_num - number;
-        // week = week < 0 ? -week : week;
-        // var queryDate = moment().add(week, 'weeks').endOf('week')
-        console.log(moment().startOf('month'))
-        var queryDate = moment().startOf('month').add(number, 'weeks').endOf('week')
+      } else if (type == "week") {
+        var queryDate = moment().startOf('month').startOf('week').add(number, 'weeks');
         query["createdAt"] = { lte: queryDate }
       }
 
@@ -527,8 +521,6 @@ module.exports = function(Karta) {
       if (versionDetails.length > 0) {
         // Getting last version from that
         const requestedVersion = versionDetails[versionDetails.length - 1];
-        // Setting deleted flag for all child phases of current karta
-        // await Karta.app.models.karta_phase.updateAll( { kartaId, "is_child": true }, { "is_deleted": true } );
 
         // Finding requested karta history before the requested time
         const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": requestedVersion.id } });
