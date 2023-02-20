@@ -10,12 +10,14 @@ exports.create_price = async (nickname, productId, amount, interval) => {
             nickname: nickname,
             product: productId,
             currency: 'usd',
-            recurring: { interval: interval, usage_type: 'licensed' }, // interval can be month/year
-            billing_scheme: 'tiered', 
-            tiers_mode: 'graduated', 
-            tiers: [
-                { up_to: 'inf', unit_amount: amount*100 },
-            ],
+            unit_amount: amount,
+            recurring: { interval }, // interval can be month/year
+            // recurring: { interval: interval, usage_type: 'licensed' }, // interval can be month/year
+            // billing_scheme: 'tiered', 
+            // tiers_mode: 'graduated', 
+            // tiers: [
+            //     { up_to: 'inf', unit_amount: amount*100 },
+            // ],
             metadata: {
                 unit_amount: amount,
             }
@@ -172,7 +174,7 @@ exports.update_plan_status = async (params) => {
 // CREATE CUSTOMER
 exports.create_customer = async (params) => {
     try {
-        const response = await stripe.customers.create({ 
+        let body = {
             name: params.name,  
             description: params.description, 
             address: {
@@ -181,9 +183,10 @@ exports.create_customer = async (params) => {
                 city: 'San Francisco',
                 state: 'CA',
                 country: 'US',
-            },
-            test_clock: params.clock
-        });
+            }
+        };
+        params.clock ? body["test_clock"] = params.clock : null;
+        const response = await stripe.customers.create(body);
         return response;
     } catch (err) {
         console.log(err);
@@ -366,6 +369,20 @@ exports.delete_card = async (customerId, cardId) => {
         return err;
     }
 }
+
+// CREATE SOURCE
+exports.create_source = async (params) => {
+    try {
+        let response = await stripe.sources.create({ 
+            customer: params.customerId, 
+            usage: 'reusable',
+        });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
 //----------------
 
 
@@ -381,7 +398,7 @@ exports.create_subscription = async (params) => {
             expand: ["latest_invoice.payment_intent"],
             off_session: true,
             billing_cycle_anchor: moment().add(1, 'months').subtract(1, 'days').unix(),
-            proration_behavior : 'none',
+            // proration_behavior : 'none',
         });
         return response;
     } catch (err) {

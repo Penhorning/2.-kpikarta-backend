@@ -23,7 +23,13 @@
     }
   },
   "validations": [],
-  "relations": {},
+  "relations": {
+    "subscription": {
+      "type": "hasOne",
+      "model": "subscription",
+      "foreignKey": "licenseId"
+    }
+  },
   "acls": [
     {
       "accessType": "*",

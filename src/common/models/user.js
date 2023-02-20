@@ -312,7 +312,7 @@ module.exports = function(User) {
                 console.log('> error while updating user', err);
                 return next(err);
               } else {
-                next(null, "User invited successfully!");
+                next(null, {message: "User invited successfully!", data: user});
                 // Send email and password to user
                 const data = {
                   subject: `Welcome to | ${User.app.get('name')}`,
