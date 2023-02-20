@@ -1,6 +1,7 @@
 'use strict';
 
 const moment = require('moment');
+const { sales_update_user } = require('../../helper/salesforce');
 
 module.exports = function (Kartanode) {
   /* QUERY VARIABLES
@@ -1009,6 +1010,24 @@ module.exports = function (Kartanode) {
         
         next(null, result);
       });
-    } else next();
+    };
+    let kartaId = instance.kartaId || instance.kartaDetailId;
+    Kartanode.app.models.karta.findOne({ where: { "id": kartaId }}, (err, karta) => {
+      if (err) {
+        next(err);
+      }
+      Kartanode.app.models.user.findOne({ where: { "id": karta.userId }}, (err, userData) => {
+        if (err) {
+          next(err);
+        }
+        Kartanode.app.models.karta.update( { "id": kartaId }, { updatedAt: instance.updatedAt }, (err, result) => {
+          if (err) {
+            next(err);
+          }
+          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: karta.name, kartaLastUpdate: instance.updatedAt });
+          next();
+        });
+      });
+    });
   });
 };

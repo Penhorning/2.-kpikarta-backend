@@ -1,14 +1,16 @@
 'use strict';
 
 module.exports = function(Kartaversion) {
+
+    // Create new version
     Kartaversion.createVersion = async (name, kartaId, versionId) => {
         try {
             const newVersion = await Kartaversion.create({ name, kartaId });
             const findHistoryTemp = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "temp" }});
             const findHistoryMain = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "main" }});
 
-            if( findHistoryTemp.length > 0 ){
-                for( let i = 0; i < findHistoryTemp.length; i++ ) {
+            if (findHistoryTemp.length > 0 ){
+                for (let i = 0; i < findHistoryTemp.length; i++ ) {
                     let newObj = {
                         event: findHistoryTemp[i].event,
                         event_options: findHistoryTemp[i].event_options,
@@ -19,7 +21,6 @@ module.exports = function(Kartaversion) {
                         historyType: 'temp'
                     };
                     findHistoryTemp[i].parentNodeId ? newObj['parentNodeId'] = findHistoryTemp[i].parentNodeId : null;
-
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
@@ -36,7 +37,6 @@ module.exports = function(Kartaversion) {
                         historyType: 'temp'
                     };
                     findHistoryMain[i].parentNodeId ? newObj['parentNodeId'] = findHistoryMain[i].parentNodeId : null;
-
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
@@ -48,4 +48,5 @@ module.exports = function(Kartaversion) {
             console.log(err);
         }
     }
+    
 };
