@@ -252,7 +252,7 @@ module.exports = function(User) {
           }
           resolve("success");
         })
-      })
+      });
     } catch (error) {
       console.error("> error in SMS function", error);
       return { success: true, msg: error };
@@ -312,7 +312,7 @@ module.exports = function(User) {
                 console.log('> error while updating user', err);
                 return next(err);
               } else {
-                next(null, "User invited successfully!");
+                next(null, {message: "User invited successfully!", data: user});
                 // Send email and password to user
                 const data = {
                   subject: `Welcome to | ${User.app.get('name')}`,
@@ -735,10 +735,28 @@ module.exports = function(User) {
       }
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       } else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       }
@@ -755,6 +773,14 @@ module.exports = function(User) {
       // Blocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+          const emailObj = {
+            subject: `Your account is unblocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "unblocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       } 
@@ -774,6 +800,14 @@ module.exports = function(User) {
               next(error);
             }
             User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
+              const emailObj = {
+                subject: `Your account is unblocked`,
+                template: "block-unblock.ejs",
+                email: user.email,
+                user: user,
+                type: "unblocked"
+              };
+              sendEmail(User.app, emailObj, () => {});
               next(err, true);
             });
           })
@@ -1005,7 +1039,7 @@ module.exports = function(User) {
                 return next(err);
               }
               // Assign roleId, licenseId and companyId
-              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true }, err => {
                 if (err) {
                   console.log('> error while updating social user', err);
                   return next(err);
@@ -1026,7 +1060,6 @@ module.exports = function(User) {
                 subject: `Welcome to | ${User.app.get('name')}`,
                 template: "welcome.ejs",
                 email: user.email,
-
                 user,
                 password,
                 loginUrl: `${process.env.WEB_URL}/login`,
@@ -1047,6 +1080,23 @@ module.exports = function(User) {
         fs.unlink(path.resolve('storage/user/', req.body.oldImage), (err) => { console.log(err) });
       }
       next();
+    }
+
+    if( req.body.defaultEmail ) {
+      User.findOne({where: {email: req.body.email}}, (err, userDetails) => {
+        if (err) {
+          console.log('> error while updating social user', err);
+          return next(err);
+        } 
+        const data = {
+          subject: `Your email has changed successfully..!!`,
+          template: "email-changed.ejs",
+          email: userDetails.email,
+          user: userDetails,
+        }
+        sendEmail(User.app, data, () => { });
+        delete req.body.defaultEmail;
+      })
     }
   });
 };

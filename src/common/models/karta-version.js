@@ -26,7 +26,6 @@ module.exports = function(Kartaversion) {
 
             if( findHistoryMain.length > 0 ){
                 for( let i = 0; i < findHistoryMain.length; i++ ) {
-                    console.log();
                     let newObj = {
                         event: findHistoryMain[i].event,
                         event_options: findHistoryMain[i].event_options,
@@ -42,6 +41,7 @@ module.exports = function(Kartaversion) {
                 }
             }
 
+            await Kartaversion.app.models.karta.update({ id: kartaId }, { historyId: "none" });
             return newVersion;
         }
         catch(err){

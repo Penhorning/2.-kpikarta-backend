@@ -13,7 +13,7 @@ exports.createSubscriptionCron = (app) => {
         try {
             // Start subscription for the users whose trial is over
             const currentDate = moment().unix();
-            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: false }});
+            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: false, cardHolder: true }});
             if ( subscribedUsers.length > 0 ) {
                 let userIds = [];
                 for (let c = 0; c < subscribedUsers.length; c++ ) {
@@ -21,81 +21,46 @@ exports.createSubscriptionCron = (app) => {
                 };
                 await app.models.subscription.update({ "trialActive": true, "trialEnds": { lte: currentDate }, "status": false, "userId": { in: userIds} }, { "cronCheck": true });
 
+                // FLow change from below
                 for (let i = 0; i < subscribedUsers.length; i++ ) {
-                    let finalItems = [];
-                    let updatedItems = [];
-                    let priceMapper = {};
                     let currentSubscribedUser = subscribedUsers[i];
-                    const userData = await app.models.user.findOne({ where: { "id": currentSubscribedUser.userId }});
-                    const findRegisteredUserDetails = await app.models.user.find({ where: { "companyId": userData.companyId, is_deleted: false }});
-                    let userTracker = {
-                        "Creator": {name: "Creator", quantity: 0 },
-                        "Champion": {name: "Champion", quantity: 0 },
-                        // "Spectator": {name: "Spectator", quantity: 0 },
-                    };
-
-                    for (let j = 0; j < findRegisteredUserDetails.length; j++) {
-                        let currentUser = findRegisteredUserDetails[j];
-                        const licenseId = await app.models.license.findOne({ where: { id: currentUser.licenseId }});
-                        userTracker[licenseId.name] = { ...userTracker[licenseId.name], quantity: userTracker[licenseId.name].quantity + 1 };
+                    const sameCompanyUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: true, companyId: currentSubscribedUser.companyId } });
+                    if (sameCompanyUsers.length > 0) {
+                        for (let j = 0; j < sameCompanyUsers.length; j++) {
+                            let companyUser = sameCompanyUsers[j];
+                            const userData = await app.models.user.findOne({ where: { "id": companyUser.userId, is_deleted: false }});
+                            if (userData) {
+                                const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
+                                const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: companyUser.currentPlan == "monthly" ? "month": "year" }});
+                                let subscription = await create_subscription({ customerId: companyUser.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+                                await app.models.subscription.update({ "id": companyUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
+                            } else {
+                                await app.models.subscription.update({ "id": companyUser.id }, { trialActive: false, subscriptionId: "deactivated", status: false, cronCheck: false });
+                            }
+                        }
                     }
-
-                    for( let k = 0; k < Object.keys(userTracker).length; k++ ) {
-                        const priceData = await app.models.price_mapping.findOne({ where: { licenseType: Object.keys(userTracker)[k], interval: userData.currentPlan == "monthly" ? "month": "year" }});
-                        priceMapper[priceData.priceId] = Object.values(userTracker)[k].quantity;
-                        finalItems.push({ price: priceData.priceId, quantity: 0 });
-                    }
-
-                    for( let x = 0; x < finalItems.length; x++ ) {
-                        let currentPrice = finalItems[x];
-                        updatedItems.push({
-                            price: currentPrice.price,
-                            quantity: priceMapper[currentPrice.price]
-                        })
-                    }
-
-                    let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: updatedItems });
-                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
                 } 
                 console.log("Subscriptions started successfully..!!");
             }
 
-            // Start subscription for the those users who recently got activated again by Admin
-            const recentlyActivatedUsers = await app.models.subscription.find({ where: { status: true, subscriptionId: "deactivated" }});
-            if (recentlyActivatedUsers.length > 0) {
-                // 1. Loop for each recently activated subscription
-                for(let i = 0; i < recentlyActivatedUsers.length; i++) {
-                    let finalItems = [];
-                    let currentSubscribedUser = recentlyActivatedUsers[i];
-                    const userData = await app.models.user.findOne({ where: { "id": currentSubscribedUser.userId }});
-                    const findRegisteredUserDetails = await app.models.user.find({ where: { "companyId": userData.companyId }});
-                    let userTracker = {
-                        "Creator": {name: "Creator", quantity: 0 },
-                        "Champion": {name: "Champion", quantity: 0 },
-                        // "Spectator": {name: "Spectator", quantity: 0 },
-                    };
+            // Start subscription for those users who recently got activated again by Admin
+            // const recentlyActivatedUsers = await app.models.subscription.find({ where: { status: true, subscriptionId: "deactivated" }});
+            // if (recentlyActivatedUsers.length > 0) {
+            //     for(let i = 0; i < recentlyActivatedUsers.length; i++) {
+            //         let currentSubscribedUser = recentlyActivatedUsers[i];
+            //         const userData = await app.models.user.findOne({ where: { "id": currentSubscribedUser.userId, is_deleted: false }});
+            //         if (userData) {
+            //             const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
+            //             const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: currentSubscribedUser.currentPlan }});
+            //             let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+            //             await app.models.subscription.update({ "id": currentSubscribedUser.id }, { subscriptionId: subscription.id, status: true });
+            //         } else {
+            //             await app.models.subscription.update({ "id": currentSubscribedUser.id }, { subscriptionId: "deactivated", status: false });
+            //         }
 
-                    for (let j = 0; j < findRegisteredUserDetails.length; j++) {
-                        let currentUser = findRegisteredUserDetails[j];
-                        const licenseId = await app.models.license.findOne({ where: { id: currentUser.licenseId }});
-                        userTracker[licenseId.name] = { ...userTracker[licenseId.name], quantity: userTracker[licenseId.name].quantity + 1 };
-                    }
-
-                    // 2. Create the item array for priceId and quantity
-                    for( let k = 0; k < Object.keys(userTracker).length; k++ ) {
-                        const priceData = await app.models.price_mapping.findOne({ where: { licenseType: Object.keys(userTracker)[k], interval: userData.currentPlan == "monthly" ? "month": "year" }});
-                        finalItems.push({ price: priceData.priceId, quantity: Object.values(userTracker)[k].quantity });
-                    }
-
-                    // 3. Create Subscription
-                    let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: finalItems });
-
-                    // 4. Update the Subscription in DB with new subId
-                    await app.models.subscription.update({ "id": currentSubscribedUser.id }, { subscriptionId: subscription.id, status: true });
-
-                    console.log("Recently activated user's subscription started..");
-                }
-            }
+            //         console.log("Recently activated user's subscription started..");
+            //     }
+            // }
         } catch (err) {
             console.log(`==========>>>>> WHILE CREATING SUBSCRIPTIONS (${new Date()}) = Someting went wrong `, err);
             throw err;

@@ -180,8 +180,10 @@ app.middleware('session', session({
 
 // Cron jobs
 const { sendTargetAlertsCron } = require('../helper/cronJobs/sendTargetAlerts');
-const { createSubscriptionCron } = require('../helper/cronJobs/createSubscriptionCron.js');
 const { profileStatusCron } = require('../helper/cronJobs/profileStatusCron.js');
+const { createSubscriptionCron } = require('../helper/cronJobs/createSubscriptionCron.js');
+const { resetAchievedValueCron } = require('../helper/cronJobs/resetAchievedValue.js');
 sendTargetAlertsCron(app);
 profileStatusCron(app);
 createSubscriptionCron(app);
+resetAchievedValueCron(app);

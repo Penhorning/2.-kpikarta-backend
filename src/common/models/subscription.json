@@ -59,6 +59,19 @@
     "cronCheck": {
       "type": "boolean",
       "default": false
+    },
+    "cardHolder": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentPlan": {
+      "type": "string"
+    },
+    "licenseId": {
+      "type": "string"
+    },
+    "testClock": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -67,6 +80,14 @@
       "type": "belongsTo",
       "model": "user",
       "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "license": {
+      "type": "belongsTo",
+      "model": "license",
+      "foreignKey": "licenseId",
       "options": {
         "nestRemoting": true
       }
@@ -169,30 +190,37 @@
         "verb": "post"
       }
     },
-    "updateSubscription": {
+    "blockSubscription": {
       "accepts": [
         {
-          "arg": "companyId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "licenseType",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "type",
+          "arg": "userId",
           "type": "string",
           "required": true
         }
       ],
       "returns": {
-        "arg": "data",
-        "type": "object"
+        "arg": "message",
+        "type": "string"
       },
       "http": {
-        "path": "/update-subscription",
+        "path": "/block-subscription",
+        "verb": "post"
+      }
+    },
+    "unblockSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/unblock-subscription",
         "verb": "post"
       }
     },
@@ -309,10 +337,6 @@
       "accepts": [
         {
           "arg": "userId",
-          "type": "string"
-        },
-        {
-          "arg": "plan",
           "type": "string"
         }
       ],
