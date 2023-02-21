@@ -32,7 +32,7 @@ module.exports = {
     "profileFields": ["gender", "link", "locale", "name", "timezone", "verified", "email", "updated_time"],
     "clientID": process.env.LINKEDIN_CLIENT_ID,
     "clientSecret": process.env.LINKEDIN_CLIENT_SECRET,
-    "callbackURL": "/auth/linkedin/callback",
+    "callbackURL": `${process.env.API_URL}/auth/linkedin/callback`,
     "authPath": "/auth/linkedin",
     "callbackPath": "/auth/linkedin/callback",
     "successRedirect": "/auth/account",
