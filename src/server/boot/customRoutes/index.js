@@ -50,7 +50,7 @@ module.exports = function (app) {
                         });
                     }
 
-                    sales_update_user(user_data, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
+                    sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
                     res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
                 });
             } else {
