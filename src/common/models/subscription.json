@@ -91,6 +91,14 @@
       "options": {
         "nestRemoting": true
       }
+    },
+    "company": {
+      "type": "belongsTo",
+      "model": "company",
+      "foreignKey": "companyId",
+      "options": {
+        "nestRemoting": true
+      }
     }
   },
   "acls": [],
@@ -290,6 +298,14 @@
         },
         {
           "arg": "nextId",
+          "type": "string"
+        },
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
           "type": "string"
         }
       ],

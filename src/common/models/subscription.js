@@ -305,9 +305,9 @@ module.exports = function (Subscription) {
     try {
       const userDetails = await Subscription.findOne({ where: { userId }});
       if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
-        if (userDetails.cardHolder == true) {
+        if (userDetails.cardHolder) {
           let findCompany = await Subscription.find({ where: { companyId: userDetails.companyId }});
-          for(let user in findCompany) {
+          for(let user of findCompany) {
             await cancel_user_subscription( user.subscriptionId );
             await Subscription.update({ userId: user.userId }, { subscriptionId: "deactivated", status: false });
           }
@@ -330,10 +330,10 @@ module.exports = function (Subscription) {
       const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
       const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
 
-      if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId === "deactivated" && userDetails.status == false && userDetails.trialActive == false ) {
+      if (userDetails && userDetails.subscriptionId && userDetails.trialActive == false ) {
         if(userDetails.cardHolder) {
           const findCompany = await Subscription.find({ where: { companyId: userDetails.companyId }});
-          for ( let user in findCompany) {
+          for ( let user of findCompany) {
             const license = await Subscription.app.models.license.findOne({ where: { id: user.licenseId }});
             const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
             let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
@@ -523,14 +523,14 @@ module.exports = function (Subscription) {
 
   // ------------------- ADMIN PANEL APIS -------------------
 
-  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
+  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId, startDate = null, endDate = null) => {
     try {
       page = parseInt(page, 10) || 1;
       limit = parseInt(limit, 10) || 10;
-      // startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
-      // endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
+      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
-      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId);
+      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId, startDate, endDate);
       if ( invoices.data && invoices.data.length > 0 ) {
 
         let newArr = [];
