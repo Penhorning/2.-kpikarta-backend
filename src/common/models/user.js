@@ -8,6 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
+const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -203,6 +204,7 @@ module.exports = function(User) {
       'Role': 1,
       'company': 1,
       'department': 1,
+      'creatorId': 1,
       'active': 1,
       'updatedAt': 1,
       'createdAt': 1
@@ -234,20 +236,27 @@ module.exports = function(User) {
     });
   }
   // Send SMS
-  const sendSMS = (user, message) => {
+  const sendSMS = (number, message) => {
     try {
       let smsOptions = {
         type: 'sms',
-        to: user.mobile.e164Number,
-        from: "+16063667831",
+        from: process.env.TWILIO_MESSAGINGSERVICE_SID,
+        to: number,
         body: message
       };
-      User.app.models.Twilio.send(smsOptions, (err, data) => {
-        console.log('> sending code to mobile number:', user.mobile.e164Number);
-        if (err) console.log('> error while sending code to mobile number', err);
+      return new Promise((resolve, reject) => {
+        User.app.models.Twilio.send(smsOptions, (err, data) => {
+          console.log('> sending code to mobile number:', number);
+          if (err) {
+            console.log('> error while sending code to mobile number', err);
+            reject(err);
+          }
+          resolve("success");
+        })
       });
     } catch (error) {
       console.error("> error in SMS function", error);
+      return { success: true, msg: error };
     }
   }
 
@@ -287,30 +296,41 @@ module.exports = function(User) {
     const password = generatePassword();
     
     // Create user
-    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, "paymentVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
       } else {
         RoleManager.assignRoles(User.app, [roleId], user.id, () => {
           // Find creator's company id and assign it to the new user
-          User.findById(creatorId, (err, creator) => {
+          User.findById(creatorId, async (err, creator) => {
             if (err) {
               console.log('> error while getting creator data', err);
               return next(err);
             }
-            User.update({ "_id": user.id },  { "companyId": creator.companyId }, err => {
+
+            const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
+            const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
+            const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            let userDetails = {
+              ...user,
+              companyName: creator.companyName,
+              license: licenseDetails.name,
+              role: roleDetails.name,
+              department: departmentDetails.name,
+            }
+            let ret = await sales_user_details(userDetails);
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, err => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
               } else {
-                next(null, "User invited successfully!");
+                next(null, {message: "User invited successfully!", data: user});
                 // Send email and password to user
                 const data = {
                   subject: `Welcome to | ${User.app.get('name')}`,
                   template: "welcome.ejs",
                   email: user.email,
-
                   user,
                   password,
                   loginUrl: `${process.env.WEB_URL}/login`,
@@ -378,12 +398,16 @@ module.exports = function(User) {
         searchQuery = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
         userId = User.getDataSource().ObjectID(userId);
         
-        let creatorId = user.creatorId || user.id;
-        let query = { "companyId": user.companyId, creatorId, "_id": { $ne: userId } };
+        // let creatorId = user.creatorId || user.id;
+        let query = { "companyId": user.companyId, "_id": { $ne: userId } };
 
-        if (type === "all") query = { "companyId": user.companyId };
+        // let exclude_spectator_billingStaff_query = {};
+        if (type === "all") {
+          query = { "companyId": user.companyId };
+          // exclude_spectator_billingStaff_query = { "Role.name" : { $ne: "billing_staff" }, "license.name": { $ne: "Spectator" } };
+        }
         else if (type === "members" && user.departmentId) {
-          query = { "companyId": user.companyId, "departmentId": user.departmentId, creatorId, "_id": { $ne: userId } }; 
+          query = { "companyId": user.companyId, "departmentId": user.departmentId, "_id": { $ne: userId } }; 
         }
 
         if (start && end) {
@@ -428,6 +452,9 @@ module.exports = function(User) {
             UNWIND_LICENSE,
             ROLE_LOOKUP,
             UNWIND_ROLE,
+            // {
+            //   $match: exclude_spectator_billingStaff_query
+            // },
             DEPARTMENT_LOOKUP,
             UNWIND_DEPARTMENT,
             SEARCH_MATCH,
@@ -491,6 +518,12 @@ module.exports = function(User) {
           },
           {
             'mobile.internationalNumber': {
+              $regex: searchQuery,
+              $options: 'i'
+            }
+          },
+          {
+            'company.name': {
               $regex: searchQuery,
               $options: 'i'
             }
@@ -571,6 +604,7 @@ module.exports = function(User) {
           if (roles.indexOf(role) > -1) {
             next(null, token);
           } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -594,6 +628,7 @@ module.exports = function(User) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
+        sales_update_user(this.app.currentUser, { "emailVerified": true });
         next(err, this.app.currentUser);
       });
     } else {
@@ -655,27 +690,19 @@ module.exports = function(User) {
   // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
     let mobileVerificationCode = keygen.number({length: 6});
-    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, err => {
+    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
       if (err) return next(err);
       else {
         let mobileNumber;
         if (type == "updateProfile") mobileNumber = mobile.e164Number;
         else mobileNumber = User.app.currentUser.mobile.e164Number;
-        let twilio_data = {
-          type: 'sms',
-          to: mobileNumber,
-          from: "+16063667831",
-          body: `${mobileVerificationCode} is your code for KPI Karta mobile verification.`
-        }
-        User.app.models.Twilio.send(twilio_data, function (err, data) {
-          console.log('> sending code to mobile number:', mobileNumber);
-          if (err) {
-            console.log('> error while sending code to mobile number', err);
-            let error = err;
-            error.status = 500;
-            return next(error);
-          }
-          next(null, 'sent');
+        sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
+        .then(() => {
+          next(null, "sent");
+        }).catch(err => {
+          let error = err;
+          error.status = 500;
+          return next(error);
         });
       }
     });
@@ -722,10 +749,28 @@ module.exports = function(User) {
       }
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       } else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       }
@@ -739,13 +784,47 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
+      // Blocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+          const emailObj = {
+            subject: `Your account is unblocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "unblocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
-      } else {
+      } 
+      // Blocking the whole company with members
+      else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
-          next(err, true);
+          if (err) {
+            let error = new Error("User not found..!!");
+            error.status = 404;
+            next(error);
+          }
+          // Starting the Subscription
+          User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
+            if (err) {
+              let error = new Error("Subscription not found..!!");
+              error.status = 404;
+              next(error);
+            }
+            User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
+              const emailObj = {
+                subject: `Your account is unblocked`,
+                template: "block-unblock.ejs",
+                email: user.email,
+                user: user,
+                type: "unblocked"
+              };
+              sendEmail(User.app, emailObj, () => {});
+              next(err, true);
+            });
+          })
         });
       }
     });
@@ -838,18 +917,27 @@ module.exports = function(User) {
             return next(err);
           }
           // Find license
-          User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
+          User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
             if (err) {
               console.log('> error while finding license', err);
               return next(err);
             }
+            let userDetails = {
+              ...user,
+              companyName: company.name,
+              license: license.name,
+              role: role.name
+            }
+            let ret = await sales_user_details(userDetails);
+            if(ret && ret.id) {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
+                  if (err) {
+                    console.log('> error while updating user', err);
+                    return next(err);
+                  }
+              });
+            }
             // Assign roleId, licenseId and companyId
-            User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              }
-            });
           });
         });
         // Create token
@@ -910,7 +998,8 @@ module.exports = function(User) {
   User.afterRemote('userLogin', (context, accessToken, next) => {
     if (accessToken && accessToken.user) {
       // Find user by access token
-      User.findById(accessToken.userId.toString(), (err, user) => {
+      User.findById(accessToken.userId.toString(), { include: ['company', 'role', 'license'] }, (err, user) => {
+        if (err) return next(err);
         // Check if user is active or not
         if (!user.active) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
@@ -937,20 +1026,16 @@ module.exports = function(User) {
         // User is verified, checking for twoFactor enabled or not
         else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
-            let mobileVerificationCode = keygen.number({length: 6});
+            let mobileVerificationCode = keygen.number({ length: 6 });
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
-              sendSMS(user, `${mobileVerificationCode} is your code for KPI Karta Login.`);
+              sendSMS(user.mobile.e164Number, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
+              .then(() => {}).catch(err => {});
             });
           }
-          // Get company details
-          User.app.models.company.findById(user.companyId.toString(), (err, company) => {
-            if (err) {
-              console.log('> error while fetching company details', err);
-              return next(err);
-            }
-            context.result.company = company;
-            next();
-          });
+          // Setting includes
+          context.result = context.result.toJSON();
+          context.result.user = user;
+          next();
         }
       });
     } else next();
@@ -977,7 +1062,7 @@ module.exports = function(User) {
                 return next(err);
               }
               // Assign roleId, licenseId and companyId
-              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true }, err => {
                 if (err) {
                   console.log('> error while updating social user', err);
                   return next(err);
@@ -998,7 +1083,6 @@ module.exports = function(User) {
                 subject: `Welcome to | ${User.app.get('name')}`,
                 template: "welcome.ejs",
                 email: user.email,
-
                 user,
                 password,
                 loginUrl: `${process.env.WEB_URL}/login`,
@@ -1019,6 +1103,23 @@ module.exports = function(User) {
         fs.unlink(path.resolve('storage/user/', req.body.oldImage), (err) => { console.log(err) });
       }
       next();
+    }
+
+    if( req.body.defaultEmail ) {
+      User.findOne({where: {email: req.body.email}}, (err, userDetails) => {
+        if (err) {
+          console.log('> error while updating social user', err);
+          return next(err);
+        } 
+        const data = {
+          subject: `Your email has changed successfully..!!`,
+          template: "email-changed.ejs",
+          email: userDetails.email,
+          user: userDetails,
+        }
+        sendEmail(User.app, data, () => { });
+        delete req.body.defaultEmail;
+      })
     }
   });
 };

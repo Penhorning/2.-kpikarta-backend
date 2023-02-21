@@ -1,6 +1,7 @@
 'use strict';
 
 const moment = require('moment');
+const { sales_update_user } = require('../../helper/salesforce');
 const { sendEmail } = require('../../helper/sendEmail');
 
 module.exports = function(Karta) {
@@ -9,11 +10,11 @@ module.exports = function(Karta) {
     // Sort
     const SORT = {
       $sort: { createdAt: -1 }
-  }
+    }
   // User lookup with id or email
   const USER_LOOKUP = (findBy, type) => {
     let column = "_id";
-    if (type === "shared")  column = "email";
+    if (type === "shared") column = "email";
 
       return {
           $lookup: {
@@ -35,6 +36,14 @@ module.exports = function(Karta) {
           }
       }
   }
+  const ALL_USER_LOOKUP = {
+    $lookup: {
+      from: 'user',
+      localField: 'userId',
+      foreignField: '_id',
+      as: 'user'
+    }
+  }
   const UNWIND_USER = {
       $unwind: "$user"
   }
@@ -52,6 +61,7 @@ module.exports = function(Karta) {
 
 /* =============================CUSTOM METHODS=========================================================== */
   // Copy Karta Functions Starts----------------
+  // Might face issue while copying because phase is not updating while creating this new history - Debug event_options
   async function createCopyKartaHistory(oldVersionHistory, newVersion, newKarta) {
     for ( let k = 0; k < oldVersionHistory.length; k++ ) {
       let history_data = {
@@ -68,7 +78,7 @@ module.exports = function(Karta) {
     }
   }
 
-  async function createCopyKartaNodes(newVersion, newKarta) {
+  async function createCopyKartaNodes(newVersion, newKarta, phaseMapping) {
     await Karta.app.models.karta_node.remove({ or: [{ kartaId: newKarta.id }, { kartaDetailId: newKarta.id }] });
 
     // Retrieving history of the newly created karta for particular version
@@ -162,7 +172,7 @@ module.exports = function(Karta) {
       // Prepare data for updating in the sharedTo field
       let data = [];
       for (let i = 0; i < newEmails.length; i++) {
-        data.push({ email: newEmails[i] });
+        data.push({ email: newEmails[i], accessType });
       }
 
       Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
@@ -221,18 +231,85 @@ module.exports = function(Karta) {
   }
 
   // Get all kartas
-  Karta.getAll = (findBy, searchQuery, type, page, limit, next) => {
+  Karta.getAll = (findBy, searchQuery, type, findType, page, limit, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    const SEARCH_MATCH = {
+      $match: {
+        $or: [
+          {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        ]
+      }
+    }
+
+    // Find for champions only
+    if (findType === "contributor") {
+      Karta.app.models.karta_node.find({ where: { "contributorId": findBy, "is_deleted": false } }, (err, result) => {
+        if (err) next(err);
+        else {
+          let kartaIds = result.map(item => item.kartaDetailId);
+          Karta.getDataSource().connector.connect(function (err, db) {
+            const KartaCollection = db.collection('karta');
+            KartaCollection.aggregate([
+              {
+                $match: { "_id": { $in: kartaIds } }
+              },
+              SEARCH_MATCH,
+              ALL_USER_LOOKUP,
+              UNWIND_USER,
+              SORT,
+              FACET(page, limit)
+            ]).toArray((err, result) => {
+              if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+              next(err, result);
+            });
+          });
+        }
+      });
+    }
+    // Find for Creators only
+    else {
+      let query = {};
+      if (type === "shared") query = { "sharedTo.email": findBy, "is_deleted": false }
+      else {
+        findBy = Karta.getDataSource().ObjectID(findBy);
+        query = { "userId": findBy, "is_deleted": false }
+      }
+  
+      Karta.getDataSource().connector.connect(function (err, db) {
+        const KartaCollection = db.collection('karta');
+        KartaCollection.aggregate([
+          {
+            $match: query
+          },
+          SEARCH_MATCH,
+          USER_LOOKUP(findBy, type),
+          UNWIND_USER,
+          SORT,
+          FACET(page, limit)
+        ]).toArray((err, result) => {
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          next(err, result);
+        });
+      });
+    }
+  }
+
+  // Get all public kartas
+  Karta.getAllPublic = (searchQuery, page, limit, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-    let query = {};
-    if (type === "shared") query = { "sharedTo.email": findBy, "is_deleted": false }
-    else {
-      findBy = Karta.getDataSource().ObjectID(findBy);
-      query = { "userId": findBy, "is_deleted": false }
-    }
+    let query = { "type": "public", "is_deleted": false }
 
     const SEARCH_MATCH = {
       $match: {
@@ -254,7 +331,7 @@ module.exports = function(Karta) {
           $match: query
         },
         SEARCH_MATCH,
-        USER_LOOKUP(findBy, type),
+        ALL_USER_LOOKUP,
         UNWIND_USER,
         SORT,
         FACET(page, limit)
@@ -273,9 +350,73 @@ module.exports = function(Karta) {
         return next(err);
       }
       else {
+        // Delete nodes
         Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
-            if (err) console.log('> error while deleting karta', err);
-            next(null, "Karta deleted successfully..!!");
+            if (err) {
+              console.log('> error while deleting karta', err);
+              next(err);
+            }
+
+            // Delete phases
+            Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+              if (err) {
+                console.log('> error while deleting phase', err);
+                return next(err);
+              }
+            });
+            
+            Karta.getDataSource().connector.connect(function (err, db) {
+              const KartaNodeCollection = db.collection('karta_node');
+              KartaNodeCollection.aggregate([
+                {
+                  $match: {
+                    "kartaDetailId": Karta.getDataSource().ObjectID(kartaId),
+                    "contributorId": { $exists: true }
+                  }
+                }
+              ]).toArray((err, result) => {
+                if(err) {
+                  console.log('> error while finding karta contributors', err);
+                  next(err);
+                }
+                Karta.findOne({ where: { id: kartaId }}, async (err, karta) => {
+                  if (err) {
+                    console.log('> error while finding karta details', err);
+                    next(err);
+                  }
+
+                  if(result.length > 0) {
+                    // Prepare notification collection data
+                    let notificationData = [];
+                    for(let i = 0; i < result.length; i++) {
+                      if(Karta.app.currentUser.id.toString() !== result[i].contributorId.toString()) {
+                        let notificationObj = {
+                          title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
+                          type: "karta_deleted",
+                          contentId: kartaId,
+                          userId: result[i].contributorId
+                        };
+                        notificationData.push(notificationObj);
+                      }
+                    };
+                    // Insert data in notification collection
+                    Karta.app.models.notification.create(notificationData, err => {
+                      if (err) console.log('> error while inserting data in notification collection', err);
+                    });
+
+                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+                    const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
+                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
+                    next(null, "Karta deleted successfully..!!");
+                  } else {
+                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+                    const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
+                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
+                    next(null, "Karta deleted successfully..!!");
+                  }
+                });
+              });
+            });
         });
       }
     })
@@ -294,35 +435,57 @@ module.exports = function(Karta) {
        }
        const newKarta = await Karta.create(newObj);
 
-       // Fetching version details of that karta
-       const versionDetails = await Karta.app.models.karta_version.find({ where: { kartaId: kartaDetails.id, id: kartaDetails.versionId }});
-       let lastHistoryOfKartaVersion = "";
-       let finalVersionId = "";
+       //Creating new Phases for new karta
+       let phaseMapping = {};
+       const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId }});
+       if (getPhases.length > 0) {
+        for ( let x = 0; x < getPhases.length; x++ ) {
+          let currentPhase = {
+            ...getPhases[x].__data,
+            kartaId: newKarta.id,
+          };
+          delete currentPhase.id;
+          currentPhase["parentId"] ? currentPhase["parentId"] = phaseMapping[currentPhase["parentId"]] : null;
+          const newPhase = await Karta.app.models.karta_phase.create(currentPhase);
+          phaseMapping[getPhases[x].id] = newPhase.id;
+        }
+       }
 
-       // Looping through each version of that karta till latest version 
-       for ( let i = 0; i < versionDetails.length; i++ ) {
-        const currentVersion = versionDetails[i];
-        const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
-        const oldVersionHistory = await Karta.app.models.karta_history.find({ where: { versionId: currentVersion.id, kartaId }});
+       // Creating a new Version for new Karta 
+       const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
+       await Karta.update({ "id": newKarta.id }, { versionId: newVersion.id });
 
-        // Creating Karta History for new Karta
-        await createCopyKartaHistory(oldVersionHistory, newVersion, newKarta);
-
-        // Creating Karta Nodes for new karta based on history
-        let data = await createCopyKartaNodes(newVersion, newKarta);
-        if ( data.length > 0 ) {
-          lastHistoryOfKartaVersion = data[0];
-          finalVersionId = data[1];
+       // Creating Copy of Karta Nodes
+       const kartaNodeMapping = {};
+       const kartaNodes = await Karta.app.models.karta_node.find({ where: { or: [{ "kartaId": kartaId }, { "kartaDetailId": kartaId } ], is_deleted: false } });
+       if ( kartaNodes.length > 0 ) {
+        for( let i = 0; i < kartaNodes.length; i++ ) {
+          let currentNode = kartaNodes[i].__data;
+          let newKartaNode = {
+            ...currentNode,
+            phaseId: phaseMapping[currentNode.phaseId],
+            versionId: newVersion.id,
+          };
+          delete newKartaNode.id;
+          delete newKartaNode.children;
+          delete newKartaNode.phase;
+          newKartaNode["contributorId"] ? delete newKartaNode["contributorId"] : null;
+          newKartaNode["notify_type"] ? delete newKartaNode["notify_type"] : null;
+          newKartaNode["notifyUserId"] ? delete newKartaNode["notifyUserId"] : null;
+          newKartaNode["kartaId"] ? newKartaNode["kartaId"] = newKarta.id : newKartaNode["kartaDetailId"] = newKarta.id;
+          const newNode = await Karta.app.models.karta_node.create(newKartaNode);
+          kartaNodeMapping[currentNode.id.toString()] = newNode.id.toString();
         }
 
-        await Karta.app.models.karta_history.remove({ kartaId: newKarta.id, versionId: newVersion.id })
-      }
-
-      if ( lastHistoryOfKartaVersion && finalVersionId ) {
-        await Karta.update( { "id": newKarta.id }, { versionId: finalVersionId, historyId: lastHistoryOfKartaVersion } );
-        await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
-      }
-
+        for (let j = 0; j < kartaNodes.length; j++ ) {
+          let currentNode = kartaNodes[j].__data;
+          if(currentNode["parentId"]) {
+            await Karta.app.models.karta_node.update({"id": kartaNodeMapping[currentNode.id]}, {"parentId": kartaNodeMapping[currentNode.parentId]});
+          }
+        }
+       }
+      
+      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
       return "Karta copy created successfully..!!";
     }
     catch(err) {
@@ -330,146 +493,175 @@ module.exports = function(Karta) {
     }
   }
 
+  // View previous month karta new
+  Karta.viewKartaDetailsNew = async (type, number, kartaId, versionId) => {
+    try {
+
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
   // View Previous month karta
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
-      // Find the latest Karta version history ----
-      let GetKartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
-      let kartaData = JSON.parse(JSON.stringify(GetKartaInfo[0]));
-      const latestVersionHistory = await Karta.app.models.karta_history.find({ where: { kartaId, versionId: kartaData.versionId } });
+      // Find the whole karta information including all nodes
+      const kartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
+      // Formatting data
+      let kartaData = JSON.parse(JSON.stringify(kartaInfo[0]));
+      // Find all the history of the current karta with current version id
+      const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId } });
 
-      // Find the requested Karta version history ----
-      // Search Query
-      const searchQuery = { kartaId };
-      if ( type == "quarter" ) {
-        searchQuery["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
-      } else if ( type == "month" ) {
-        searchQuery["createdAt"] = { lte: moment().month(number-1).endOf('month') }
-      } else if ( type == "week" ) {
-        let cur_week_num = moment().isoWeek() - moment().subtract('days', moment().date() - 1).isoWeek() + 1;
-        let total_weeks = ( moment().week() - ( moment().month() * 4 ));
-        let week = cur_week_num - number;
-        week = week < 0 ? -week : week;
-        var queryDate = moment().add(week, 'weeks').endOf('week')
-        searchQuery["createdAt"] = { lte: queryDate }
+      // Prepare query according to requested parameters
+      let query = { kartaId };
+      if (type == "quarter") {
+        query["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
+      } else if (type == "month") {
+        query["createdAt"] = { lte: moment().month(number).endOf('month') }
+      } else if (type == "week") {
+        var queryDate = moment().startOf('month').startOf('week').add(number, 'weeks');
+        query["createdAt"] = { lte: queryDate }
       }
 
-      // Finding version which was created before the requested time
-      const versionDetails = await Karta.app.models.karta_version.find({ where: searchQuery });
-      if ( versionDetails.length > 0 ) {
+      // Find all versions which was created before the requested time
+      const versionDetails = await Karta.app.models.karta_version.find({ where: query });
+      if (versionDetails.length > 0) {
+        // Getting last version from that
         const requestedVersion = versionDetails[versionDetails.length - 1];
 
-        // Finding requested karta history before the requested time 
-        const requestedVersionHistory = await Karta.app.models.karta_history.find({ where: { ...searchQuery, versionId: requestedVersion.id } });
-        const lastHistoryObject = requestedVersionHistory[requestedVersionHistory.length - 1];
+        // Finding requested karta history before the requested time
+        const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": requestedVersion.id } });
+        // Getting last history event object from that
+        const lastHistoryObject = JSON.parse(JSON.stringify(requestedKartaHistory[requestedKartaHistory.length - 1]));
 
         // Comparing Latest Karta History with Requested Karta History
-        const historyIndex = latestVersionHistory.findIndex(x => {
-          if ( x.event == lastHistoryObject.event && JSON.stringify(x.kartaNodeId) == JSON.stringify(lastHistoryObject.kartaNodeId) ) {
-            if ( x.event == "node_created" || x.event == "node_removed" ) {
+        const historyIndex = latestKartaHistory.findIndex(x => {
+          // Find index of the last history object from the latest karta history
+          if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
+            // Return index of that directly, if node is created or removed
+            if (x.event == "node_created" || x.event == "node_removed" || x.event == "phase_created" || x.event == "phase_removed") {
               return x;
-            } else {
-              let newObj = {};
+            }
+            // If node is updated, then return the last updated history index
+            else if (x.event === "node_updated") {
+              const newObj = JSON.parse(JSON.stringify(x.old_options));
               let flagCheck = false;
-              Object.keys(x.old_options).forEach(key => {
-                newObj[key] = x.old_options[key];
-              });
 
-              if (Object.keys(lastHistoryObject.old_options).length == Object.keys(x.old_options).length) {
+              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
                 Object.keys(lastHistoryObject.old_options).forEach(key => {
-                  if ( newObj.hasOwnProperty(key) ) {
-                    if( typeof lastHistoryObject.old_options[key] == 'string' || typeof lastHistoryObject.old_options[key] == 'number' || typeof lastHistoryObject.old_options[key] == 'boolean'){
-                      newObj[key] == lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
-                    } else if ( typeof lastHistoryObject.old_options[key] == 'object' ) {
-                      Object.keys(newObj[key]).length == Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
+                  if (newObj.hasOwnProperty(key)) {
+                    if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
+                      newObj[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
+                    } else if (typeof lastHistoryObject.old_options[key] === 'object') {
+                      Object.keys(newObj[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
                     } else {
                       newObj[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
                     }
-                  } else {
-                    flagCheck = false;
-                  }
+                  } else flagCheck = false;
                 });
-              } else {
-                flagCheck = false;
-              }
-
-              if( flagCheck ){
-                return x;
-              }
+              } else flagCheck = false;
+              if (flagCheck) return x;
+            }
+            // If phase is updated, then return the last updated history index
+            else if (x.event === "phase_updated") {
+              let flagCheck = false;
+              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
+                if (lastHistoryObject.old_options.name === x.old_options.name) flagCheck = true;
+                else flagCheck = false;
+              } else flagCheck = false;
+              if (flagCheck) return x;
             }
           }
         });
 
         // Latest Karta History - Requested Karta History = History to Undo from main karta data 
-        const filteredHistory = latestVersionHistory.slice(historyIndex+1, latestVersionHistory.length);
+        const filteredHistory = latestKartaHistory.slice(historyIndex + 1, latestKartaHistory.length);
         
         // Performing Undo functionality on main kartaData
         let kartaNode = kartaData.node;
-        for ( let i = filteredHistory.length - 1; i >= 0; i-- ) {
+        let phaseIds = [];
+        let updatedPhaseIds = {};
+        for (let i = filteredHistory.length - 1; i >= 0; i--) {
           let currentHistoryObj = filteredHistory[i];
-          if ( currentHistoryObj.event == "node_created" ) {
+          // CHECKING FOR NODES
+          if (currentHistoryObj.event == "node_created") {
             function updateData(data) {
-              if ( data && JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.kartaNodeId) ) {
+              if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 return true;
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for(let j = 0; j < data.children.length; j++) {
-                      let value = updateData(data.children[j]);
-                      if (value) {
-                          delete data.children[j];
-                          break;
-                      }
-                    }
+              } else if (data && data.children && data.children.length > 0) {
+                for (let j = 0; j < data.children.length; j++) {
+                  let value = updateData(data.children[j]);
+                  if (value) {
+                    let tempChildren = data.children[j].children;
+                    delete data.children[j];
+                    data.children = [...tempChildren, data.children[j]];
+                    break;
                   }
+                }
               }
             }
             updateData(kartaNode);
-          } else if ( currentHistoryObj.event == "node_updated" ) {
+          } else if (currentHistoryObj.event == "node_updated") {
             function updateData(data) {
-              if ( data && JSON.stringify( data.id ) == JSON.stringify( currentHistoryObj.kartaNodeId ) ) {
+              if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 Object.keys(currentHistoryObj.old_options).map(x => {
-                  data[x] = currentHistoryObj.old_options[x];
+                  data[x] = JSON.parse(JSON.stringify(currentHistoryObj.old_options[x]));
                 });
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for( let j = 0; j < data.children.length; j++ ) {
-                      updateData(data.children[j]);
-                      break;
-                    }
-                  }
+              } else if (data && data.children && data.children.length > 0) {
+                for (let j = 0; j < data.children.length; j++) {
+                  updateData(data.children[j]);
+                }
               }
             }
             updateData(kartaNode);
-          } else if ( currentHistoryObj.event == "node_removed" ) {
+          } else if (currentHistoryObj.event == "node_removed") {
             function updateData(data) {
-              if (JSON.stringify(data.id) == JSON.stringify(currentHistoryObj.parentNodeId) ) {
+              if (data && data.id.toString() === currentHistoryObj.parentNodeId.toString()) {
                 let tempNode = {
                   ...currentHistoryObj.event_options.removed,
                   id: currentHistoryObj.kartaNodeId
-                };
+                }
                 return data.children && data.children.length > 0 ? data.children.push(tempNode) : data['children'] = [tempNode];
-              }
-              else {
-                  if ( data && data.children && data.children.length > 0 ) {
-                    for(let j = 0; j < data.children.length; j++) {
-                      updateData(data.children[j]);
-                      break;
-                    }
-                  }
+              } else if (data && data.children && data.children.length > 0) {
+                for(let j = 0; j < data.children.length; j++) {
+                  updateData(data.children[j]);
+                  break;
+                }
               }
             }
             updateData(kartaNode);
           }
+          // CHECKING FOR PHASES
+          if (currentHistoryObj.event === "phase_created") {
+            phaseIds.push(currentHistoryObj.kartaNodeId.toString());
+          } else if (currentHistoryObj.event == "phase_updated") {
+            updatedPhaseIds[i] = {
+              key: filteredHistory[i].kartaNodeId,
+              value: filteredHistory[i].old_options
+            }
+            // phaseIds.push(currentHistoryObj.kartaNodeId.toString());
+          } else if (currentHistoryObj.event == "phase_removed") {
+            phaseIds = phaseIds.filter(item => item !== filteredHistory[i].kartaNodeId);
+          }
         }
 
+        // Getting phases
+        let phases = await Karta.app.models.karta_phase.find({ where: { kartaId, or: [ { "id": { nin: phaseIds } }, { "is_child": false } ] } });
+        // Updating phases properties
+        phases = phases.map(item => {
+          Object.values(updatedPhaseIds).forEach(el => {
+            if (el.key.toString() === item.id.toString()) item.name = el.value.name;
+          });
+          return item;
+        });
+
         // Remove null from children arrays
-        function nullRemover( data ) {
-          if( data && data.children ) {
-            data.children = data.children.filter( x => x!== null );
-            if ( data.children.length > 0 ) {
-              for(let i = 0; i < data.children.length; i++) {
+        function nullRemover(data) {
+          if (data && data.children) {
+            data.children = data.children.filter( x => (x !== null && x !== undefined) );
+            if (data.children.length > 0) {
+              for (let i = 0; i < data.children.length; i++) {
                 nullRemover(data.children[i]);
               }
             }
@@ -478,7 +670,7 @@ module.exports = function(Karta) {
         nullRemover(kartaNode);
         kartaData["node"] = kartaNode;
 
-        return { message: "Karta data found..!!", data: kartaData };
+        return { message: "Karta data found..!!", karta: { kartaData, phases } };
       } else {
         return { message: "Karta was not created before the requested timeframe..!!", data: null };
       }
@@ -491,18 +683,62 @@ module.exports = function(Karta) {
 /* =============================REMOTE HOOKS=========================================================== */
     Karta.afterRemote('create', function(context, karta, next) {
       // Create Version
-      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (err, result) => {
-        if (err) {
-          console.log('> error while creating karta version', err);
+      Karta.app.models.karta_version.create({ "name" : "1", "kartaId": karta.id }, {} , (versionErr, versionResult) => {
+        if (versionErr) {
+          console.log('> error while creating karta version', versionErr);
           return next(err);
         } else {
-          Karta.update({ "id" : karta.id }, { "versionId" : result.id, selfCopyCount: 0, sharedCopyCount: 0 }, (err, data) => {
-            if (err) {
-              console.log('> error while updating newly crated karta', err);
+          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, selfCopyCount: 0, sharedCopyCount: 0 }, async (kartaErr, kartaResult) => {
+            if (kartaErr) {
+              console.log('> error while updating newly crated karta', kartaErr);
               return next(err);
-            } else next();
+            } else {
+              const userDetails = await Karta.app.models.user.findOne({ where: { "id": karta.userId }});
+              if (userDetails) {
+                await sales_update_user({ sforceId: userDetails.sforceId }, { activeKarta: karta.name, kartaLastUpdate: karta.updatedAt });
+              }
+              // Get all phases
+              Karta.app.models.karta_phase.find({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, (phaseErr, phaseResult) => {
+                if (phaseErr) {
+                  console.log('> error while fetching all global phases', phaseErr);
+                  return next(err);
+                } else {
+                  let phases = [];
+                  phaseResult.forEach(element => {
+                    phases.push({
+                      "name": element.name,
+                      "global_name": element.name,
+                      "is_global": true,
+                      "phaseId": element.id,
+                      "kartaId": karta.id,
+                      "userId": karta.userId
+                    });
+                  });
+                  // Create a copy of global phases for current karta
+                  Karta.app.models.karta_phase.create(phases, (phaseErr2, phaseResult2) => {
+                    if (phaseErr2) {
+                      console.log('> error while creating all global phases', phaseErr2);
+                      return next(err);
+                    } else next();
+                  });
+                }
+              });
+            }
           });
         }
       });
+    });
+
+    Karta.afterRemote('prototype.patchAttributes', function(context, instance, next) {
+      const req = context.req;
+      if (req.body.updatedAt) {
+        Karta.app.models.user.findOne({ where: { "id": instance.userId }}, (err, userData) => {
+          if (err) {
+            next(err);
+          }
+          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
+          next();
+        });
+      } else next();
     });
 };

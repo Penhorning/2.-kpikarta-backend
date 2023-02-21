@@ -49,7 +49,7 @@ exports.sendTargetAlertsCron = async (app) => {
                 userId: item.notifyUserId
             }
             await app.models.notification.create(notificationData);
-            await app.models.KartaNode.update({ "_id": item.id },  { "last_alert_sent_on": new Date() });
+            await app.models.KartaNode.update({ "_id": item.id }, { "last_alert_sent_on": new Date() });
         } else if (params["percentage"] < params["thresholdValue"] && item.alert_type === "email") {
             const data = {
                 subject: "KPI Target Alert",
@@ -63,7 +63,7 @@ exports.sendTargetAlertsCron = async (app) => {
                 achievedValue: item.achieved_value
             }
             sendEmail(app, data, async () => {
-                await app.models.KartaNode.update({ "_id": item.id },  { "last_alert_sent_on": new Date() });
+                await app.models.KartaNode.update({ "_id": item.id }, { "last_alert_sent_on": new Date() });
             });
         }
     }

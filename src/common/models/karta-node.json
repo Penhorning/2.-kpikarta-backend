@@ -85,8 +85,12 @@
         }
       ]
     },
+
     "achieved_value": {
       "type": "number"
+    },
+    "target_label": {
+      "type": "string"
     },
     "is_achieved_modified": {
       "type": "boolean"
@@ -109,6 +113,9 @@
           "userId": "string"
         }
       ]
+    },
+    "sample": {
+      "type": "boolean"
     }
   },
   "validations": [],
@@ -180,9 +187,21 @@
   },
   "acls": [
     {
-      "accessType": "READ",
+      "accessType": "*",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "DENY"
+    },
+    {
+      "accessType": "*",
       "principalType": "ROLE",
       "principalId": "$authenticated",
+      "permission": "ALLOW"
+    },
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
       "permission": "ALLOW"
     }
   ],
@@ -322,6 +341,40 @@
       },
       "http": {
         "path": "/kpis",
+        "verb": "post"
+      }
+    },
+    "getNodesDetails": {
+      "accepts": [
+        {
+          "arg": "nodeIds",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "nodes",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-nodes-details",
+        "verb": "post"
+      }
+    },
+    "updateKpiNodes": {
+      "accepts": [
+        {
+          "arg": "nodes",
+          "type": "array",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-kpi-nodes",
         "verb": "post"
       }
     },

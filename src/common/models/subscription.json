@@ -21,6 +21,9 @@
       "type": "string",
       "required": true
     },
+    "companyId": {
+      "type": "string"
+    },
     "customerId": {
       "type": "string",
       "required": true
@@ -34,8 +37,41 @@
       "required": true
     },
     "subscriptionId": {
-      "type": "string",
-      "required": true
+      "type": "string"
+    },
+    "trialActive": {
+      "type": "boolean",
+      "default": false
+    },
+    "trialEnds": {
+      "type": "string"
+    },
+    "status": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentSubscriptionDate": {
+      "type": "string"
+    },
+    "nextSubscriptionDate": {
+      "type": "string"
+    },
+    "cronCheck": {
+      "type": "boolean",
+      "default": false
+    },
+    "cardHolder": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentPlan": {
+      "type": "string"
+    },
+    "licenseId": {
+      "type": "string"
+    },
+    "testClock": {
+      "type": "string"
     }
   },
   "validations": [],
@@ -44,6 +80,14 @@
       "type": "belongsTo",
       "model": "user",
       "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "license": {
+      "type": "belongsTo",
+      "model": "license",
+      "foreignKey": "licenseId",
       "options": {
         "nestRemoting": true
       }
@@ -132,7 +176,7 @@
     "getCards": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string",
           "required": true
         }
@@ -146,37 +190,44 @@
         "verb": "post"
       }
     },
-    "updateSubscription": {
+    "blockSubscription": {
       "accepts": [
         {
           "arg": "userId",
           "type": "string",
           "required": true
-        },
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/block-subscription",
+        "verb": "post"
+      }
+    },
+    "unblockSubscription": {
+      "accepts": [
         {
-          "arg": "licenseType",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "type",
+          "arg": "userId",
           "type": "string",
           "required": true
         }
       ],
       "returns": {
-        "arg": "data",
-        "type": "object"
+        "arg": "message",
+        "type": "string"
       },
       "http": {
-        "path": "/update-subscription",
+        "path": "/unblock-subscription",
         "verb": "post"
       }
     },
     "getSubscribedUsers": {
       "accepts": [
         {
-          "arg": "userId",
+          "arg": "companyId",
           "type": "string",
           "required": true
         }
@@ -190,10 +241,27 @@
         "verb": "post"
       }
     },
-    "getInvoices": {
+    "getOfflineUsers": {
       "accepts": [
         {
           "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-dashboard-users",
+        "verb": "post"
+      }
+    },
+    "getInvoices": {
+      "accepts": [
+        {
+          "arg": "companyId",
           "type": "string"
         }
       ],
@@ -206,6 +274,54 @@
         "verb": "post"
       }
     },
+    "getInvoicesForAdmin": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "previousId",
+          "type": "string"
+        },
+        {
+          "arg": "nextId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "invoices",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices",
+        "verb": "post"
+      }
+    },
+    "getInvoicesForAdminChart": {
+      "accepts": [
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices-chart",
+        "verb": "post"
+      }
+    },
     "getPrices": {
       "accepts": [],
       "returns": {
@@ -214,6 +330,100 @@
       },
       "http": {
         "path": "/get-prices",
+        "verb": "get"
+      }
+    },
+    "createSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-subscription",
+        "verb": "post"
+      }
+    },
+    "getPricesForAdmin": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-admin-plans",
+        "verb": "get"
+      }
+    },
+    "getPriceByIdForAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plan",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plan",
+        "verb": "post"
+      }
+    },
+    "updatePlansByAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        },
+        {
+          "arg": "amount",
+          "type": "string"
+        },
+        {
+          "arg": "name",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plans",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-admin-plans",
+        "verb": "post"
+      }
+    },
+    "cancelSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "subscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-subscription",
+        "verb": "post"
+      }
+    },
+    "getUserCount": {
+      "accepts": [],
+      "returns": {
+        "arg": "count",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-user-count",
         "verb": "get"
       }
     }

@@ -76,7 +76,26 @@
       }
     }
   },
-  "acls": [],
+  "acls": [
+    {
+      "accessType": "*",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "DENY"
+    },
+    {
+      "accessType": "*",
+      "principalType": "ROLE",
+      "principalId": "$authenticated",
+      "permission": "ALLOW"
+    },
+    {
+      "accessType": "READ",
+      "principalType": "ROLE",
+      "principalId": "$everyone",
+      "permission": "ALLOW"
+    }
+  ],
   "methods": {
     "getAll": {
       "accepts": [
@@ -92,6 +111,11 @@
         },
         {
           "arg": "type",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "accessType",
           "type": "string",
           "required": false
         },
@@ -117,6 +141,38 @@
       },
       "http": {
         "path": "/get-all",
+        "verb": "post"
+      }
+    },
+    "getAllPublic": {
+      "accepts": [
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "nodeTypes",
+          "type": "array",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "catalogs",
+        "type": "karta_catalog"
+      },
+      "http": {
+        "path": "/get-all-public",
         "verb": "post"
       }
     },
