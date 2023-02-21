@@ -1,6 +1,7 @@
 'use strict';
 
 const moment = require('moment');
+const { sales_update_user } = require('../../helper/salesforce');
 const { sendEmail } = require('../../helper/sendEmail');
 
 module.exports = function(Karta) {
@@ -355,6 +356,7 @@ module.exports = function(Karta) {
               console.log('> error while deleting karta', err);
               next(err);
             }
+
             // Delete phases
             Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
               if (err) {
@@ -377,7 +379,7 @@ module.exports = function(Karta) {
                   console.log('> error while finding karta contributors', err);
                   next(err);
                 }
-                Karta.findOne({ where: { id: kartaId }}, (err, karta) => {
+                Karta.findOne({ where: { id: kartaId }}, async (err, karta) => {
                   if (err) {
                     console.log('> error while finding karta details', err);
                     next(err);
@@ -402,8 +404,14 @@ module.exports = function(Karta) {
                       if (err) console.log('> error while inserting data in notification collection', err);
                     });
 
+                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+                    const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
+                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
                     next(null, "Karta deleted successfully..!!");
                   } else {
+                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
+                    const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
+                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
                     next(null, "Karta deleted successfully..!!");
                   }
                 });
@@ -680,11 +688,15 @@ module.exports = function(Karta) {
           console.log('> error while creating karta version', versionErr);
           return next(err);
         } else {
-          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, selfCopyCount: 0, sharedCopyCount: 0 }, (kartaErr, kartaResult) => {
+          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, selfCopyCount: 0, sharedCopyCount: 0 }, async (kartaErr, kartaResult) => {
             if (kartaErr) {
               console.log('> error while updating newly crated karta', kartaErr);
               return next(err);
             } else {
+              const userDetails = await Karta.app.models.user.findOne({ where: { "id": karta.userId }});
+              if (userDetails) {
+                await sales_update_user({ sforceId: userDetails.sforceId }, { activeKarta: karta.name, kartaLastUpdate: karta.updatedAt });
+              }
               // Get all phases
               Karta.app.models.karta_phase.find({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, (phaseErr, phaseResult) => {
                 if (phaseErr) {
@@ -715,5 +727,18 @@ module.exports = function(Karta) {
           });
         }
       });
+    });
+
+    Karta.afterRemote('prototype.patchAttributes', function(context, instance, next) {
+      const req = context.req;
+      if (req.body.updatedAt) {
+        Karta.app.models.user.findOne({ where: { "id": instance.userId }}, (err, userData) => {
+          if (err) {
+            next(err);
+          }
+          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
+          next();
+        });
+      } else next();
     });
 };

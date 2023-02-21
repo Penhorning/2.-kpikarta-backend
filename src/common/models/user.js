@@ -8,6 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
+const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -302,12 +303,24 @@ module.exports = function(User) {
       } else {
         RoleManager.assignRoles(User.app, [roleId], user.id, () => {
           // Find creator's company id and assign it to the new user
-          User.findById(creatorId, (err, creator) => {
+          User.findById(creatorId, async (err, creator) => {
             if (err) {
               console.log('> error while getting creator data', err);
               return next(err);
             }
-            User.update({ "_id": user.id },  { "companyId": creator.companyId }, err => {
+
+            const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
+            const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
+            const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            let userDetails = {
+              ...user,
+              companyName: creator.companyName,
+              license: licenseDetails.name,
+              role: roleDetails.name,
+              department: departmentDetails.name,
+            }
+            let ret = await sales_user_details(userDetails);
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, err => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
@@ -318,7 +331,6 @@ module.exports = function(User) {
                   subject: `Welcome to | ${User.app.get('name')}`,
                   template: "welcome.ejs",
                   email: user.email,
-
                   user,
                   password,
                   loginUrl: `${process.env.WEB_URL}/login`,
@@ -592,6 +604,7 @@ module.exports = function(User) {
           if (roles.indexOf(role) > -1) {
             next(null, token);
           } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -615,6 +628,7 @@ module.exports = function(User) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
+        sales_update_user(this.app.currentUser, { "emailVerified": true });
         next(err, this.app.currentUser);
       });
     } else {
@@ -903,18 +917,27 @@ module.exports = function(User) {
             return next(err);
           }
           // Find license
-          User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
+          User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
             if (err) {
               console.log('> error while finding license', err);
               return next(err);
             }
+            let userDetails = {
+              ...user,
+              companyName: company.name,
+              license: license.name,
+              role: role.name
+            }
+            let ret = await sales_user_details(userDetails);
+            if(ret && ret.id) {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
+                  if (err) {
+                    console.log('> error while updating user', err);
+                    return next(err);
+                  }
+              });
+            }
             // Assign roleId, licenseId and companyId
-            User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              }
-            });
           });
         });
         // Create token

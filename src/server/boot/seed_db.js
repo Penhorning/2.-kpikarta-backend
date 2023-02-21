@@ -134,7 +134,7 @@ module.exports = async function(app) {
     }
   }
 
-  createDummyKarta();
+  await createDummyKarta();
   // Creating 7 global phases
   const phases= ['Goal', 'Critical Success Factor', 'Phase', 'Segment', 'Approach', 'Action', 'KPI']
   for (let phase of phases) {
