@@ -77,13 +77,14 @@ module.exports = function (Kartanode) {
   }
 
   // Delete child nodes
-  const deleteChildNodes = (params) => {
+  const deleteChildNodes = (params, randomKey) => {
     try {
       if(params.length > 0){
         params.forEach(async item => {
           let childrens = await Kartanode.find({ where: { "parentId": item.id } });
           await Kartanode.updateAll({ "_id": item.id }, { $set: { "is_deleted": true } });
-          if (childrens.length > 0) deleteChildNodes(childrens);
+          await createHistory(item.kartaDetailId, item, { "is_deleted": true }, randomKey, "node_removed");
+          if (childrens.length > 0) deleteChildNodes(childrens, randomKey);
         });
       }
     } catch (err) {
@@ -92,14 +93,12 @@ module.exports = function (Kartanode) {
   }
 
   // Create history
-  const createHistory = async (kartaId, node, updatedData, randomKey) => {
-    console.log(node, 'node')
-    console.log(updatedData, 'updatedData')
+  const createHistory = async (kartaId, node, updatedData, randomKey, event = "node_updated") => {
     Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
       // Create history
       // Prepare history data
       let history_data = {
-        event: "node_updated",
+        event,
         kartaNodeId: node.id,
         userId: Kartanode.app.currentUser.id,
         versionId: karta.versionId,
@@ -358,6 +357,13 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Get last updated kpi nodes
+  Kartanode.lastUpdatedKPINode = (kartaId, next) => {
+    Kartanode.findOne({ where: { "kartaDetailId": kartaId, "is_deleted": false, or: [ { "node_type": "measure" }, { "node_type": "metrics" } ] } }, { sort: { "updatedAt": -1 } }, (err, result) => {
+      next(err, result);
+    });
+  }
+
   // Get kpi nodes by contributorId
   Kartanode.kpiNodes = (page, limit, searchQuery, userId, statusType, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
@@ -609,17 +615,19 @@ module.exports = function (Kartanode) {
 
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
-    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, (err) => {
+    const randomKey = new Date().getTime();
+    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
       if (err) {
         console.log('error while soft deleting karta Nodes', err);
         return next(err);
       }
       else {
+        createHistory(kartaId, { id: nodeId, "is_deleted": false }, { "is_deleted": true }, randomKey, "node_removed");
         Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
           if (err) console.log('> error while finding child nodes', err);
-          deleteChildNodes(result);
+          deleteChildNodes(result, randomKey);
         });
-        reAdjustWeightage(kartaId, parentId, phaseId);
+        reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
         return next(null, "Node deleted successfully..!!");
       }
     })
@@ -990,7 +998,7 @@ module.exports = function (Kartanode) {
           next(err);
         }   
 
-        if(Kartanode.app.currentUser.id.toString() !== req.body.contributorId.toString()) {
+        if (Kartanode.app.currentUser.id.toString() !== req.body.contributorId.toString()) {
           // Prepare notification collection data
           let notificationObj = {
             title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
@@ -1007,7 +1015,6 @@ module.exports = function (Kartanode) {
             }
           });
         }
-        
         next(null, result);
       });
     };
@@ -1023,9 +1030,10 @@ module.exports = function (Kartanode) {
         Kartanode.app.models.karta.update( { "id": kartaId }, { updatedAt: instance.updatedAt }, (err, result) => {
           if (err) {
             next(err);
+          } else if (userData.sforceId) {
+            sales_update_user({ sforceId: userData.sforceId }, { activeKarta: karta.name, kartaLastUpdate: instance.updatedAt });
           }
-          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: karta.name, kartaLastUpdate: instance.updatedAt });
-          next();
+          if (!req.body.contributorId) next();
         });
       });
     });

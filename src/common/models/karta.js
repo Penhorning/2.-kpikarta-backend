@@ -406,12 +406,16 @@ module.exports = function(Karta) {
 
                     const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
                     const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
-                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
+                    if (userData.sforceId) {
+                      sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt });
+                    }
                     next(null, "Karta deleted successfully..!!");
                   } else {
                     const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
                     const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
-                    sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt })
+                    if (userData.sforceId) {
+                      sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt });
+                    }
                     next(null, "Karta deleted successfully..!!");
                   }
                 });
@@ -694,7 +698,7 @@ module.exports = function(Karta) {
               return next(err);
             } else {
               const userDetails = await Karta.app.models.user.findOne({ where: { "id": karta.userId }});
-              if (userDetails) {
+              if (userDetails && userDetails.sforceId) {
                 await sales_update_user({ sforceId: userDetails.sforceId }, { activeKarta: karta.name, kartaLastUpdate: karta.updatedAt });
               }
               // Get all phases
@@ -735,8 +739,9 @@ module.exports = function(Karta) {
         Karta.app.models.user.findOne({ where: { "id": instance.userId }}, (err, userData) => {
           if (err) {
             next(err);
+          } else if (userData.sforceId) {
+            sales_update_user({ sforceId: userData.sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
           }
-          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: instance.name, kartaLastUpdate: instance.updatedAt });
           next();
         });
       } else next();
