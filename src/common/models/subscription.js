@@ -171,7 +171,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(1, 'minutes').unix(), 
+              trialEnds: moment().add(15, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
@@ -398,7 +398,7 @@ module.exports = function (Subscription) {
             let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
             tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
             tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
-            tracker[licenseName].total_amount ? tracker[licenseName].total_amount = tracker[licenseName].total_amount + priceDataFromStripe.metadata.unit_amount : tracker[licenseName].total_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker[licenseName].total_amount ? (tracker[licenseName].total_amount = Number(tracker[licenseName].total_amount) + Number(priceDataFromStripe.metadata.unit_amount)) : (tracker[licenseName].total_amount = Number(priceDataFromStripe.metadata.unit_amount));
             tracker[licenseName].currency = "usd";
 
             userObj.interval ? null : userObj.interval = currentUser.currentPlan;
@@ -437,6 +437,8 @@ module.exports = function (Subscription) {
             tracker["Champion"].total_amount = 0;
             tracker["Champion"].currency = "usd";
           }
+
+          userObj.interval = "Trial";
         }
 
         // Finding Spectators List
