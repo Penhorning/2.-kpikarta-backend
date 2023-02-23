@@ -77,13 +77,14 @@ module.exports = function (Kartanode) {
   }
 
   // Delete child nodes
-  const deleteChildNodes = (params) => {
+  const deleteChildNodes = (params, randomKey) => {
     try {
       if(params.length > 0){
         params.forEach(async item => {
           let childrens = await Kartanode.find({ where: { "parentId": item.id } });
           await Kartanode.updateAll({ "_id": item.id }, { $set: { "is_deleted": true } });
-          if (childrens.length > 0) deleteChildNodes(childrens);
+          await createHistory(item.kartaDetailId, item, { "is_deleted": true }, randomKey, "node_removed");
+          if (childrens.length > 0) deleteChildNodes(childrens, randomKey);
         });
       }
     } catch (err) {
@@ -92,14 +93,12 @@ module.exports = function (Kartanode) {
   }
 
   // Create history
-  const createHistory = async (kartaId, node, updatedData, randomKey) => {
-    console.log(node, 'node')
-    console.log(updatedData, 'updatedData')
+  const createHistory = async (kartaId, node, updatedData, randomKey, event = "node_updated") => {
     Kartanode.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
       // Create history
       // Prepare history data
       let history_data = {
-        event: "node_updated",
+        event,
         kartaNodeId: node.id,
         userId: Kartanode.app.currentUser.id,
         versionId: karta.versionId,
@@ -616,17 +615,19 @@ module.exports = function (Kartanode) {
 
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
-    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, (err) => {
+    const randomKey = new Date().getTime();
+    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
       if (err) {
         console.log('error while soft deleting karta Nodes', err);
         return next(err);
       }
       else {
+        createHistory(kartaId, { id: nodeId, "is_deleted": false }, { "is_deleted": true }, randomKey, "node_removed");
         Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
           if (err) console.log('> error while finding child nodes', err);
-          deleteChildNodes(result);
+          deleteChildNodes(result, randomKey);
         });
-        reAdjustWeightage(kartaId, parentId, phaseId);
+        reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
         return next(null, "Node deleted successfully..!!");
       }
     })
