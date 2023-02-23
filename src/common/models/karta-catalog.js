@@ -95,6 +95,15 @@ module.exports = function(Kartacatalog) {
         USER_LOOKUP(objectUserId),
         UNWIND_USER,
         SORT,
+        {
+          $project: {
+            "name": 1,
+            "node": 1,
+            "node_type": 1,
+            "type": 1,
+            "user": 1
+          }
+        },
         FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;

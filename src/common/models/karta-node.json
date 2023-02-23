@@ -21,6 +21,9 @@
       "type": "string",
       "default": "Child"
     },
+    "node_description": {
+      "type": "string"
+    },
     "assigned_date": {
       "type": "date"
     },
@@ -259,6 +262,23 @@
       },
       "http": {
         "path": "/kpiStats",
+        "verb": "post"
+      }
+    },
+    "lastUpdatedKPINode": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "kpi_node",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/last-updated-kpi-node",
         "verb": "post"
       }
     },
