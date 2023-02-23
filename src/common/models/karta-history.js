@@ -4,14 +4,59 @@ const e = require("cors");
 
 module.exports = function(Kartahistory) {
     // Generic functions 
-    async function findChildNodes(nodeId, type) {
-        let boolValue = type == "remove" ? true : false;
-        await Kartahistory.app.models.karta_node.update({ "id": nodeId, "is_deleted": boolValue }, { "is_deleted": !boolValue });
-        const children = await Kartahistory.app.models.karta_node.find({ where: { "parentId": nodeId, "is_deleted": boolValue }});
-        if (children && children.length > 0) {
-            for ( let i = 0; i < children.length; i++ ) {
-                await findChildNodes(children[i].id, type);
+    async function ReachToLastVersion(kartaId) {
+        await Kartahistory.app.models.karta_node.updateAll( { or: [ { kartaId }, { kartaDetailId: kartaId }] }, { "is_deleted": true } );
+        await Kartahistory.app.models.karta_phase.updateAll( { kartaId, "is_child": true }, { "is_deleted": true } );
+
+        let kartaVersions = await Kartahistory.app.models.karta_version.find({ where: { kartaId }});
+        let lastVersion = kartaVersions[kartaVersions.length - 1];
+
+        let tempHistoryData = await Kartahistory.find({ where: { versionId: lastVersion.id, kartaId, historyType: 'temp', "undoCheck" : false }}); 
+        let mainHistoryData = await Kartahistory.find({ where: { versionId: lastVersion.id, kartaId, historyType: 'main', "undoCheck" : false }});
+        let finalHistoryData = tempHistoryData.concat(mainHistoryData);
+        let lastHistoryOfKartaVersion = "";
+        let nodeIds = {};
+        let updatedNodeIds = {};
+        let phaseIds = {};
+        let updatedPhaseIds = {};
+        
+        for ( let j = 0; j < finalHistoryData.length; j++ ) {
+            if(finalHistoryData[j].event == "node_created") {
+                nodeIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
+            } else if (finalHistoryData[j].event == "node_updated") {
+                updatedNodeIds[j] = {
+                    key: finalHistoryData[j].kartaNodeId,
+                    value: finalHistoryData[j].event_options.updated
+                };
+                nodeIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
+            } else if (finalHistoryData[j].event == "node_removed") {
+                delete nodeIds[finalHistoryData[j].kartaNodeId];
+            } else if (finalHistoryData[j].event == "phase_created") {
+                phaseIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
+            } else if (finalHistoryData[j].event == "phase_updated") {
+                updatedPhaseIds[j] = {
+                    key: finalHistoryData[j].kartaNodeId,
+                    value: finalHistoryData[j].event_options.updated
+                };
+                phaseIds[finalHistoryData[j].kartaNodeId] = finalHistoryData[j].kartaNodeId;
+            } else if (finalHistoryData[j].event == "phase_removed") {
+                delete phaseIds[finalHistoryData[j].kartaNodeId];
             }
+
+            if ( j == finalHistoryData.length - 1 ){
+                lastHistoryOfKartaVersion = finalHistoryData[j].id;
+            }
+        }
+
+        await Kartahistory.app.models.karta_phase.update( { "id": {in: Object.keys(phaseIds)}, "is_deleted": true }, { "is_deleted": false } );
+        for(let l = 0; l < Object.keys(updatedPhaseIds).length; l++) {
+            await Kartahistory.app.models.karta_phase.update( { "id": updatedPhaseIds[l].key.toString() }, updatedPhaseIds[l].value );
+        }
+
+        await Kartahistory.app.models.karta_node.update( { "id": {in: Object.keys(nodeIds)}, "is_deleted": true }, { "is_deleted": false } );
+        for(let k = 0; k < Object.values(updatedNodeIds).length; k++) {
+            let newValue = Object.values(updatedNodeIds);
+            await Kartahistory.app.models.karta_node.update( { "id": newValue[k].key }, newValue[k].value );
         }
     }
 
@@ -65,6 +110,9 @@ module.exports = function(Kartahistory) {
 
     Kartahistory.versionControlChange = async (versionId, kartaId) => {
         try {
+            // Reaching to the last version first
+            await ReachToLastVersion(kartaId);
+
             await Kartahistory.app.models.karta_node.updateAll( { or: [ { kartaId }, { kartaDetailId: kartaId }] }, { "is_deleted": true } );
             await Kartahistory.app.models.karta_phase.updateAll( { kartaId, "is_child": true }, { "is_deleted": true } );
 
@@ -105,13 +153,15 @@ module.exports = function(Kartahistory) {
                 }
             }
 
-            await Kartahistory.app.models.karta_node.update( { "id": {in: Object.keys(nodeIds)}, "is_deleted": true }, { "is_deleted": false } );
-            for(let k in updatedNodeIds) {
-                await Kartahistory.app.models.karta_node.update( { "id": updatedNodeIds[k].key.toString() }, updatedNodeIds[k].value );
-            }
             await Kartahistory.app.models.karta_phase.update( { "id": {in: Object.keys(phaseIds)}, "is_deleted": true }, { "is_deleted": false } );
-            for(let l in updatedPhaseIds) {
+            for(let l = 0; l < Object.keys(updatedPhaseIds).length; l++) {
                 await Kartahistory.app.models.karta_phase.update( { "id": updatedPhaseIds[l].key.toString() }, updatedPhaseIds[l].value );
+            }
+
+            await Kartahistory.app.models.karta_node.update( { "id": {in: Object.keys(nodeIds)}, "is_deleted": true }, { "is_deleted": false } );
+            for(let k = 0; k < Object.values(updatedNodeIds).length; k++) {
+                let newValue = Object.values(updatedNodeIds);
+                await Kartahistory.app.models.karta_node.update( { "id": newValue[k].key }, newValue[k].value );
             }
 
             await Kartahistory.app.models.karta.update( { "id": kartaId }, { versionId, historyId: lastHistoryOfKartaVersion } );

@@ -116,9 +116,9 @@ module.exports = function (Subscription) {
       } else {
         // Creating Test Clock for testing
         let testClock = null;
-        testClock = await stripe.testHelpers.testClocks.create({
-          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        });
+        // testClock = await stripe.testHelpers.testClocks.create({
+        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        // });
 
         // Create Customer on Stripe
         let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
@@ -171,7 +171,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().subtract(2, 'days').unix(), 
+              trialEnds: moment().add(1, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
@@ -417,7 +417,13 @@ module.exports = function (Subscription) {
           for ( let i = 0; i < findUsers.length; i++) {
             let currentUser = findUsers[i];
             let licenseName = currentUser.license().name;
+            let interval = currentUser.currentPlan;
+            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
+            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
             tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
+            tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker[licenseName].total_amount = 0;
+            tracker[licenseName].currency = "usd";
 
             userObj.interval ? null : userObj.interval = currentUser.currentPlan;
           }
@@ -432,6 +438,11 @@ module.exports = function (Subscription) {
             tracker["Champion"].currency = "usd";
           }
         }
+
+        // Finding Spectators List
+        const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
+        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id }, include: "license" });
+        tracker["Spectator"].quantity = findSpectators.length;
 
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
         userObj["userDetails"] = userDetails;
@@ -493,7 +504,7 @@ module.exports = function (Subscription) {
 
               result.map( async x => {
                 tracker[x.license.name] = {...tracker[x.license.name], quantity: tracker[x.license.name].quantity + 1 };
-              })
+              });
 
               let userDetails = Object.keys(tracker).map(x => tracker[x]);
               userObj["userDetails"] = userDetails;
@@ -692,24 +703,28 @@ module.exports = function (Subscription) {
       // 3. Update the new priceId for every subscription on stripe
       const subscriptionsList = await Subscription.find({ trialActive: false , status: true });
 
-      for ( let i = 0; i < subscriptionsList.length; i++ ) {
+      for (let i = 0; i < subscriptionsList.length; i++ ) {
         let currentSubscription = subscriptionsList[i];
-        const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
-        let updatedItems = [];
-        for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
-          if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
-            updatedItems.push({
-              id: getSubscriptionDetails.items.data[j].id,
-              price: newPrice.id
-            });
+        if (currentSubscription.subscriptionId && currentSubscription.subscriptionId !== "deactivated") {
+          const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
+          let updatedItems = [];
+          for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+            if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
+              updatedItems.push({
+                id: getSubscriptionDetails.items.data[j].id,
+                price: newPrice.id
+              });
+            }
+          }
+
+          if ( updatedItems.length > 0 ) {
+            await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
           }
         }
-        if ( updatedItems.length > 0 ) {
-          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
-          // 4. Update the new priceid in DB
-          await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
-        }
-      };
+      }
+
+      // 4. Update the new priceid in DB
+      await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
 
       // 5. Deactivate the old price in stripe
       await update_price_by_id(priceId, { active: false });

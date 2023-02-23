@@ -10,7 +10,7 @@ exports.create_price = async (nickname, productId, amount, interval) => {
             nickname: nickname,
             product: productId,
             currency: 'usd',
-            unit_amount: amount,
+            unit_amount: amount * 100,
             recurring: { interval }, // interval can be month/year
             // recurring: { interval: interval, usage_type: 'licensed' }, // interval can be month/year
             // billing_scheme: 'tiered', 
