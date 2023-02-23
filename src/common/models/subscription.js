@@ -1,5 +1,6 @@
 "use strict";
 const stripe = require("stripe")(process.env.STRIPE_API_KEY);
+const { sendEmail } = require('../../helper/sendEmail');
 const { 
   create_customer, 
   update_customer_by_id, 
@@ -21,7 +22,8 @@ const {
   create_refund,
   update_price_by_id,
   cancel_user_subscription,
-  delete_card
+  delete_card,
+  create_source
 } = require("../../helper/stripe");
 const moment = require('moment');
 
@@ -50,7 +52,7 @@ module.exports = function (Subscription) {
   Subscription.saveCard = async (userId, cardNumber, expirationDate, fullName, cvc, plan) => {
     // PLAN - Monthly/Yearly
     try {
-      const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }});
+      const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }, include: "company" });
       const findUser = await Subscription.findOne({where: { userId }});
       if(findUser) {
         // Create a token
@@ -90,11 +92,14 @@ module.exports = function (Subscription) {
             }
 
             // Update Customer & Subscription
+            const allCardUsers = await Subscription.find({ where: { cardId: findUser.cardId}});
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-            if (findUser.subscriptionId && findUser.status ) {
-              await update_subscription(findUser.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
+            for(let user in allCardUsers) {
+              if ( !user.trialActive && user.status ) {
+                await update_subscription(user.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
+              }
+              await Subscription.update({ userId: user.userId }, { tokenId: token.id, cardId: card.id });
             }
-            await Subscription.update({ userId }, { tokenId: token.id, cardId: card.id });
 
             // Delete the Previous Card
             await delete_card(findUser.customerId, previousCardId);
@@ -110,13 +115,15 @@ module.exports = function (Subscription) {
         }
       } else {
         // Creating Test Clock for testing
-        const testClock = await stripe.testHelpers.testClocks.create({
-          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        });
+        let testClock = null;
+        // testClock = await stripe.testHelpers.testClocks.create({
+        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        // });
 
         // Create Customer on Stripe
-        let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}, clock: testClock.id });
-        // let customer = await create_customer({ name: fullName, description: `Welcome to stripe, ${fullName}`, address: {} });
+        let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
+        testClock ? customerObj["clock"] = testClock.id : null;
+        let customer = await create_customer(customerObj);
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
@@ -159,16 +166,32 @@ module.exports = function (Subscription) {
             const trialData = await Subscription.app.models.trial_period.findOne({});
             const trialDays = trialData ? moment().add(trialData.days, 'days').unix() : moment().add(14, 'days').unix();
             await Subscription.app.models.user.update({ "id": userId }, { currentPlan: plan });
-            // await Subscription.create({ userId, customerId: customer.id, cardId: card.id, tokenId: token.id, trialEnds: trialDays, trialActive: true, companyId: userDetails.companyId });
-            await Subscription.create({ 
+            let subscriptionObj = { 
               userId, 
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().subtract(2, 'days').unix(), 
+              trialEnds: moment().add(1, 'minutes').unix(), 
+              // trialEnds: trialDays,
               trialActive: true,
-              companyId: userDetails.companyId
-            });
+              companyId: userDetails.companyId,
+              cardHolder: true,
+              currentPlan: plan,
+              licenseId: userDetails.licenseId
+            };
+            testClock ? subscriptionObj["testClock"] = testClock.id : null;
+            await Subscription.create(subscriptionObj);
+
+            const superAdmin = await Subscription.app.models.user.findOne({ where: { licenseId: { exists : false }, companyId: { exists : false } }});
+            const emailObj = {
+              subject: `A new user has signed up..!!`,
+              template: "admin-notify.ejs",
+              email: superAdmin.email,
+              user: userDetails,
+              admin: superAdmin,
+              company: userDetails.company().name
+            };
+            sendEmail(Subscription.app, emailObj, () => {});
   
             // Successful Return
             return {message: "Card saved successfully", data: null};
@@ -226,157 +249,123 @@ module.exports = function (Subscription) {
     }
   }
 
-  Subscription.createSubscription = async (userId, plan) => {
+  Subscription.createSubscription = async (userId) => {
     try {
-      // PLAN - Monthly/Yearly
+      // 1. Get User Details and get Company Id
+      const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      // 2. Get Card Holder details from Subscription of that companyId
+      const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
+      // 3. Check if the company admin is on trial
+      if ( !cardHolder.trialActive && cardHolder.status ) {
+        let subscriptionObj = { 
+          userId, 
+          customerId: cardHolder.customerId, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
+        };
+        cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
+        Subscription.create(subscriptionObj);
 
-      const subscriptionData = await Subscription.findOne({ where: { userId }}); // Fetching card details
-      const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }}); // Fetching user details for companyId
-      const allUsersOfCompany = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }}); // All users of same company
+        const license = await Subscription.app.models.license.findOne({ where: { id: findUser.licenseId }});
+        const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
+        let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+        await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
 
-      let userRoleMapping = {
-        Creator: 0,
-        Champion: 0,
-      };
-
-      for( let i = 0; i < allUsersOfCompany.length; i++ ) {
-        let currentUser = allUsersOfCompany[i];
-        let currentLicense = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId } });
-        if (userRoleMapping.hasOwnProperty(currentLicense.name)) {
-          userRoleMapping[currentLicense.name] = userRoleMapping[currentLicense.name] + 1;
+        return "Subscription created successfully..!!";
+      } else {
+        let subscriptionObj = { 
+          userId, 
+          customerId: cardHolder.customerId, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: findUser.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: findUser.licenseId
         }
+        cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
+        await Subscription.create(subscriptionObj);
+        return "User is on trial period..!!";
       }
-
-      // Create Payment methods
-      const paymentMethods = await stripe.customers.listPaymentMethods(
-        subscriptionData.customerId,
-        { type: 'card' }
-      );
-
-      // SetupIntent
-      const setupIntent = await create_setup_intent(subscriptionData.customerId, paymentMethods.data[0].id); // Create SetupIntent
-      await attach_payment_method( setupIntent.payment_method, subscriptionData.customerId ); // Attach payment method to customer
-
-      // Create Subscription
-      const intervalValue = plan == "monthly" ? "month" : "year";
-      const getCreatorPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Creator", interval: intervalValue }});
-      const getChampionPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: intervalValue }});
-      const priceArray = [
-        // { price: getCreatorTrialPriceId.priceId, quantity: 1 },
-        { price: getCreatorPriceId.priceId, quantity: userRoleMapping.Creator },
-        { price: getChampionPriceId.priceId, quantity: userRoleMapping.Champion },
-      ];
-      const subscription = await create_subscription({ customerId: customer.id, items: priceArray, sourceId: card.id });
-      await Subscription.update({ id: subscriptionData.id } , { subscriptionId: subscription.id });
-
-      return "Subscription created successfully..!!";
-
     } catch (err) {
       console.log(err);
       throw Error(err);
     }
   }
 
-  Subscription.updateSubscription = async (companyId, licenseType, type) => {
+  Subscription.blockSubscription = async (userId) => {
     try {
-      // LicenseType - Creator/Champion
-      // Type - Add/Remove
-      const findUser = await Subscription.findOne({ where: { companyId }});
-
-      if ( !findUser.trialActive && findUser.status ) {
-        const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
-        const itemsData = subscriptionDetails.items.data;
-  
-        let pricingArr = [];
-        for( let i = 0; i < itemsData.length; i++ ) {
-          let currentItem = itemsData[i];
-          const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-  
-          if ( findPricing.licenseType == licenseType ) {
-            pricingArr.push({
-              id: currentItem.id,
-              price: currentItem.price.id, 
-              quantity: type.toLowerCase() == "add" ? currentItem.quantity + 1 : currentItem.quantity - 1
-            });
-          } else {
-            pricingArr.push({
-              id: currentItem.id,
-              price: currentItem.price.id, 
-              quantity: currentItem.quantity
-            });
+      const userDetails = await Subscription.findOne({ where: { userId }});
+      if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
+        if (userDetails.cardHolder) {
+          let findCompany = await Subscription.find({ where: { companyId: userDetails.companyId }});
+          for(let user of findCompany) {
+            await cancel_user_subscription( user.subscriptionId );
+            await Subscription.update({ userId: user.userId }, { subscriptionId: "deactivated", status: false });
           }
-        };
-  
-        let response = await update_subscription( findUser.subscriptionId, { items: pricingArr, proration_behavior: 'none' });
-        return response;
-      } else {
-        return { message: "User is on trial period..!!", data: null };
+          return "Subscription has been cancelled..!!";
+        } else {
+          await cancel_user_subscription( userDetails.subscriptionId );
+          await Subscription.update({ userId }, { subscriptionId: "deactivated", status: false });
+          return "Subscription has been cancelled..!!";
+        }
       }
-
     } catch (err) {
       console.log(err);
+      throw err;
+    }
+  }
+
+  Subscription.unblockSubscription = async (userId) => {
+    try {
+      const userDetails = await Subscription.findOne({ where: { userId }});
+      const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
+
+      if (userDetails && userDetails.subscriptionId && userDetails.trialActive == false ) {
+        if(userDetails.cardHolder) {
+          const findCompany = await Subscription.find({ where: { companyId: userDetails.companyId }});
+          for ( let user of findCompany) {
+            const license = await Subscription.app.models.license.findOne({ where: { id: user.licenseId }});
+            const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
+            let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+            await Subscription.app.models.subscription.update({ "userId": user.userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
+          }
+          return "Subscription created successfully..!!";
+        } else {
+          const license = await Subscription.app.models.license.findOne({ where: { id: findUser.licenseId }});
+          const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
+          let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+          await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
+          return "Subscription created successfully..!!";
+        }
+      } else {
+        let error = new Error("User not found..!!");
+        error.status = 404;
+        throw error;
+      }
+    } catch (err) {
+      console.log(err);
+      throw err;
     }
   }
 
   Subscription.getSubscribedUsers = async (companyId) => {
     try {
-      const findUser = await Subscription.findOne({ where: { companyId, subscriptionId: { exists: true }, status: true }});
-      if (findUser) {
-        const subscriptionDetails = await get_subscription_plan_by_id(findUser.subscriptionId);
-        if(subscriptionDetails) {
-          const itemsData = subscriptionDetails.items.data;
-    
-          let userArr = {};
-          let userArray = [];
-          let interval = "";
-    
-          for( let i = 0; i < itemsData.length; i++ ) {
-            let currentItem = itemsData[i];
-            const findPricing = await Subscription.app.models.price_mapping.findOne( { where: { priceId: currentItem.price.id }} );
-            interval = currentItem.plan.interval;
-            userArr["interval"] = currentItem.plan.interval + "ly";
-    
-            if ( findPricing.licenseType == "Creator" ) {
-              let newObj = {
-                user: "Creator",
-                quantity: currentItem.quantity,
-                unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-                total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-                currency: currentItem.price.currency
-              };
-              userArray.push(newObj);
-            } else {
-              let newObj = {
-                user: "Champion",
-                quantity: currentItem.quantity,
-                unit_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) : null,
-                total_amount: currentItem.price.metadata.unit_amount ? Number(currentItem.price.metadata.unit_amount) * currentItem.quantity : null,
-                currency: currentItem.price.currency
-              };
-              userArray.push(newObj);
-            }
-          };
-    
-          // Finding Spectators from Application Database
-          const spectatorLicenseId = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-          const findSpectatorsList = await Subscription.app.models.user.find({ where: { "licenseId": spectatorLicenseId.id, "companyId": companyId }});
-          let newObj = {
-            user: "Spectators",
-            quantity: findSpectatorsList.length,
-            unit_amount: 0,
-            total_amount: "Free",
-            currency: "usd"
-          };
-          userArray.push(newObj);
-          userArr["userDetails"] = userArray;
-          return { message: "Data found..!!", data: userArr };
-        } else {
-          return { message: "No Data found..!!", data: null };
-        }
-      } else {
-        // Finding Registered Users from Application Database
-        const findRegisteredUserDetails = await Subscription.app.models.user.find({ where: { "companyId": companyId }});
-        let userObj = {};
+      const cardHolder = await Subscription.findOne({ where: { companyId , cardHolder: true }});
+      if (cardHolder) {
+        const findUsers = await Subscription.find({ where: { companyId }, include: "license" });
+        let userObj = {
+          interval: ""
+        };
         let tracker = {
           Creator: {
             user: "Creator",
@@ -393,26 +382,79 @@ module.exports = function (Subscription) {
             currency: null
           },
           Spectator: {
-            user: "Spectator",
+            user: "Spectators",
             quantity: 0,
-            unit_amount: null,
-            total_amount: null,
-            currency: null
+            unit_amount: 0,
+            total_amount: "Free",
+            currency: "usd"
           }
         };
-        for(let i = 0; i < findRegisteredUserDetails.length; i++) {
-          let currentUser = findRegisteredUserDetails[i];
-          const licenseId = await Subscription.app.models.license.findOne({ where: { id: currentUser.licenseId }});
-          tracker[licenseId.name] = {...tracker[licenseId.name], quantity: tracker[licenseId.name].quantity + 1 };
+        if ( cardHolder.status == true && cardHolder.trialActive == false ) {
+          for ( let i = 0; i < findUsers.length; i++) {
+            let currentUser = findUsers[i];
+            let licenseName = currentUser.license().name;
+            let interval = currentUser.currentPlan;
+            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
+            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
+            tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
+            tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker[licenseName].total_amount ? tracker[licenseName].total_amount = tracker[licenseName].total_amount + priceDataFromStripe.metadata.unit_amount : tracker[licenseName].total_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker[licenseName].currency = "usd";
+
+            userObj.interval ? null : userObj.interval = currentUser.currentPlan;
+          }
+
+          if (tracker["Champion"].quantity == 0) {
+            let interval = userObj.interval;
+            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: interval == "monthly" ? "month" : "year" } });
+            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
+            tracker["Champion"].quantity = tracker["Champion"].quantity;
+            tracker["Champion"].unit_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker["Champion"].total_amount = 0;
+            tracker["Champion"].currency = "usd";
+          }
+        } else {
+          for ( let i = 0; i < findUsers.length; i++) {
+            let currentUser = findUsers[i];
+            let licenseName = currentUser.license().name;
+            let interval = currentUser.currentPlan;
+            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
+            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
+            tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
+            tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker[licenseName].total_amount = 0;
+            tracker[licenseName].currency = "usd";
+
+            userObj.interval ? null : userObj.interval = currentUser.currentPlan;
+          }
+
+          if (tracker["Champion"].quantity == 0) {
+            let interval = userObj.interval;
+            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: interval == "monthly" ? "month" : "year" } });
+            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
+            tracker["Champion"].quantity = tracker["Champion"].quantity;
+            tracker["Champion"].unit_amount = priceDataFromStripe.metadata.unit_amount;
+            tracker["Champion"].total_amount = 0;
+            tracker["Champion"].currency = "usd";
+          }
         }
+
+        // Finding Spectators List
+        const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
+        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id }, include: "license" });
+        tracker["Spectator"].quantity = findSpectators.length;
 
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
         userObj["userDetails"] = userDetails;
         return { message: "Data found..!!", data: userObj };
+      } else {
+        let error = new Error("Card holder not found..!!");
+        error.status = 404;
+        throw error;
       }
     } catch (err) {
       console.log(err);
-      throw Error(err);
+      throw err;
     }
   }
 
@@ -462,7 +504,7 @@ module.exports = function (Subscription) {
 
               result.map( async x => {
                 tracker[x.license.name] = {...tracker[x.license.name], quantity: tracker[x.license.name].quantity + 1 };
-              })
+              });
 
               let userDetails = Object.keys(tracker).map(x => tracker[x]);
               userObj["userDetails"] = userDetails;
@@ -475,7 +517,7 @@ module.exports = function (Subscription) {
 
   Subscription.getInvoices = async (companyId) => {
     try {
-      const subscriptionDetails = await Subscription.findOne({ where: { companyId }});
+      const subscriptionDetails = await Subscription.findOne({ where: { companyId, cardHolder: true }});
       if(subscriptionDetails) {
         let invoices = await get_invoices( subscriptionDetails.customerId );
         if ( invoices.data.length > 0 ) {
@@ -492,14 +534,14 @@ module.exports = function (Subscription) {
 
   // ------------------- ADMIN PANEL APIS -------------------
 
-  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId) => {
+  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId, startDate = null, endDate = null) => {
     try {
       page = parseInt(page, 10) || 1;
       limit = parseInt(limit, 10) || 10;
-      // startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
-      // endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
+      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
-      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId);
+      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId, startDate, endDate);
       if ( invoices.data && invoices.data.length > 0 ) {
 
         let newArr = [];
@@ -661,24 +703,28 @@ module.exports = function (Subscription) {
       // 3. Update the new priceId for every subscription on stripe
       const subscriptionsList = await Subscription.find({ trialActive: false , status: true });
 
-      for ( let i = 0; i < subscriptionsList.length; i++ ) {
+      for (let i = 0; i < subscriptionsList.length; i++ ) {
         let currentSubscription = subscriptionsList[i];
-        const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
-        let updatedItems = [];
-        for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
-          if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
-            updatedItems.push({
-              id: getSubscriptionDetails.items.data[j].id,
-              price: newPrice.id
-            });
+        if (currentSubscription.subscriptionId && currentSubscription.subscriptionId !== "deactivated") {
+          const getSubscriptionDetails = await get_subscription_plan_by_id(currentSubscription.subscriptionId);
+          let updatedItems = [];
+          for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+            if( getSubscriptionDetails.items.data[j].price.id == priceId ) {
+              updatedItems.push({
+                id: getSubscriptionDetails.items.data[j].id,
+                price: newPrice.id
+              });
+            }
+          }
+
+          if ( updatedItems.length > 0 ) {
+            await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
           }
         }
-        if ( updatedItems.length > 0 ) {
-          await update_subscription(currentSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
-          // 4. Update the new priceid in DB
-          await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
-        }
-      };
+      }
+
+      // 4. Update the new priceid in DB
+      await Subscription.app.models.price_mapping.update({ priceId }, { priceId: newPrice.id });
 
       // 5. Deactivate the old price in stripe
       await update_price_by_id(priceId, { active: false });

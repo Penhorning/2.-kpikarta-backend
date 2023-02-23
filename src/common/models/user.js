@@ -8,6 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
+const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -252,7 +253,7 @@ module.exports = function(User) {
           }
           resolve("success");
         })
-      })
+      });
     } catch (error) {
       console.error("> error in SMS function", error);
       return { success: true, msg: error };
@@ -302,23 +303,34 @@ module.exports = function(User) {
       } else {
         RoleManager.assignRoles(User.app, [roleId], user.id, () => {
           // Find creator's company id and assign it to the new user
-          User.findById(creatorId, (err, creator) => {
+          User.findById(creatorId, async (err, creator) => {
             if (err) {
               console.log('> error while getting creator data', err);
               return next(err);
             }
-            User.update({ "_id": user.id },  { "companyId": creator.companyId }, err => {
+
+            const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
+            const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
+            const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            let userDetails = {
+              ...user,
+              companyName: creator.companyName,
+              license: licenseDetails.name,
+              role: roleDetails.name,
+              department: departmentDetails.name,
+            }
+            let ret = await sales_user_details(userDetails);
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, err => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
               } else {
-                next(null, "User invited successfully!");
+                next(null, {message: "User invited successfully!", data: user});
                 // Send email and password to user
                 const data = {
                   subject: `Welcome to | ${User.app.get('name')}`,
                   template: "welcome.ejs",
                   email: user.email,
-
                   user,
                   password,
                   loginUrl: `${process.env.WEB_URL}/login`,
@@ -592,6 +604,7 @@ module.exports = function(User) {
           if (roles.indexOf(role) > -1) {
             next(null, token);
           } else if (role === 'not_admin' && roles[0] !== 'admin') {
+            sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -615,6 +628,7 @@ module.exports = function(User) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
+        sales_update_user(this.app.currentUser, { "emailVerified": true });
         next(err, this.app.currentUser);
       });
     } else {
@@ -675,23 +689,29 @@ module.exports = function(User) {
   };
   // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
-    let mobileVerificationCode = keygen.number({length: 6});
-    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
-      if (err) return next(err);
-      else {
-        let mobileNumber;
-        if (type == "updateProfile") mobileNumber = mobile.e164Number;
-        else mobileNumber = User.app.currentUser.mobile.e164Number;
-        sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
-        .then(() => {
-          next(null, "sent");
-        }).catch(err => {
-          let error = err;
-          error.status = 500;
-          return next(error);
-        });
-      }
-    });
+    if (this.app.currentUser.mobileVerified && (this.app.currentUser.mobile.e164Number === mobile.e164Number)) {
+      let error = new Error("Mobile number is already verified!");
+      error.status = 400;
+      next(error);
+    } else {
+      let mobileVerificationCode = keygen.number({ length: 6 });
+      this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
+        if (err) return next(err);
+        else {
+          let mobileNumber;
+          if (type == "updateProfile") mobileNumber = mobile.e164Number;
+          else mobileNumber = User.app.currentUser.mobile.e164Number;
+          sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
+          .then(() => {
+            next(null, "sent");
+          }).catch(err => {
+            let error = err;
+            error.status = 500;
+            return next(error);
+          });
+        }
+      });
+    }
   };
   // Assign plan
   User.selectPlan = function(plan, next) {
@@ -735,10 +755,28 @@ module.exports = function(User) {
       }
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       } else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
+          // Creating Email Object for Block User
+          const emailObj = {
+            subject: `Your account is blocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "blocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       }
@@ -755,6 +793,14 @@ module.exports = function(User) {
       // Blocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+          const emailObj = {
+            subject: `Your account is unblocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "unblocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
           next(err, true);
         });
       } 
@@ -774,6 +820,14 @@ module.exports = function(User) {
               next(error);
             }
             User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
+              const emailObj = {
+                subject: `Your account is unblocked`,
+                template: "block-unblock.ejs",
+                email: user.email,
+                user: user,
+                type: "unblocked"
+              };
+              sendEmail(User.app, emailObj, () => {});
               next(err, true);
             });
           })
@@ -869,18 +923,27 @@ module.exports = function(User) {
             return next(err);
           }
           // Find license
-          User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
+          User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
             if (err) {
               console.log('> error while finding license', err);
               return next(err);
             }
+            let userDetails = {
+              ...user,
+              companyName: company.name,
+              license: license.name,
+              role: role.name
+            }
+            let ret = await sales_user_details(userDetails);
+            if(ret && ret.id) {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
+                  if (err) {
+                    console.log('> error while updating user', err);
+                    return next(err);
+                  }
+              });
+            }
             // Assign roleId, licenseId and companyId
-            User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
-              if (err) {
-                console.log('> error while updating user', err);
-                return next(err);
-              }
-            });
           });
         });
         // Create token
@@ -999,18 +1062,27 @@ module.exports = function(User) {
               return next(err);
             }
             // Find license
-            User.app.models.License.findOne({ where: { "name": "Creator" } }, (err, license) => {
+            User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
               if (err) {
                 console.log('> error while finding license', err);
                 return next(err);
               }
               // Assign roleId, licenseId and companyId
-              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, err => {
-                if (err) {
-                  console.log('> error while updating social user', err);
-                  return next(err);
-                } 
-              });
+              let userDetails = {
+                ...user,
+                companyName: company.name,
+                license: license.name,
+                role: role.name
+              }
+              let ret = await sales_user_details(userDetails);
+              if(ret && ret.id) {
+                User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
+                  if (err) {
+                    console.log('> error while updating social user', err);
+                    return next(err);
+                  } 
+                });
+              }
             });
           });
           // Send welcome email to social users
@@ -1026,7 +1098,6 @@ module.exports = function(User) {
                 subject: `Welcome to | ${User.app.get('name')}`,
                 template: "welcome.ejs",
                 email: user.email,
-
                 user,
                 password,
                 loginUrl: `${process.env.WEB_URL}/login`,
@@ -1047,6 +1118,23 @@ module.exports = function(User) {
         fs.unlink(path.resolve('storage/user/', req.body.oldImage), (err) => { console.log(err) });
       }
       next();
+    }
+
+    if( req.body.defaultEmail ) {
+      User.findOne({where: {email: req.body.email}}, (err, userDetails) => {
+        if (err) {
+          console.log('> error while updating social user', err);
+          return next(err);
+        } 
+        const data = {
+          subject: `Your email has changed successfully..!!`,
+          template: "email-changed.ejs",
+          email: userDetails.email,
+          user: userDetails,
+        }
+        sendEmail(User.app, data, () => { });
+        delete req.body.defaultEmail;
+      })
     }
   });
 };
