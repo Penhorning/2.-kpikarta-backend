@@ -358,6 +358,13 @@ module.exports = function (Kartanode) {
     });
   }
 
+  // Get last updated kpi nodes
+  Kartanode.lastUpdatedKPINode = (kartaId, next) => {
+    Kartanode.findOne({ where: { "kartaDetailId": kartaId, "is_deleted": false, or: [ { "node_type": "measure" }, { "node_type": "metrics" } ] } }, { sort: { "updatedAt": -1 } }, (err, result) => {
+      next(err, result);
+    });
+  }
+
   // Get kpi nodes by contributorId
   Kartanode.kpiNodes = (page, limit, searchQuery, userId, statusType, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
@@ -990,7 +997,7 @@ module.exports = function (Kartanode) {
           next(err);
         }   
 
-        if(Kartanode.app.currentUser.id.toString() !== req.body.contributorId.toString()) {
+        if (Kartanode.app.currentUser.id.toString() !== req.body.contributorId.toString()) {
           // Prepare notification collection data
           let notificationObj = {
             title: `${Kartanode.app.currentUser.fullName} has added you as contributor for node ${instance.name}`,
@@ -1007,7 +1014,6 @@ module.exports = function (Kartanode) {
             }
           });
         }
-        
         next(null, result);
       });
     };
@@ -1023,9 +1029,10 @@ module.exports = function (Kartanode) {
         Kartanode.app.models.karta.update( { "id": kartaId }, { updatedAt: instance.updatedAt }, (err, result) => {
           if (err) {
             next(err);
+          } else if (userData.sforceId) {
+            sales_update_user({ sforceId: userData.sforceId }, { activeKarta: karta.name, kartaLastUpdate: instance.updatedAt });
           }
-          sales_update_user({ sforceId: userData.sforceId }, { activeKarta: karta.name, kartaLastUpdate: instance.updatedAt });
-          next();
+          if (!req.body.contributorId) next();
         });
       });
     });

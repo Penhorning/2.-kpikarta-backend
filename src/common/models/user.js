@@ -689,23 +689,29 @@ module.exports = function(User) {
   };
   // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
-    let mobileVerificationCode = keygen.number({length: 6});
-    this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
-      if (err) return next(err);
-      else {
-        let mobileNumber;
-        if (type == "updateProfile") mobileNumber = mobile.e164Number;
-        else mobileNumber = User.app.currentUser.mobile.e164Number;
-        sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
-        .then(() => {
-          next(null, "sent");
-        }).catch(err => {
-          let error = err;
-          error.status = 500;
-          return next(error);
-        });
-      }
-    });
+    if (this.app.currentUser.mobileVerified && (this.app.currentUser.mobile.e164Number === mobile.e164Number)) {
+      let error = new Error("Mobile number is already verified!");
+      error.status = 400;
+      next(error);
+    } else {
+      let mobileVerificationCode = keygen.number({ length: 6 });
+      this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
+        if (err) return next(err);
+        else {
+          let mobileNumber;
+          if (type == "updateProfile") mobileNumber = mobile.e164Number;
+          else mobileNumber = User.app.currentUser.mobile.e164Number;
+          sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for KPI Karta Mobile Number Verification.`)
+          .then(() => {
+            next(null, "sent");
+          }).catch(err => {
+            let error = err;
+            error.status = 500;
+            return next(error);
+          });
+        }
+      });
+    }
   };
   // Assign plan
   User.selectPlan = function(plan, next) {
