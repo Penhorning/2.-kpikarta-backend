@@ -550,7 +550,7 @@ module.exports = function (Subscription) {
           let newObj = {
             id: inv.id,
             planName: inv.lines.data[0].plan.nickname,
-            price: inv.total,
+            price: Number(inv.total) / 100,
             paymentDate : moment(inv.created * 1000),
             status: inv.status,
           };
