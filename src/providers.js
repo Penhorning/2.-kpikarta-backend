@@ -18,7 +18,7 @@ module.exports = {
     "strategy": "OAuth2Strategy",
     "clientID": process.env.GOOGLE_CLIENT_ID,
     "clientSecret": process.env.GOOGLE_CLIENT_SECRET,
-    "callbackURL": "/auth/google/callback",
+    "callbackURL": `${process.env.API_URL}/auth/google/callback`,
     "authPath": "/auth/google",
     "callbackPath": "/auth/google/callback",
     "successRedirect": "/auth/account",
