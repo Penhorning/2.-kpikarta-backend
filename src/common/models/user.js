@@ -967,18 +967,20 @@ module.exports = function(User) {
         // Send email and password to new users
         if (req.body.addedBy == "admin") {
           const password = generatePassword();
-          const data = {
-            subject: `Welcome to | ${User.app.get('name')}`,
-            template: "welcome.ejs",
-            email: user.email,
-      
-            user,
-            password,
-            loginUrl: `${process.env.WEB_URL}/login`,
-            appName: User.app.get('name')
-          }
-          sendEmail(User.app, data, async () => {
-            await user.updateAttributes({ "emailVerified": true, password });
+          user.updateAttributes({ "emailVerified": true, password }, (err, result) => {
+            if (!err) {
+              const data = {
+                subject: `Welcome to | ${User.app.get('name')}`,
+                template: "welcome.ejs",
+                email: user.email,
+          
+                user,
+                password,
+                loginUrl: `${process.env.WEB_URL}/login`,
+                appName: User.app.get('name')
+              }
+              sendEmail(User.app, data);
+            }
           });
         } else {
           // Generate verification code and send email
@@ -1075,7 +1077,7 @@ module.exports = function(User) {
                 role: role.name
               }
               let ret = await sales_user_details(userDetails);
-              if(ret && ret.id) {
+              if (ret && ret.id) {
                 User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
                   if (err) {
                     console.log('> error while updating social user', err);
