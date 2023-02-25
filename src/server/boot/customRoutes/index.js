@@ -61,6 +61,8 @@ module.exports = function (app) {
 
     // Stripe webhook url
     app.post("/webhook", (req, res) => {
+        console.log(req.body, 'data');
+        console.log(req.body.data, 'data2');
         req.app.models.subscription.update({ subscriptionId: req.body.data.object.id, customerId: req.body.data.object.customer }, { nextSubscriptionDate: req.body.data.object.current_period_end, currentSubscriptionDate: req.body.data.object.current_period_start }, (err) => {
             if (err) return console.log('> error while updating subscription on webhook..!!');
             res.send("webhook working..!!");

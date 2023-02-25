@@ -126,3 +126,17 @@ exports.sales_update_karta = (karta_sforceId, upadatedValue) => {
         return err;
     }
 }
+
+exports.sales_delete_user = (sforceId) => {
+    try {
+        conn.sobject(salesForceInfo.contactModel).destroy(sforceId, function(err, ret) {
+            if (err || !ret.success) { 
+                return console.error(err, ret); 
+            }
+            return ret;
+        });
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}

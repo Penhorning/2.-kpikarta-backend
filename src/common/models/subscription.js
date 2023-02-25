@@ -301,6 +301,74 @@ module.exports = function (Subscription) {
     }
   }
 
+  Subscription.updateSubscription = async (userId, licenseName) => {
+    try {
+      // 1. Find user subscription
+      let userSubscription = await Subscription.findOne({ where: { userId , trialActive: false, status: true }});
+      if (userSubscription) {
+
+        if (licenseName !== "Spectator") {
+          // If Switching between Creator to Champion or vice verse
+          let license = await Subscription.app.models.license.findOne({ where: { name: licenseName }});
+          let newPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: userSubscription.currentPlan == "monthly" ? "month" : "year" }});
+          const getSubscriptionDetails = await get_subscription_plan_by_id(userSubscription.subscriptionId);
+          let updatedItems = [];
+          for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+            updatedItems.push({
+              id: getSubscriptionDetails.items.data[j].id,
+              price: newPriceId.priceId
+            });
+          }
+    
+          if ( updatedItems.length > 0 ) {
+            await update_subscription(userSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
+          }
+    
+          await Subscription.update({ userId , trialActive: false, status: true }, { licenseId: license.id });
+          return "Subscription updated successfully..!!";
+        } else {
+
+          // If switching from Creator/Champion to Spectator
+          await cancel_user_subscription(userSubscription.subscriptionId);
+          await Subscription.deleteAll({ userId , trialActive: false, status: true });
+
+          return "Subscription updated successfully..!!";
+        }
+
+      } else {
+        // If switching from Spectator to Creator/Champion
+
+        let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
+        // 1. Find cardHolder subscription
+        const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId , trialActive: false, status: true, cardHolder: true }});
+
+        let subscriptionObj = { 
+          userId, 
+          customerId: cardHolder.customerId, 
+          cardId: cardHolder.cardId, 
+          tokenId: cardHolder.tokenId, 
+          trialEnds: cardHolder.trialEnds, 
+          trialActive: cardHolder.trialActive,
+          companyId: userDetails.companyId,
+          cardHolder: false,
+          currentPlan: cardHolder.currentPlan,
+          licenseId: userDetails.licenseId
+        }
+        cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
+
+        await Subscription.create(subscriptionObj);
+        const license = await Subscription.app.models.license.findOne({ where: { id: userDetails.licenseId }});
+        const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
+        let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+        await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
+        return "Subscription updated successfully..!!";
+      }
+    } catch (err) {
+      console.log(err);
+      throw Error(err);
+    }
+  }
+
   Subscription.blockSubscription = async (userId) => {
     try {
       const userDetails = await Subscription.findOne({ where: { userId }});
@@ -317,6 +385,20 @@ module.exports = function (Subscription) {
           await Subscription.update({ userId }, { subscriptionId: "deactivated", status: false });
           return "Subscription has been cancelled..!!";
         }
+      }
+    } catch (err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  Subscription.deleteSubscription = async (userId) => {
+    try {
+      const userDetails = await Subscription.findOne({ where: { userId }});
+      if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
+        await cancel_user_subscription( userDetails.subscriptionId );
+        await Subscription.deleteAll({ userId });
+        return "Subscription has been deleted..!!";
       }
     } catch (err) {
       console.log(err);
