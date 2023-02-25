@@ -8,7 +8,7 @@ const generator = require('generate-password');
 const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
-const { sales_user_details, sales_update_user } = require("../../helper/salesforce");
+const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -857,6 +857,7 @@ module.exports = function(User) {
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
         user.save();
+        sales_delete_user(user.sforceId);
         next(null, true);
       }
     });

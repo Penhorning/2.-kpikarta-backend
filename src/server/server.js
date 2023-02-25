@@ -29,7 +29,7 @@ if (!fs.existsSync(dir2)) {
   fs.mkdirSync(dir2, { recursive: true });
 }
 
-app.middleware('parse', bodyParser.json({ limit: '1mb' }));
+app.middleware('parse', bodyParser.json({ limit: '10mb' }));
 
 // parse application/x-www-form-urlencoded
 app.use(cors());
