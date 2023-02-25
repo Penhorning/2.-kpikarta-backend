@@ -82,8 +82,8 @@ module.exports = function (Kartanode) {
       if(params.length > 0){
         params.forEach(async item => {
           let childrens = await Kartanode.find({ where: { "parentId": item.id } });
+          await createHistory(item.kartaDetailId, item, item, randomKey, "node_removed");
           await Kartanode.updateAll({ "_id": item.id }, { $set: { "is_deleted": true } });
-          await createHistory(item.kartaDetailId, item, { "is_deleted": true }, randomKey, "node_removed");
           if (childrens.length > 0) deleteChildNodes(childrens, randomKey);
         });
       }
@@ -105,16 +105,26 @@ module.exports = function (Kartanode) {
         kartaId: kartaId,
         parentNodeId: node.parentId,
         historyType: 'main',
-        event_options: {
-          created: null,
-          updated: updatedData,
-          removed: null
-        },
         randomKey
       }
-      let oldOptions = {};
-      Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
-      history_data["old_options"] = oldOptions;
+      event == "node_removed" ? history_data["event_options"] = {
+        created: null,
+        updated: null,
+        removed: updatedData
+      } : event == "node_updated" ? history_data["event_options"] = {
+        created: null,
+        updated: updatedData,
+        removed: null
+      } : history_data["event_options"] = {
+        created: updatedData,
+        updated: null,
+        removed: null
+      }
+      if(event == "node_updated") {
+        let oldOptions = {};
+        Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
+        history_data["old_options"] = oldOptions;
+      }
       // Create history of current node
       Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
         if(err) console.log(err, 'err');
@@ -616,21 +626,23 @@ module.exports = function (Kartanode) {
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
     const randomKey = new Date().getTime();
-    Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
-      if (err) {
-        console.log('error while soft deleting karta Nodes', err);
-        return next(err);
-      }
-      else {
-        createHistory(kartaId, { id: nodeId, "is_deleted": false }, { "is_deleted": true }, randomKey, "node_removed");
-        Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
-          if (err) console.log('> error while finding child nodes', err);
-          deleteChildNodes(result, randomKey);
-        });
-        reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
-        return next(null, "Node deleted successfully..!!");
-      }
-    })
+    Kartanode.findOne({ where: { "_id": nodeId } }, (err, node) => {
+      Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
+        if (err) {
+          console.log('error while soft deleting karta Nodes', err);
+          return next(err);
+        }
+        else {
+          createHistory(kartaId, { id: nodeId, "is_deleted": false }, JSON.parse(JSON.stringify(node)), randomKey, "node_removed");
+          Kartanode.find({ where: { "parentId": nodeId } }, (err, result) => {
+            if (err) console.log('> error while finding child nodes', err);
+            deleteChildNodes(result, randomKey);
+          });
+          reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
+          return next(null, "Node deleted successfully..!!");
+        }
+      })
+    });
   }
 
   // Calculate percentage according to kpi calculation

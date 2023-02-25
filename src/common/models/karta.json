@@ -159,11 +159,6 @@
           "required": false
         },
         {
-          "arg": "findType",
-          "type": "string",
-          "required": false
-        },
-        {
           "arg": "page",
           "type": "number",
           "required": false

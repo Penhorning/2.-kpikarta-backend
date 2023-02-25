@@ -13,33 +13,24 @@ exports.createSubscriptionCron = (app) => {
         try {
             // Start subscription for the users whose trial is over
             const currentDate = moment().unix();
-            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: false, cardHolder: true }});
+            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: false }});
+            let userIds = [];
+            for (let c = 0; c < subscribedUsers.length; c++ ) {
+                userIds.push(subscribedUsers[c].userId);
+            };
+            await app.models.subscription.update({ "trialActive": true, "status": false, "userId": { in: userIds} }, { "cronCheck": true });
             if ( subscribedUsers.length > 0 ) {
-                let userIds = [];
-                for (let c = 0; c < subscribedUsers.length; c++ ) {
-                    userIds.push(subscribedUsers[c].userId);
-                };
-                await app.models.subscription.update({ "trialActive": true, "trialEnds": { lte: currentDate }, "status": false, "userId": { in: userIds} }, { "cronCheck": true });
-
-                // FLow change from below
-                for (let i = 0; i < subscribedUsers.length; i++ ) {
-                    let currentSubscribedUser = subscribedUsers[i];
-                    const sameCompanyUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { lte: currentDate }, status: false, cronCheck: true, companyId: currentSubscribedUser.companyId } });
-                    if (sameCompanyUsers.length > 0) {
-                        for (let j = 0; j < sameCompanyUsers.length; j++) {
-                            let companyUser = sameCompanyUsers[j];
-                            const userData = await app.models.user.findOne({ where: { "id": companyUser.userId, is_deleted: false }});
-                            if (userData) {
-                                const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
-                                const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: companyUser.currentPlan == "monthly" ? "month": "year" }});
-                                let subscription = await create_subscription({ customerId: companyUser.customerId, items: [{price: priceData.priceId, quantity: 1}] });
-                                await app.models.subscription.update({ "id": companyUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
-                            } else {
-                                await app.models.subscription.update({ "id": companyUser.id }, { trialActive: false, subscriptionId: "deactivated", status: false, cronCheck: false });
-                            }
-                        }
+                for ( let i = 0; i < subscribedUsers.length; i++ ) {
+                    const userData = await app.models.user.findOne({ where: { "id": subscribedUsers[i].userId, is_deleted: false }});
+                    if (userData) {
+                        const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
+                        const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: subscribedUsers[i].currentPlan == "monthly" ? "month": "year" }});
+                        let subscription = await create_subscription({ customerId: subscribedUsers[i].customerId, items: [{price: priceData.priceId, quantity: 1}] });
+                        await app.models.subscription.update({ "id": subscribedUsers[i].id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
+                    } else {
+                        await app.models.subscription.update({ "id": subscribedUsers[i].id }, { "trialActive": false, "subscriptionId": "deactivated", "status": false, "cronCheck": false });
                     }
-                } 
+                }
                 console.log("Subscriptions started successfully..!!");
             }
 
@@ -74,14 +65,9 @@ exports.createSubscriptionCron = (app) => {
     // cron.schedule('*/5 * * * * *', async () => {
     cron.schedule('0 4 * * *', async () => {
         try {
-            // var currentTime = moment().unix();
-            // let trialEndDate = moment.unix("1674468805").format("YYYY/MM/DD");
-            // let currentDate = moment.unix(currentTime).format("YYYY/MM/DD");
-            // let difference = moment(trialEndDate.split("/")).diff(moment(currentDate.split("/")), 'days');
-
-            const startDay = moment().add(3, 'days').startOf("day").unix();
-            const endDay = moment().add(3, 'days').endOf("day").unix();
-            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { gte: startDay, lte: endDay }, status: false }});
+            const threeDaysLaterStart = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').startOf("day").unix();
+            const threeDaysLaterEnd = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').endOf("day").unix();
+            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { gte: threeDaysLaterStart, lte: threeDaysLaterEnd }, status: false }});
 
             if(subscribedUsers.length > 0) {
                 // Prepare notification collection data
