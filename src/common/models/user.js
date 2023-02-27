@@ -943,6 +943,13 @@ module.exports = function(User) {
                     return next(err);
                   }
               });
+            } else {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, (err) => {
+                if (err) {
+                  console.log('> error while updating user', err);
+                  return next(err);
+                }
+            });
             }
             // Assign roleId, licenseId and companyId
           });
