@@ -899,7 +899,7 @@ module.exports = function(User) {
     User.app.models.company.findOne({ where: { "name": regex } }, (err, result) => {
       if (err) return next(err);
       else if (result) {
-        let error = new Error("Company name is already registered!");
+        let error = new Error("Company name is already registered! Try adding a suffix for signing up for a different location of the company.");
         error.status = 400;
         next(error);
       } else next();
@@ -943,6 +943,13 @@ module.exports = function(User) {
                     return next(err);
                   }
               });
+            } else {
+              User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id }, (err) => {
+                if (err) {
+                  console.log('> error while updating user', err);
+                  return next(err);
+                }
+            });
             }
             // Assign roleId, licenseId and companyId
           });
