@@ -304,7 +304,7 @@ module.exports = function (Subscription) {
   Subscription.updateSubscription = async (userId, licenseName) => {
     try {
       // 1. Find user subscription
-      let userSubscription = await Subscription.findOne({ where: { userId , trialActive: false, status: true }});
+      let userSubscription = await Subscription.findOne({ where: { userId }});
       if (userSubscription) {
 
         if (licenseName !== "Spectator") {
@@ -330,7 +330,7 @@ module.exports = function (Subscription) {
 
           // If switching from Creator/Champion to Spectator
           await cancel_user_subscription(userSubscription.subscriptionId);
-          await Subscription.deleteAll({ userId , trialActive: false, status: true });
+          await Subscription.deleteAll({ userId });
 
           return "Subscription updated successfully..!!";
         }
@@ -340,7 +340,7 @@ module.exports = function (Subscription) {
 
         let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
         // 1. Find cardHolder subscription
-        const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId , trialActive: false, status: true, cardHolder: true }});
+        const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
 
         let subscriptionObj = { 
           userId, 
@@ -444,7 +444,7 @@ module.exports = function (Subscription) {
     try {
       const cardHolder = await Subscription.findOne({ where: { companyId , cardHolder: true }});
       if (cardHolder) {
-        const findUsers = await Subscription.find({ where: { companyId }, include: "license" });
+        const findUsers = await Subscription.find({ where: { companyId }, include: ["license", {relation: "user", scope: { where: { is_deleted: false }}}] });
         let userObj = {
           interval: ""
         };
@@ -525,7 +525,7 @@ module.exports = function (Subscription) {
 
         // Finding Spectators List
         const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id }, include: "license" });
+        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id, is_deleted: false }, include: "license" });
         tracker["Spectator"].quantity = findSpectators.length;
 
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
@@ -691,7 +691,7 @@ module.exports = function (Subscription) {
           if( invoice_obj[date] ) {
             invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
           } else {
-            invoice_obj[date] = invoices.data[i].amount_paid
+            invoice_obj[date] = invoices.data[i].amount_paid / 100
           }
         }
   
