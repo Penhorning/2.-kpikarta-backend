@@ -126,8 +126,7 @@ module.exports = function (Kartanode) {
         let oldOptions = {};
         Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
         history_data["old_options"] = oldOptions;
-      } 
-      console.log(history_data);
+      }
       // Create history of current node
       Kartanode.app.models.karta_history.create(history_data, {}, (err, response) => {
         if(err) console.log(err, 'err');
@@ -593,12 +592,22 @@ module.exports = function (Kartanode) {
   }
   
   // Update nodes and adjust weightage of all the other child nodes
-  async function updateNodeAndAssignWeightage (kartaId, nodeData, randomKey, previousphaseId = 0, previousparentId = 0) {
+  async function updateNodeAndAssignWeightage (kartaId, nodeData, randomKey, previousPhaseId = 0, previousParentId = 0) {
+    const userId = Kartanode.app.currentUser.id;
     await Kartanode.update({ "_id": nodeData.id } , { $set: { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) } });
     await reAdjustWeightage(kartaId, nodeData.parentId, nodeData.phaseId, randomKey);
     // Create new history
-    if(previousphaseId && previousparentId) {
-      await createHistory(kartaId, { id: nodeData.id, "parentId": convertIdToBSON(previousparentId), "phaseId": convertIdToBSON(previousphaseId) }, { "parentId": convertIdToBSON(nodeData.parentId), "phaseId": convertIdToBSON(nodeData.phaseId) }, randomKey);
+    if (previousPhaseId && previousParentId) {
+      let data1 = {
+        "id": nodeData.id,
+        "parentId": convertIdToBSON(previousParentId),
+        "phaseId": convertIdToBSON(previousPhaseId)
+      }
+      let data2 = {
+        "parentId": convertIdToBSON(nodeData.parentId),
+        "phaseId": convertIdToBSON(nodeData.phaseId)
+      }
+      await createHistory(kartaId, data1, data2, randomKey, "node_updated", userId);
     }
     // Check if children exists or not
     if (nodeData.children && nodeData.children.length > 0) {
@@ -606,9 +615,12 @@ module.exports = function (Kartanode) {
         // Get all phases
         const phases = await getAllPhases(kartaId);
         const phaseId = phases[findPhaseIndex(phases, nodeData.phaseId) + 1].id;
+        // Previous phase id
+        let previousChildrenPhaseId = children.phaseId;
+        let previousChildrenParentId = children.parentId;
         // Changing phase id
         children.phaseId = phaseId;
-        updateNodeAndAssignWeightage(kartaId, children, randomKey);
+        updateNodeAndAssignWeightage(kartaId, children, randomKey, previousChildrenPhaseId, previousChildrenParentId);
       }
     }
   }

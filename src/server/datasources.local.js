@@ -4,6 +4,7 @@ module.exports = {
     "database": process.env.DB,
     "name": "db",
     "connector": "mongodb",
+    "maxDepthOfData": 11000
   },
   "email": {
     "name": "email",
