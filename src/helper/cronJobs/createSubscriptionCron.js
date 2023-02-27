@@ -21,12 +21,17 @@ exports.createSubscriptionCron = (app) => {
             await app.models.subscription.update({ "trialActive": true, "status": false, "userId": { in: userIds} }, { "cronCheck": true });
             if ( subscribedUsers.length > 0 ) {
                 for ( let i = 0; i < subscribedUsers.length; i++ ) {
-                    const userData = await app.models.user.findOne({ where: { "id": subscribedUsers[i].userId, is_deleted: false }});
+                    let userData = await app.models.user.findOne({ where: { "id": subscribedUsers[i].userId, is_deleted: false }});
+                    userData = JSON.parse(JSON.stringify(userData));
                     if (userData) {
                         const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
-                        const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: subscribedUsers[i].currentPlan == "monthly" ? "month": "year" }});
-                        let subscription = await create_subscription({ customerId: subscribedUsers[i].customerId, items: [{price: priceData.priceId, quantity: 1}] });
-                        await app.models.subscription.update({ "id": subscribedUsers[i].id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
+                        if (license.name == "Spectator") {
+                            await Subscription.deleteAll({ userId: subscribedUsers[i].userId });
+                        } else {
+                            const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: subscribedUsers[i].currentPlan == "monthly" ? "month": "year" }});
+                            let subscription = await create_subscription({ customerId: subscribedUsers[i].customerId, items: [{price: priceData.priceId, quantity: 1}] });
+                            await app.models.subscription.update({ "id": subscribedUsers[i].id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false });
+                        }
                     } else {
                         await app.models.subscription.update({ "id": subscribedUsers[i].id }, { "trialActive": false, "subscriptionId": "deactivated", "status": false, "cronCheck": false });
                     }
@@ -34,24 +39,6 @@ exports.createSubscriptionCron = (app) => {
                 console.log("Subscriptions started successfully..!!");
             }
 
-            // Start subscription for those users who recently got activated again by Admin
-            // const recentlyActivatedUsers = await app.models.subscription.find({ where: { status: true, subscriptionId: "deactivated" }});
-            // if (recentlyActivatedUsers.length > 0) {
-            //     for(let i = 0; i < recentlyActivatedUsers.length; i++) {
-            //         let currentSubscribedUser = recentlyActivatedUsers[i];
-            //         const userData = await app.models.user.findOne({ where: { "id": currentSubscribedUser.userId, is_deleted: false }});
-            //         if (userData) {
-            //             const license = await app.models.license.findOne({ where: { id: userData.licenseId }});
-            //             const priceData = await app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: currentSubscribedUser.currentPlan }});
-            //             let subscription = await create_subscription({ customerId: currentSubscribedUser.customerId, items: [{price: priceData.priceId, quantity: 1}] });
-            //             await app.models.subscription.update({ "id": currentSubscribedUser.id }, { subscriptionId: subscription.id, status: true });
-            //         } else {
-            //             await app.models.subscription.update({ "id": currentSubscribedUser.id }, { subscriptionId: "deactivated", status: false });
-            //         }
-
-            //         console.log("Recently activated user's subscription started..");
-            //     }
-            // }
         } catch (err) {
             console.log(`==========>>>>> WHILE CREATING SUBSCRIPTIONS (${new Date()}) = Someting went wrong `, err);
             throw err;

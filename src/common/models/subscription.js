@@ -330,7 +330,7 @@ module.exports = function (Subscription) {
 
           // If switching from Creator/Champion to Spectator
           await cancel_user_subscription(userSubscription.subscriptionId);
-          await Subscription.deleteAll({ userId , trialActive: false, status: true });
+          await Subscription.deleteAll({ userId });
 
           return "Subscription updated successfully..!!";
         }
@@ -444,7 +444,7 @@ module.exports = function (Subscription) {
     try {
       const cardHolder = await Subscription.findOne({ where: { companyId , cardHolder: true }});
       if (cardHolder) {
-        const findUsers = await Subscription.find({ where: { companyId }, include: "license" });
+        const findUsers = await Subscription.find({ where: { companyId }, include: ["license", {relation: "user", scope: { where: { is_deleted: false }}}] });
         let userObj = {
           interval: ""
         };
@@ -474,6 +474,7 @@ module.exports = function (Subscription) {
         if ( cardHolder.status == true && cardHolder.trialActive == false ) {
           for ( let i = 0; i < findUsers.length; i++) {
             let currentUser = findUsers[i];
+            console.log(currentUser.user());
             let licenseName = currentUser.license().name;
             let interval = currentUser.currentPlan;
             let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
@@ -525,7 +526,7 @@ module.exports = function (Subscription) {
 
         // Finding Spectators List
         const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id }, include: "license" });
+        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id, is_deleted: false }, include: "license" });
         tracker["Spectator"].quantity = findSpectators.length;
 
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
@@ -691,7 +692,7 @@ module.exports = function (Subscription) {
           if( invoice_obj[date] ) {
             invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
           } else {
-            invoice_obj[date] = invoices.data[i].amount_paid
+            invoice_obj[date] = invoices.data[i].amount_paid / 100
           }
         }
   
