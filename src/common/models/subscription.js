@@ -26,6 +26,7 @@ const {
   create_source
 } = require("../../helper/stripe");
 const moment = require('moment');
+const { sales_delete_user } = require("../../helper/salesforce");
 
 module.exports = function (Subscription) {
   // Find user who is not deleted
@@ -171,7 +172,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(15, 'minutes').unix(), 
+              trialEnds: moment().add(4, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
@@ -395,8 +396,10 @@ module.exports = function (Subscription) {
   Subscription.deleteSubscription = async (userId) => {
     try {
       const userDetails = await Subscription.findOne({ where: { userId }});
-      if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
-        await cancel_user_subscription( userDetails.subscriptionId );
+      if (userDetails) {
+        if(userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
+          await cancel_user_subscription( userDetails.subscriptionId );
+        }
         await Subscription.deleteAll({ userId });
         return "Subscription has been deleted..!!";
       }
