@@ -172,7 +172,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(4, 'minutes').unix(), 
+              trialEnds: moment().add(15, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
