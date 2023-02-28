@@ -104,6 +104,11 @@
           "arg": "phaseId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "nextPhaseId",
+          "type": "string",
+          "required": true
         }
       ],
       "returns": {

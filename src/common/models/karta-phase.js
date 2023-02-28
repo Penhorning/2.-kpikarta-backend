@@ -1,8 +1,63 @@
 'use strict';
 
 module.exports = function(Kartaphase) {
+    // Create history
+    const createHistory = async (kartaId, node, updatedData, randomKey, event = "node_updated") => {
+        const userIdValue = Kartaphase.app.currentUser.id;
+        Kartaphase.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
+        // Prepare history data
+        let history_data = {
+            event,
+            kartaNodeId: node.id,
+            userId: userIdValue,
+            versionId: karta.versionId,
+            kartaId: kartaId,
+            parentNodeId: node.parentId,
+            historyType: 'main',
+            randomKey
+        }
+        event == "node_removed" ? history_data["event_options"] = {
+            created: null,
+            updated: null,
+            removed: updatedData
+        } : event == "node_updated" ? history_data["event_options"] = {
+            created: null,
+            updated: updatedData,
+            removed: null
+        } : history_data["event_options"] = {
+            created: updatedData,
+            updated: null,
+            removed: null
+        }
+        if (event == "node_updated") {
+            let oldOptions = {};
+            Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
+            history_data["old_options"] = oldOptions;
+        }
+        // Create history of current node
+        Kartaphase.app.models.karta_history.create(history_data, {}, (err, response) => {
+            if (err) console.log(err, 'err');
+            Kartaphase.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+        });
+        });
+    }
+
+    // Adjust weightage
+    const reAdjustWeightage = async (kartaId, parentId, phaseId, randomKey) => {
+        // Find children of current karta
+        const childrens = await Kartaphase.app.models.karta_node.find({ where: { "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false } });
+        // Assign divided weightage to all the nodes of that phase of current karta
+        if (childrens.length > 0) {
+        // Divide weightage
+        const weightage = + (100 / childrens.length).toFixed(2);
+        await Kartaphase.app.models.karta_node.updateAll({ "kartaDetailId": kartaId, parentId, phaseId, "is_deleted": false }, { weightage });
+        // Create new history
+        for (let children of childrens) createHistory(kartaId, children, { weightage }, randomKey);
+        }
+    }
+
     // Delete extra added child phase and reconnect it's child to the above phase
-    Kartaphase.delete = async (kartaId, phaseId) => {
+    Kartaphase.delete = async (kartaId, phaseId, nextPhaseId) => {
         try {
             // Random key
             const randomKey = new Date().getTime();
@@ -12,7 +67,7 @@ module.exports = function(Kartaphase) {
             const currentPhase = await Kartaphase.findOne({ where: { "_id": phaseId } });
             let removed_phase = currentPhase.__data;
             delete removed_phase["id"];
-            // Set the status of phase to deleted aong with its history
+            // Set the status of phase to deleted along with its history
             await Kartaphase.update({ "_id": phaseId, "is_child": true } , { $set: { "is_deleted": true } });
             let history_data = {
                 event: "phase_removed",
@@ -28,7 +83,7 @@ module.exports = function(Kartaphase) {
                   removed: removed_phase,
                 },
                 randomKey
-            };
+            }
             await Kartaphase.app.models.karta_history.create(history_data);
 
             // Reconnect child phase to another parent
@@ -58,12 +113,12 @@ module.exports = function(Kartaphase) {
                 }
             }
 
-            // Find nodes that are attached to current phase
+            // Find nodes that are attached to current phase and set it to deleted
             const nodes = await Kartaphase.app.models.karta_node.find({ where: { "kartaDetailId": kartaId, phaseId } });
             if (nodes.length > 0) {
-                // Reconnect child nodes to another parent
-                for ( let j = 0; j < nodes.length; j++ ) {
+                for (let j=0; j<nodes.length; j++) {
                     let item = nodes[j];
+                    // Set the status of node to deleted along with its history
                     await Kartaphase.app.models.karta_node.update({ "_id": item.id }, { $set: { "is_deleted": true } });
                     let removed_node = item;
                     delete removed_node["id"];
@@ -82,12 +137,15 @@ module.exports = function(Kartaphase) {
                         },
                         randomKey
                     };
+                    // Create history
                     await Kartaphase.app.models.karta_history.create(history_data);
 
-                    const findNodes = await Kartaphase.app.models.karta_node.find({ where: { "parentId": item.id }});
-                    if(findNodes.length > 0) {
-                        for ( let k = 0; k < findNodes.length; k++) {
-                            let currentNode = findNodes[k].__data;
+                    // Find childrens of deleted node
+                    const childrens = await Kartaphase.app.models.karta_node.find({ where: { "parentId": item.id }});
+                    if (childrens.length > 0) {
+                        for (let k=0; k<childrens.length; k++) {
+                            let currentNode = childrens[k].__data;
+                            // Reconnect child nodes to another parent
                             await Kartaphase.app.models.karta_node.update({ "id": currentNode.id }, { $set: { "parentId": item.parentId } }); 
                             let history_data = {
                                 event: "node_updated",
@@ -107,9 +165,13 @@ module.exports = function(Kartaphase) {
                             }
                             // Create history of updated node
                             let history = await Kartaphase.app.models.karta_history.create(history_data);
-                            if ( k == findNodes.length - 1) await Kartaphase.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
+                            if ( k == childrens.length - 1) await Kartaphase.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
                         }
                     }
+                }
+                // Readjust weightage
+                for (let node of nodes) {
+                    await reAdjustWeightage(kartaId, node.parentId, nextPhaseId, randomKey);
                 }
                 return "Phase deleted successfully!";
             }
