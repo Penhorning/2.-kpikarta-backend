@@ -469,16 +469,6 @@ module.exports = function(Karta) {
     }
   }
 
-  // View previous month karta new
-  Karta.viewKartaDetailsNew = async (type, number, kartaId, versionId) => {
-    try {
-
-    } catch (err) {
-      console.log(err);
-      throw Error(err);
-    }
-  }
-
   // View Previous month karta
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
@@ -623,7 +613,7 @@ module.exports = function(Karta) {
         }
 
         // Getting phases
-        let phases = await Karta.app.models.karta_phase.find({ where: { kartaId, or: [ { "id": { nin: phaseIds } }, { "is_child": false } ] } });
+        let phases = await Karta.app.models.karta_phase.find({ where: { kartaId, "is_deleted": false, or: [ { "id": { nin: phaseIds } }, { "is_child": false } ] } });
         // Updating phases properties
         phases = phases.map(item => {
           Object.values(updatedPhaseIds).forEach(el => {
