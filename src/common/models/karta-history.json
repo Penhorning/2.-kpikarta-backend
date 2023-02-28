@@ -37,8 +37,7 @@
       "required": true
     },
     "userId": {
-      "type": "string",
-      "required": true
+      "type": "string"
     },
     "kartaId": {
       "type": "string",
