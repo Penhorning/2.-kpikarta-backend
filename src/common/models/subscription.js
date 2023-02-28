@@ -26,6 +26,7 @@ const {
   create_source
 } = require("../../helper/stripe");
 const moment = require('moment');
+const { sales_delete_user } = require("../../helper/salesforce");
 
 module.exports = function (Subscription) {
   // Find user who is not deleted
@@ -171,7 +172,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(15, 'minutes').unix(), 
+              trialEnds: moment().add(4, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
@@ -304,7 +305,7 @@ module.exports = function (Subscription) {
   Subscription.updateSubscription = async (userId, licenseName) => {
     try {
       // 1. Find user subscription
-      let userSubscription = await Subscription.findOne({ where: { userId , trialActive: false, status: true }});
+      let userSubscription = await Subscription.findOne({ where: { userId }});
       if (userSubscription) {
 
         if (licenseName !== "Spectator") {
@@ -340,7 +341,7 @@ module.exports = function (Subscription) {
 
         let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
         // 1. Find cardHolder subscription
-        const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId , trialActive: false, status: true, cardHolder: true }});
+        const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
 
         let subscriptionObj = { 
           userId, 
@@ -395,8 +396,10 @@ module.exports = function (Subscription) {
   Subscription.deleteSubscription = async (userId) => {
     try {
       const userDetails = await Subscription.findOne({ where: { userId }});
-      if (userDetails && userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
-        await cancel_user_subscription( userDetails.subscriptionId );
+      if (userDetails) {
+        if(userDetails.subscriptionId && userDetails.subscriptionId !== "deactivated" && userDetails.status == true ) {
+          await cancel_user_subscription( userDetails.subscriptionId );
+        }
         await Subscription.deleteAll({ userId });
         return "Subscription has been deleted..!!";
       }
@@ -474,7 +477,6 @@ module.exports = function (Subscription) {
         if ( cardHolder.status == true && cardHolder.trialActive == false ) {
           for ( let i = 0; i < findUsers.length; i++) {
             let currentUser = findUsers[i];
-            console.log(currentUser.user());
             let licenseName = currentUser.license().name;
             let interval = currentUser.currentPlan;
             let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
