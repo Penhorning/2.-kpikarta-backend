@@ -270,38 +270,6 @@
         "path": "/view-karta-details",
         "verb": "post"
       }
-    },
-    "viewKartaDetailsNew": {
-      "accepts": [
-        {
-          "arg": "type",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "number",
-          "type": "number",
-          "required": true
-        },
-        {
-          "arg": "kartaId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "versionId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "object"
-      },
-      "http": {
-        "path": "/view-karta-details-new",
-        "verb": "post"
-      }
     }
   }
 }
