@@ -766,7 +766,7 @@ module.exports = function (Kartanode) {
           await createHistory(kartaId, children, updateQuery, randomKey);
           await Kartanode.update({ "_id": children.id }, updateQuery);
         }
-        updateNodeAndAssignWeightage(kartaId, children, randomKey, previousChildrenPhaseId, previousChildrenParentId);
+        await updateNodeAndAssignWeightage(kartaId, children, randomKey, previousChildrenPhaseId, previousChildrenParentId);
       }
     }
   }
