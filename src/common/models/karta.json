@@ -252,7 +252,7 @@
           "required": true
         },
         {
-          "arg": "number",
+          "arg": "duration",
           "type": "number",
           "required": true
         },
