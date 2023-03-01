@@ -87,30 +87,27 @@ module.exports = function(Kartaphase) {
             await Kartaphase.app.models.karta_history.create(history_data);
 
             // Reconnect child phase to another parent
-            const childPhases = await Kartaphase.find({ where: { "parentId": phaseId }});
-            if (childPhases.length > 0) {
-                for ( let i = 0; i < childPhases.length; i++ ) {
-                    let childPhase = childPhases[i].__data;
-                    await Kartaphase.update({ "id": childPhase.id } , { $set: { "parentId": currentPhase.parentId } });
-                    let history_data = {
-                        event: "phase_updated",
-                        kartaNodeId: childPhase.id,
-                        userId: Kartaphase.app.currentUser.id,
-                        versionId: kartaDetails.versionId,
-                        kartaId: kartaId,
-                        parentNodeId: currentPhase.id,
-                        historyType: 'main',
-                        event_options: {
-                          created: null,
-                          updated: { "parentId": currentPhase.parentId },
-                          removed: null,
-                        },
-                        old_options: { "parentId": currentPhase.id },
-                        randomKey
-                    }
-                    // Create history of updated node
-                    await Kartaphase.app.models.karta_history.create(history_data);
+            const childPhase = await Kartaphase.findOne({ where: { "parentId": phaseId }});
+            if (childPhase) {
+                await Kartaphase.update({ "id": childPhase.id } , { $set: { "parentId": currentPhase.parentId } });
+                let history_data = {
+                    event: "phase_updated",
+                    kartaNodeId: childPhase.id,
+                    userId: Kartaphase.app.currentUser.id,
+                    versionId: kartaDetails.versionId,
+                    kartaId: kartaId,
+                    parentNodeId: phaseId,
+                    historyType: 'main',
+                    event_options: {
+                        created: null,
+                        updated: { "parentId": currentPhase.parentId },
+                        removed: null,
+                    },
+                    old_options: { "parentId": phaseId },
+                    randomKey
                 }
+                // Create history of updated node
+                await Kartaphase.app.models.karta_history.create(history_data);
             }
 
             // Find nodes that are attached to current phase and set it to deleted
