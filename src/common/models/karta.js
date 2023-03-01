@@ -469,7 +469,7 @@ module.exports = function(Karta) {
     }
   }
 
-  // View Previous month karta
+  // View Previous karta
   Karta.viewKartaDetails = async (type, number, kartaId, next) => {
     try {
       // Find the whole karta information including all nodes
