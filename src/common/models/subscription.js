@@ -172,7 +172,7 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(15, 'minutes').unix(), 
+              trialEnds: moment().add(4, 'minutes').unix(), 
               // trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
@@ -342,27 +342,45 @@ module.exports = function (Subscription) {
         let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
         // 1. Find cardHolder subscription
         const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
-
-        let subscriptionObj = { 
-          userId, 
-          customerId: cardHolder.customerId, 
-          cardId: cardHolder.cardId, 
-          tokenId: cardHolder.tokenId, 
-          trialEnds: cardHolder.trialEnds, 
-          trialActive: cardHolder.trialActive,
-          companyId: userDetails.companyId,
-          cardHolder: false,
-          currentPlan: cardHolder.currentPlan,
-          licenseId: userDetails.licenseId
+        if (cardHolder.subscriptionId && cardHolder.subscriptionId !== "deactivated" && cardHolder.status == true) {
+          let subscriptionObj = { 
+            userId, 
+            customerId: cardHolder.customerId, 
+            cardId: cardHolder.cardId, 
+            tokenId: cardHolder.tokenId, 
+            trialEnds: cardHolder.trialEnds, 
+            trialActive: cardHolder.trialActive,
+            companyId: userDetails.companyId,
+            cardHolder: false,
+            currentPlan: cardHolder.currentPlan,
+            licenseId: userDetails.licenseId
+          }
+          cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
+  
+          await Subscription.create(subscriptionObj);
+          const license = await Subscription.app.models.license.findOne({ where: { id: userDetails.licenseId }});
+          const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
+          let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+          await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
+          return "Subscription updated successfully..!!";
+        } else {
+          let subscriptionObj = { 
+            userId, 
+            customerId: cardHolder.customerId, 
+            cardId: cardHolder.cardId, 
+            tokenId: cardHolder.tokenId, 
+            trialEnds: cardHolder.trialEnds, 
+            trialActive: cardHolder.trialActive,
+            companyId: userDetails.companyId,
+            cardHolder: false,
+            currentPlan: cardHolder.currentPlan,
+            licenseId: userDetails.licenseId
+          }
+          cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
+  
+          await Subscription.create(subscriptionObj);
+          return "Subscription updated successfully..!!";
         }
-        cardHolder.testClock ? subscriptionObj["testClock"] = cardHolder.testClock : null;
-
-        await Subscription.create(subscriptionObj);
-        const license = await Subscription.app.models.license.findOne({ where: { id: userDetails.licenseId }});
-        const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: license.name, interval: cardHolder.currentPlan == "monthly" ? "month" : "year" }});
-        let subscription = await create_subscription({ customerId: cardHolder.customerId, items: [{price: priceData.priceId, quantity: 1}] });
-        await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
-        return "Subscription updated successfully..!!";
       }
     } catch (err) {
       console.log(err);
