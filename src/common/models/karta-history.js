@@ -71,15 +71,15 @@ module.exports = function(Kartahistory) {
                 } else if (finalHistoryData[j].event == "node_updated") {
                     await Kartahistory.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                 } else if (finalHistoryData[j].event == "node_removed") {
-                    await Kartahistory.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId, "is_deleted": false }, { $set: { "is_deleted": true } } );
+                    await Kartahistory.app.models.karta_node.update( { "id": finalHistoryData[j].kartaNodeId }, { "is_deleted": true } );
                 } else if (finalHistoryData[j].event == "phase_created") {
                     let phaseData = JSON.parse(JSON.stringify(finalHistoryData[j].event_options.created));
                     delete phaseData.id;
-                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, phaseData );
+                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId, "is_deleted": true }, phaseData );
                 } else if (finalHistoryData[j].event == "phase_updated") {
                     await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                 } else if (finalHistoryData[j].event == "phase_removed") {
-                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, { $set: { "is_deleted": true } } );
+                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, { "is_deleted": true } );
                 }
 
                 if ( j == finalHistoryData.length - 1 ){
@@ -128,7 +128,7 @@ module.exports = function(Kartahistory) {
                                 await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : true });
                                 let nodeData = JSON.parse( JSON.stringify(currentHistory.event_options.removed ));
                                 delete nodeData.id;
-                                await Kartahistory.app.models.karta_node.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, nodeData );
+                                await Kartahistory.app.models.karta_node.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, { "is_deleted": false } );
                                 if(i == 0) lastHistory = currentHistory;
                             } else if ( currentHistory.event == "phase_created" ) {
                                 await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : true });
@@ -178,7 +178,7 @@ module.exports = function(Kartahistory) {
                         if ( currentHistory.event == "node_created" ) {
                             await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
                             // await findChildNodes(currentHistory.kartaNodeId, "remove");
-                            await Kartahistory.app.models.karta_node.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, currentHistory.event_options.created );
+                            await Kartahistory.app.models.karta_node.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, { "is_deleted": false } );
                             if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                         } 
                         else if ( currentHistory.event == "node_updated" ) {

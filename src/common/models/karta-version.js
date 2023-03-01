@@ -20,6 +20,7 @@ module.exports = function(Kartaversion) {
                         kartaId: findHistoryTemp[i].kartaId,
                         historyType: 'temp'
                     };
+                    if(findHistoryTemp[i].event == "node_updated" || findHistoryTemp[i].event == "phase_updated") newObj["old_options"] = findHistoryTemp[i].old_options;
                     findHistoryTemp[i].parentNodeId ? newObj['parentNodeId'] = findHistoryTemp[i].parentNodeId : null;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
@@ -36,6 +37,7 @@ module.exports = function(Kartaversion) {
                         kartaId: findHistoryMain[i].kartaId,
                         historyType: 'temp'
                     };
+                    if(findHistoryTemp[i].event == "node_updated" || findHistoryTemp[i].event == "phase_updated") newObj["old_options"] = findHistoryTemp[i].old_options;
                     findHistoryMain[i].parentNodeId ? newObj['parentNodeId'] = findHistoryMain[i].parentNodeId : null;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
