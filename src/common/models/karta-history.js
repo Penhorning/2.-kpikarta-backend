@@ -75,7 +75,7 @@ module.exports = function(Kartahistory) {
                 } else if (finalHistoryData[j].event == "phase_created") {
                     let phaseData = JSON.parse(JSON.stringify(finalHistoryData[j].event_options.created));
                     delete phaseData.id;
-                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, phaseData );
+                    await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId, "is_deleted": true }, phaseData );
                 } else if (finalHistoryData[j].event == "phase_updated") {
                     await Kartahistory.app.models.karta_phase.update( { "id": finalHistoryData[j].kartaNodeId }, finalHistoryData[j].event_options.updated );
                 } else if (finalHistoryData[j].event == "phase_removed") {
