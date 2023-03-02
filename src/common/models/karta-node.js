@@ -739,16 +739,16 @@ module.exports = function (Kartanode) {
     await reAdjustWeightage(kartaId, nodeData.parentId, nodeData.phaseId, randomKey);
     // Create new history
     if (previousPhaseId && previousParentId) {
-      let data1 = {
+      let old_data = {
         "id": nodeData.id,
         "parentId": convertIdToBSON(previousParentId),
         "phaseId": convertIdToBSON(previousPhaseId)
       }
-      let data2 = {
+      let updated_data = {
         "parentId": convertIdToBSON(nodeData.parentId),
         "phaseId": convertIdToBSON(nodeData.phaseId)
       }
-      await createHistory(kartaId, data1, data2, randomKey);
+      await createHistory(kartaId, old_data, updated_data, randomKey);
     }
     // Check if children exists or not
     if (nodeData.children && nodeData.children.length > 0) {
@@ -766,11 +766,12 @@ module.exports = function (Kartanode) {
           await createHistory(kartaId, children, updateQuery, randomKey);
           await Kartanode.update({ "_id": children.id }, updateQuery);
         }
-        updateNodeAndAssignWeightage(kartaId, children, randomKey, previousChildrenPhaseId, previousChildrenParentId);
+        await updateNodeAndAssignWeightage(kartaId, children, randomKey, previousChildrenPhaseId, previousChildrenParentId);
       }
     }
   }
 
+  // Drag and drop node
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     try {
       const randomKey = new Date().getTime();
