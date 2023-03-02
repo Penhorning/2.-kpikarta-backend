@@ -315,7 +315,7 @@ module.exports = function(Karta) {
   }
 
   // Delete
-  Karta.delete = (kartaId, next) => {
+  Karta.delete = (kartaId, userId, next) => {
     Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
         console.log('error while soft deleting karta', err);
@@ -361,7 +361,7 @@ module.exports = function(Karta) {
                     // Prepare notification collection data
                     let notificationData = [];
                     for(let i = 0; i < result.length; i++) {
-                      if(Karta.app.currentUser.id.toString() !== result[i].contributorId.toString()) {
+                      if(userId !== result[i].contributorId.toString()) {
                         let notificationObj = {
                           title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
                           type: "karta_deleted",
@@ -470,7 +470,7 @@ module.exports = function(Karta) {
   }
 
   // View Previous karta
-  Karta.viewKartaDetails = async (type, number, kartaId, next) => {
+  Karta.viewKartaDetails = async (type, duration, kartaId, next) => {
     try {
       // Find the whole karta information including all nodes
       const kartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
@@ -482,11 +482,11 @@ module.exports = function(Karta) {
       // Prepare query according to requested parameters
       let query = { kartaId };
       if (type == "quarter") {
-        query["createdAt"] = { lte: moment().quarter(number).endOf('quarter') }
+        query["createdAt"] = { lte: moment().quarter(duration).endOf('quarter') }
       } else if (type == "month") {
-        query["createdAt"] = { lte: moment().month(number).endOf('month') }
+        query["createdAt"] = { lte: moment().month(duration).endOf('month') }
       } else if (type == "week") {
-        var queryDate = moment().startOf('month').startOf('week').add(number, 'weeks');
+        var queryDate = moment().startOf('month').startOf('week').add(duration, 'weeks');
         query["createdAt"] = { lte: queryDate }
       }
 
