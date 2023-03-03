@@ -559,9 +559,13 @@ module.exports = function(Karta) {
                 for (let j = 0; j < data.children.length; j++) {
                   let value = updateData(data.children[j]);
                   if (value) {
-                    let tempChildren = data.children[j].children;
+                    let tempChildren = data.children[j].children || [];
+                    if (tempChildren.length > 0) {
+                      tempChildren = tempChildren.filter(item => item !== undefined);
+                    }
                     delete data.children[j];
-                    data.children = [...tempChildren, data.children[j]];
+                    if (tempChildren.length > 0) data.children = [...tempChildren, data.children[j]];
+                    else data.children = [data.children[j]];
                     break;
                   }
                 }
