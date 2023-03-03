@@ -1,7 +1,5 @@
 {
   "db": {
-    "host": "localhost",
-    "database": "kpikarta",
     "name": "db",
     "connector": "mongodb"
   }
