@@ -315,7 +315,7 @@ module.exports = function(Karta) {
   }
 
   // Delete
-  Karta.delete = (kartaId, next) => {
+  Karta.delete = (kartaId, userId, next) => {
     Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
       if(err){
         console.log('error while soft deleting karta', err);
@@ -361,7 +361,7 @@ module.exports = function(Karta) {
                     // Prepare notification collection data
                     let notificationData = [];
                     for(let i = 0; i < result.length; i++) {
-                      if(Karta.app.currentUser.id.toString() !== result[i].contributorId.toString()) {
+                      if(result[i].contributorId && userId !== result[i].contributorId.toString()) {
                         let notificationObj = {
                           title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
                           type: "karta_deleted",
