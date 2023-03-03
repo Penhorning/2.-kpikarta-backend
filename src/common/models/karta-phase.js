@@ -118,8 +118,10 @@ module.exports = function(Kartaphase) {
                     const deletingNode = deletingNodes[j];
                     // Set the status of node to deleted along with its history
                     await Kartaphase.app.models.karta_node.update({ "_id": deletingNode.id }, { $set: { "is_deleted": true } });
-                    // let removed_node = deletingNode;
-                    // delete removed_node["id"];
+                    let removed_node = JSON.stringify(deletingNode.__data, function (key, value) {
+                        if (key == 'children') return [];
+                        return value;
+                    });
                     let history_data = {
                         event: "node_removed",
                         kartaNodeId: deletingNode.id,
@@ -131,11 +133,11 @@ module.exports = function(Kartaphase) {
                         event_options: {
                           created: null,
                           updated: null,
-                          removed: deletingNode.__data,
+                          removed: JSON.parse(removed_node),
                         },
                         randomKey
                     };
-                    // Create history
+                    // // Create history
                     await Kartaphase.app.models.karta_history.create(history_data);
 
                     // Find childrens of deleted node

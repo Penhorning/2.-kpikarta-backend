@@ -361,7 +361,7 @@ module.exports = function(Karta) {
                     // Prepare notification collection data
                     let notificationData = [];
                     for(let i = 0; i < result.length; i++) {
-                      if(userId !== result[i].contributorId.toString()) {
+                      if(result[i].contributorId && userId !== result[i].contributorId.toString()) {
                         let notificationObj = {
                           title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
                           type: "karta_deleted",
