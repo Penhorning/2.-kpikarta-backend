@@ -515,6 +515,39 @@
         "path": "/calculation-period",
         "verb": "post"
       }
+    },
+    "viewPreviousKpis": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string"
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "month",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "kpi",
+        "type": "array"
+      },
+      "http": {
+        "path": "/view-previous-kpis",
+        "verb": "post"
+      }
     }
   }
 }

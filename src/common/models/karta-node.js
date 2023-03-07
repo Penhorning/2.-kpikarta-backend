@@ -547,9 +547,86 @@ module.exports = function (Kartanode) {
   }
 
   // View previous kpi nodes
-  // Karta.viewKartaDetails = async (page, limit, searchQuery, userId, month, next) => {
-  //   try {
-  //     // Find the whole karta information including all nodes
+  Kartanode.viewPreviousKpis = (page, limit, searchQuery, userId, month, next) => {
+    try {
+      // Find the karta nodes information for a particular month
+      userId = convertIdToBSON(userId);
+
+      page = parseInt(page, 10) || 1;
+      limit = parseInt(limit, 10) || 100;
+
+      let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
+    
+      Kartanode.getDataSource().connector.connect(function (err, db) {
+        const kartaNodeCollection = db.collection('karta_node');
+        kartaNodeCollection.aggregate([
+          {
+            $match: {
+              "contributorId": userId,
+              "is_deleted": false,
+              "createdAt": {
+                $gte: moment().month(month).startOf('month').toDate(),
+                $lte: moment().month(month).endOf('month').toDate()
+              }
+            }
+          },
+          KARTA_LOOKUP,
+          UNWIND_KARTA,
+          {
+            $lookup: {
+              from: 'karta_history',
+              let: {
+                node_id: "$_id"
+              },
+              pipeline: [
+                { 
+                  $match: { 
+                    $expr: { $eq: ["$kartaNodeId", "$$node_id"] },
+                    "event": "node_updated",
+                    "old_options.achieved_value": { $exists: true },
+                    "createdAt": {
+                      $gte: moment().month(month).startOf('month').toDate(),
+                      $lte: moment().month(month).endOf('month').toDate()
+                    }
+                  } 
+                },
+                {
+                  $sort: {
+                    "createdAt": -1
+                  }
+                },
+                {
+                  $limit: 1
+                }
+              ],
+              as: 'node'
+            }
+          },
+          {
+            $unwind: {
+              path: "$node",
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $project: {
+              "name": 1,
+              "target": 1,
+              "kpi_calc_period": 1,
+              "karta": 1,
+              "assigned_date": 1,
+              "achieved_value": {
+                $cond: [ "$node.event_options.updated.achieved_value", "$node.event_options.updated.achieved_value", "$achieved_value" ]
+              }
+            }
+          },
+          FACET(page, limit)
+        ]).toArray((err, result) => {
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          next(err, result);
+        });
+      });
+
   //     const kartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
   //     // Formatting data
   //     let kartaData = JSON.parse(JSON.stringify(kartaInfo[0]));
@@ -685,10 +762,10 @@ module.exports = function (Kartanode) {
   //     } else {
   //       return { message: "KPI Nodes was not created before the requested timeframe..!!", kpis: null };
   //     }
-  //   } catch(err) {
-  //     console.log(err);
-  //   }
-  // }
+    } catch(err) {
+      console.log(err);
+    }
+  }
 
   // Update kpi nodes
   Kartanode.updateKpiNodes = (nodes, next) => {
