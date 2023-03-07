@@ -7,7 +7,8 @@ module.exports = async function(app) {
     async.series([function(callback) {
       app.models.Role.create(role, function(err, created) {
         if (err) {
-          console.log('[DB] ADD ROLE: ' + created.name + ' -> FAILED ' + err.details.messages.name[0]);
+          console.log(err);
+          console.log('[DB] ADD ROLE: ' + role.name + ' -> FAILED ');
           return callback(err);
         };
         console.log('[DB] ADD ROLE: ' + created.name + ' -> DONE');
