@@ -527,17 +527,17 @@
           "type": "number"
         },
         {
-          "arg": "searchQuery",
-          "type": "string"
-        },
-        {
-          "arg": "userId",
-          "type": "string",
+          "arg": "contributorIds",
+          "type": "array",
           "required": true
         },
         {
-          "arg": "month",
+          "arg": "type",
           "type": "string"
+        },
+        {
+          "arg": "duration",
+          "type": "number"
         }
       ],
       "returns": {
