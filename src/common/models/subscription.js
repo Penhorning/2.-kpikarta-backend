@@ -54,7 +54,7 @@ module.exports = function (Subscription) {
     // PLAN - Monthly/Yearly
     try {
       const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }, include: "company" });
-      const findUser = await Subscription.findOne({where: { userId }});
+      const findUser = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");

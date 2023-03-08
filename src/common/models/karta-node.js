@@ -547,148 +547,103 @@ module.exports = function (Kartanode) {
   }
 
   // View previous kpi nodes
-  // Karta.viewKartaDetails = async (page, limit, searchQuery, userId, month, next) => {
-  //   try {
-  //     // Find the whole karta information including all nodes
-  //     const kartaInfo = await Karta.find({ where: { "id": kartaId }, include: ["node"]});
-  //     // Formatting data
-  //     let kartaData = JSON.parse(JSON.stringify(kartaInfo[0]));
-  //     // Find all the history of the current karta with current version id
-  //     const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId } });
+  Kartanode.viewPreviousKpis = (page, limit, contributorIds, type, duration, next) => {
+    try {
+      // Find the karta nodes information for a particular month
+      contributorIds = contributorIds.map(item => convertIdToBSON(item));
 
-  //     // Prepare query according to requested parameters
-  //     let query = { "createdAt": { lte: moment().month(number).endOf('month') } }
+      page = parseInt(page, 10) || 1;
+      limit = parseInt(limit, 10) || 100;
 
-  //     // Find all versions which was created before the requested time
-  //     const versionDetails = await Karta.app.models.karta_version.find({ where: query });
-  //     if (versionDetails.length > 0) {
-  //       // Getting last version from that
-  //       const requestedVersion = versionDetails[versionDetails.length - 1];
+      const kartanode_query = {
+        "contributorId": { $in: contributorIds },
+        "is_deleted": false,
+      };
 
-  //       // Finding requested karta history before the requested time
-  //       const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": requestedVersion.id } });
-  //       // Getting last history event object from that
-  //       const lastHistoryObject = JSON.parse(JSON.stringify(requestedKartaHistory[requestedKartaHistory.length - 1]));
+      const kartahistory_query = {
+        $expr: { $eq: ["$kartaNodeId", "$$node_id"] },
+        "event": "node_updated",
+        "old_options.achieved_value": { $exists: true },
+      };
 
-  //       // Comparing Latest Karta History with Requested Karta History
-  //       const historyIndex = latestKartaHistory.findIndex(x => {
-  //         // Find index of the last history object from the latest karta history
-  //         if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
-  //           // Return index of that directly, if node is created or removed
-  //           if (x.event == "node_created" || x.event == "node_removed" || x.event == "phase_created" || x.event == "phase_removed") {
-  //             return x;
-  //           }
-  //           // If node is updated, then return the last updated history index
-  //           else if (x.event === "node_updated") {
-  //             const newObj = JSON.parse(JSON.stringify(x.old_options));
-  //             let flagCheck = false;
+      const date_query = {
+        "createdAt": {
+          $gte: moment().month(duration).startOf('month').toDate(),
+          $lte: moment().month(duration).endOf('month').toDate()
+        }
+      }
 
-  //             if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
-  //               Object.keys(lastHistoryObject.old_options).forEach(key => {
-  //                 if (newObj.hasOwnProperty(key)) {
-  //                   if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
-  //                     newObj[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
-  //                   } else if (typeof lastHistoryObject.old_options[key] === 'object') {
-  //                     Object.keys(newObj[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
-  //                   } else {
-  //                     newObj[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
-  //                   }
-  //                 } else flagCheck = false;
-  //               });
-  //             } else flagCheck = false;
-  //             if (flagCheck) return x;
-  //           }
-  //           // If phase is updated, then return the last updated history index
-  //           else if (x.event === "phase_updated") {
-  //             let flagCheck = false;
-  //             if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
-  //               if (lastHistoryObject.old_options.name === x.old_options.name) flagCheck = true;
-  //               else flagCheck = false;
-  //             } else flagCheck = false;
-  //             if (flagCheck) return x;
-  //           }
-  //         }
-  //       });
-
-  //       // Latest Karta History - Requested Karta History = History to Undo from main karta data 
-  //       const filteredHistory = latestKartaHistory.slice(historyIndex + 1, latestKartaHistory.length);
-        
-  //       // Performing Undo functionality on main kartaData
-  //       let kartaNode = kartaData.node;
-  //       for (let i = filteredHistory.length - 1; i >= 0; i--) {
-  //         let currentHistoryObj = filteredHistory[i];
-  //         // CHECKING FOR NODES
-  //         if (currentHistoryObj.event == "node_created") {
-  //           function updateData(data) {
-  //             if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
-  //               return true;
-  //             } else if (data && data.children && data.children.length > 0) {
-  //               for (let j = 0; j < data.children.length; j++) {
-  //                 let value = updateData(data.children[j]);
-  //                 if (value) {
-  //                   let tempChildren = data.children[j].children;
-  //                   delete data.children[j];
-  //                   data.children = [...tempChildren, data.children[j]];
-  //                   break;
-  //                 }
-  //               }
-  //             }
-  //           }
-  //           updateData(kartaNode);
-  //         } else if (currentHistoryObj.event == "node_updated") {
-  //           function updateData(data) {
-  //             if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
-  //               Object.keys(currentHistoryObj.old_options).map(x => {
-  //                 data[x] = JSON.parse(JSON.stringify(currentHistoryObj.old_options[x]));
-  //               });
-  //             } else if (data && data.children && data.children.length > 0) {
-  //               for (let j = 0; j < data.children.length; j++) {
-  //                 updateData(data.children[j]);
-  //               }
-  //             }
-  //           }
-  //           updateData(kartaNode);
-  //         } else if (currentHistoryObj.event == "node_removed") {
-  //           function updateData(data) {
-  //             if (data && data.id.toString() === currentHistoryObj.parentNodeId.toString()) {
-  //               let tempNode = {
-  //                 ...currentHistoryObj.event_options.removed,
-  //                 id: currentHistoryObj.kartaNodeId
-  //               }
-  //               return data.children && data.children.length > 0 ? data.children.push(tempNode) : data['children'] = [tempNode];
-  //             } else if (data && data.children && data.children.length > 0) {
-  //               for(let j = 0; j < data.children.length; j++) {
-  //                 updateData(data.children[j]);
-  //                 break;
-  //               }
-  //             }
-  //           }
-  //           updateData(kartaNode);
-  //         }
-  //       }
-
-  //       // Remove null from children arrays
-  //       function nullRemover(data) {
-  //         if (data && data.children) {
-  //           data.children = data.children.filter( x => (x !== null && x !== undefined) );
-  //           if (data.children.length > 0) {
-  //             for (let i = 0; i < data.children.length; i++) {
-  //               nullRemover(data.children[i]);
-  //             }
-  //           }
-  //         } else return;
-  //       }
-  //       nullRemover(kartaNode);
-  //       kartaData["node"] = kartaNode;
-
-  //       return { message: "KPI Nodes data found..!!", kpis: kartaData };
-  //     } else {
-  //       return { message: "KPI Nodes was not created before the requested timeframe..!!", kpis: null };
-  //     }
-  //   } catch(err) {
-  //     console.log(err);
-  //   }
-  // }
+      if (type == "year") {
+        date_query["createdAt"] = {
+          $gte: moment().year(duration).startOf('year').toDate(),
+          $lte: moment().year(duration).endOf('year').toDate()
+        }
+      }
+    
+      Kartanode.getDataSource().connector.connect(function (err, db) {
+        const kartaNodeCollection = db.collection('karta_node');
+        kartaNodeCollection.aggregate([
+          {
+            $match: kartanode_query
+          },
+          {
+            $match: date_query
+          },
+          KARTA_LOOKUP,
+          UNWIND_KARTA,
+          {
+            $lookup: {
+              from: 'karta_history',
+              let: {
+                node_id: "$_id"
+              },
+              pipeline: [
+                { 
+                  $match: kartahistory_query
+                },
+                { 
+                  $match: date_query
+                },
+                {
+                  $sort: {
+                    "createdAt": -1
+                  }
+                },
+                {
+                  $limit: 1
+                }
+              ],
+              as: 'node'
+            }
+          },
+          {
+            $unwind: {
+              path: "$node",
+              preserveNullAndEmptyArrays: true
+            }
+          },
+          {
+            $project: {
+              "name": 1,
+              "target": 1,
+              "kpi_calc_period": 1,
+              "karta": 1,
+              "assigned_date": 1,
+              "achieved_value": {
+                $cond: [ "$node.event_options.updated.achieved_value", "$node.event_options.updated.achieved_value", "$achieved_value" ]
+              }
+            }
+          },
+          FACET(page, limit)
+        ]).toArray((err, result) => {
+          if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          next(err, result);
+        });
+      });
+    } catch(err) {
+      console.log(err);
+    }
+  }
 
   // Update kpi nodes
   Kartanode.updateKpiNodes = (nodes, next) => {
