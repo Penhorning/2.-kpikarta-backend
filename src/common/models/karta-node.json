@@ -265,7 +265,7 @@
         "verb": "post"
       }
     },
-    "lastUpdatedKPINode": {
+    "lastSavedKarta": {
       "accepts": [
         {
           "arg": "kartaId",
@@ -278,7 +278,24 @@
         "type": "karta_node"
       },
       "http": {
-        "path": "/last-updated-kpi-node",
+        "path": "/last-saved-karta",
+        "verb": "post"
+      }
+    },
+    "lastUpdatedKarta": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "kpi_node",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/last-updated-karta",
         "verb": "post"
       }
     },
@@ -361,6 +378,44 @@
       },
       "http": {
         "path": "/kpis",
+        "verb": "post"
+      }
+    },
+    "viewPreviousKpis": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "contributorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "nodeIds",
+          "type": "array",
+          "required": false
+        },
+        {
+          "arg": "type",
+          "type": "string"
+        },
+        {
+          "arg": "duration",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "arg": "kpi_nodes",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/view-previous-kpis",
         "verb": "post"
       }
     },
@@ -513,39 +568,6 @@
       },
       "http": {
         "path": "/calculation-period",
-        "verb": "post"
-      }
-    },
-    "viewPreviousKpis": {
-      "accepts": [
-        {
-          "arg": "page",
-          "type": "number"
-        },
-        {
-          "arg": "limit",
-          "type": "number"
-        },
-        {
-          "arg": "contributorIds",
-          "type": "array",
-          "required": true
-        },
-        {
-          "arg": "type",
-          "type": "string"
-        },
-        {
-          "arg": "duration",
-          "type": "number"
-        }
-      ],
-      "returns": {
-        "arg": "kpi",
-        "type": "array"
-      },
-      "http": {
-        "path": "/view-previous-kpis",
         "verb": "post"
       }
     }
