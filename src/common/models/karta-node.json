@@ -381,7 +381,36 @@
         "verb": "post"
       }
     },
-    "viewPreviousKpis": {
+    "viewPreviousKpisByMonth": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "contributorId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "month",
+          "type": "number"
+        }
+      ],
+      "returns": {
+        "arg": "kpi_nodes",
+        "type": "karta_node"
+      },
+      "http": {
+        "path": "/view-previous-kpis-by-month",
+        "verb": "post"
+      }
+    },
+    "viewPreviousKpisByYear": {
       "accepts": [
         {
           "arg": "page",
@@ -398,15 +427,10 @@
         },
         {
           "arg": "nodeIds",
-          "type": "array",
-          "required": false
+          "type": "array"
         },
         {
-          "arg": "type",
-          "type": "string"
-        },
-        {
-          "arg": "duration",
+          "arg": "year",
           "type": "number"
         }
       ],
@@ -415,7 +439,7 @@
         "type": "karta_node"
       },
       "http": {
-        "path": "/view-previous-kpis",
+        "path": "/view-previous-kpis-by-year",
         "verb": "post"
       }
     },

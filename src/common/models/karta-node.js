@@ -419,13 +419,13 @@ module.exports = function (Kartanode) {
 
   // Get last saved karta version history
   Kartanode.lastSavedKarta = (kartaId, next) => {
-    Kartanode.app.models.karta_version.find({ where: { kartaId } }, (err, result) => {
+    Kartanode.app.models.karta_version.find({ where: { kartaId, "is_deleted": false } }, (err, result) => {
       next(err, result[result.length-1]);
     });
   }
   // Get last updated karta history
   Kartanode.lastUpdatedKarta = (kartaId, next) => {
-    Kartanode.app.models.karta_history.find({ where: { kartaId } }, (err, result) => {
+    Kartanode.app.models.karta_history.find({ where: { kartaId, "is_deleted": false } }, (err, result) => {
       next(err, result[result.length-1]);
     });
   }
@@ -559,8 +559,8 @@ module.exports = function (Kartanode) {
     });
   }
 
-  // View previous kpi nodes
-  Kartanode.viewPreviousKpis = (page, limit, contributorId, nodeIds, type, duration, next) => {
+  // View previous kpi nodes by month
+  Kartanode.viewPreviousKpisByMonth = (page, limit, contributorId, month, next) => {
     page = parseInt(page, 10) || 1;
     limit = parseInt(limit, 10) || 100;
     
@@ -568,32 +568,19 @@ module.exports = function (Kartanode) {
 
     const karta_node_query = {
       "contributorId": contributorId,
-      "is_deleted": false,
+      "is_deleted": false
     }
 
     const karta_history_query = {
-    //   $expr: { $eq: ["$kartaNodeId", "$$node_id"] },
       "kartaNodeId": "$node_id",
       "event": "node_updated",
-      "old_options.achieved_value": { $exists: true },
-    }
-
-    if (nodeIds && nodeIds.length > 0) {
-      nodeIds = nodeIds.map(item => convertIdToBSON(item));
-      karta_history_query["kartaNodeId"] = { $in: nodeIds }
+      "old_options.achieved_value": { $exists: true }
     }
 
     const date_query = {
       "createdAt": {
-        $gte: moment().month(duration).startOf('month').toDate(),
-        $lte: moment().month(duration).endOf('month').toDate()
-      }
-    }
-
-    if (type == "year") {
-      date_query["createdAt"] = {
-        $gte: moment().year(duration).startOf('year').toDate(),
-        $lte: moment().year(duration).endOf('year').toDate()
+        $gte: moment().month(month).startOf('month').toDate(),
+        $lte: moment().month(month).endOf('month').toDate()
       }
     }
   
@@ -657,6 +644,90 @@ module.exports = function (Kartanode) {
         FACET(page, limit)
       ]).toArray((err, result) => {
         if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
+  }
+
+  // View previous kpi nodes by year
+  Kartanode.viewPreviousKpisByYear = (page, limit, contributorId, nodeIds, year, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 100;
+    
+    contributorId = convertIdToBSON(contributorId);
+
+    const karta_node_query = {
+      "contributorId": contributorId,
+      "is_deleted": false,
+      "createdAt": {
+        $gte: moment().year(year).startOf('year').toDate(),
+        $lte: moment().year(year).endOf('year').toDate()
+      }
+    }
+    // query for selected nodes only
+    if (nodeIds && nodeIds.length > 0) {
+      nodeIds = nodeIds.map(item => convertIdToBSON(item));
+      karta_node_query["_id"] = { $in: nodeIds }
+    }
+  
+    Kartanode.getDataSource().connector.connect(function (err, db) {
+      const kartaNodeCollection = db.collection('karta_node');
+      kartaNodeCollection.aggregate([
+        {
+          $match: karta_node_query
+        },
+        KARTA_LOOKUP,
+        UNWIND_KARTA,
+        KARTA_USER_LOOKUP,
+        UNWIND_KARTA_USER,
+        FACET(page, limit)
+      ]).toArray(async (err, result) => {
+        if (result) {
+          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          // Fetch whole year history month wise
+          for (let item of result[0].data) {
+            item["nodes"] = [];
+            const query = {
+              "kartaNodeId": item._id,
+              "event": "node_updated",
+              "old_options.achieved_value": { exists: true }
+            }
+            // if year is less than current year
+            const currentYear = moment().year();
+            const currentMonth = moment().month();
+            let totalMonths = 12;
+            if (year >= currentYear) totalMonths = currentMonth;
+            for (let i=0; i<totalMonths; i++) {
+              query["createdAt"] = {
+                  gte: moment().month(i).startOf('month').toDate(),
+                  lte: moment().month(i).endOf('month').toDate()
+              }
+              const sort_query = { "sort": { "createdAt": -1 }, "limit": 1 };
+              const achieved_history = await Kartanode.app.models.karta_history.find({ where: query, sort_query });
+              const target_query = {
+                "kartaNodeId": item._id,
+                "randomKey": achieved_history.randomKey,
+                "event": "node_updated",
+                "old_options.target": { exists: true }
+              }
+              const target_history = await Kartanode.app.models.karta_history.findOne({ where: target_query });
+              const formula_query = {
+                "kartaNodeId": item._id,
+                "randomKey": achieved_history.randomKey,
+                "event": "node_updated",
+                "old_options.node_formula": { exists: true }
+              }
+              const formula_history = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+              item.nodes.push(
+                {
+                  achieved: JSON.parse(JSON.stringify(achieved_history[0])),
+                  target: JSON.parse(JSON.stringify(target_history)),
+                  formula: JSON.parse(JSON.stringify(formula_history))
+                }
+              );
+            }
+          }
+        }
         next(err, result);
       });
     });

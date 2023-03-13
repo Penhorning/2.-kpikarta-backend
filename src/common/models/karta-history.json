@@ -157,6 +157,10 @@
         {
           "arg": "historyType",
           "type": "string"
+        },
+        {
+          "arg": "randomKey",
+          "type": "string"
         }
       ],
       "returns": {

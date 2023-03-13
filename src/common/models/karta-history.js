@@ -4,7 +4,7 @@ const e = require("cors");
 
 module.exports = function(Kartahistory) {
 
-    Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, next) => {
+    Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, randomKey, next) => {
         const event_object = {
             "node_created": "created",
             "phase_created": "created",
@@ -29,7 +29,7 @@ module.exports = function(Kartahistory) {
             kartaId,
             parentNodeId,
             historyType,
-            randomKey: new Date().getTime()
+            randomKey: randomKey || new Date().getTime()
         };
 
         event_options_obj[event_object[event]] = eventValue;
