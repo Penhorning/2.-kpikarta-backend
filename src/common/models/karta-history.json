@@ -55,6 +55,10 @@
     },
     "randomKey": {
       "type": "string"
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
