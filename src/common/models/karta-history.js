@@ -164,9 +164,9 @@ module.exports = function(Kartahistory) {
 
     Kartahistory.redoKartaToVersion = async ( versionId, kartaId ) => {
         try {
-            let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
-            let wholeHistory = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
-            let lastHistoryIndex = wholeHistory.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
+            const kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
+            const wholeHistory = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
+            const lastHistoryIndex = wholeHistory.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
             if ( lastHistoryIndex != -1 ) {
                 let nextHistory = wholeHistory[lastHistoryIndex + 1];
                 if (nextHistory) {
