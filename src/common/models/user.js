@@ -1063,60 +1063,72 @@ module.exports = function(User) {
     const req = context.req;
 
     if (req.body.type == "social_user") {
-      User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
-        RoleManager.assignRoles(User.app, [role.id], user.id, () => {
-          // Create company
-          User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
-            if (err) {
-              console.log('> error while creating company', err);
-              return next(err);
-            }
-            // Find license
-            User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
-              if (err) {
-                console.log('> error while finding license', err);
-                return next(err);
-              }
-              // Assign roleId, licenseId and companyId
-              let userDetails = {
-                ...user,
-                companyName: company.name,
-                license: license.name,
-                role: role.name
-              }
-              let ret = await sales_user_details(userDetails);
-              if (ret && ret.id) {
-                User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
+      const companyName = removeSpace(req.body.companyName);
+      const regex = new RegExp(["^", companyName, "$"].join(""), "i");
+
+      User.app.models.company.findOne({ where: { "name": regex } }, (err, result) => {
+        if (err) return next(err);
+        else if (result) {
+          let error = new Error("Company name is already registered! Try adding a suffix for signing up for a different location of the company.");
+          error.status = 400;
+          next(error);
+        } else {
+          User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
+            RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+              // Create company
+              User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
+                if (err) {
+                  console.log('> error while creating company', err);
+                  return next(err);
+                }
+                // Find license
+                User.app.models.License.findOne({ where: { "name": "Creator" } }, async (err, license) => {
                   if (err) {
-                    console.log('> error while updating social user', err);
+                    console.log('> error while finding license', err);
                     return next(err);
-                  } 
+                  }
+                  // Assign roleId, licenseId and companyId
+                  let userDetails = {
+                    ...user,
+                    companyName: company.name,
+                    license: license.name,
+                    role: role.name
+                  }
+                  let ret = await sales_user_details(userDetails);
+                  if (ret && ret.id) {
+                    User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
+                      if (err) {
+                        console.log('> error while updating social user', err);
+                        return next(err);
+                      } 
+                    });
+                  }
                 });
-              }
+              });
+              // Send welcome email to social users
+              const password = generatePassword();
+              user.updateAttributes({ password }, {}, (err) => {
+                // Create access token
+                user.accessTokens.create((err, token) => {
+                  userInstance.__data.accessToken = token.id;
+                  next();
+                });
+                if (!user.email.includes("facebook.com")) {
+                  const data = {
+                    subject: `Welcome to | ${User.app.get('name')}`,
+                    template: "welcome.ejs",
+                    email: user.email,
+                    user,
+                    password,
+                    loginUrl: `${process.env.WEB_URL}/login`,
+                    appName: User.app.get('name')
+                  }
+                  sendEmail(User.app, data, () => { });
+                }
+              });
             });
           });
-          // Send welcome email to social users
-          const password = generatePassword();
-          user.updateAttributes({ password }, {}, (err) => {
-            // Create access token
-            user.accessTokens.create((err, token) => {
-              userInstance.__data.accessToken = token.id;
-              next();
-            });
-            if (!user.email.includes("facebook.com")) {
-              const data = {
-                subject: `Welcome to | ${User.app.get('name')}`,
-                template: "welcome.ejs",
-                email: user.email,
-                user,
-                password,
-                loginUrl: `${process.env.WEB_URL}/login`,
-                appName: User.app.get('name')
-              }
-              sendEmail(User.app, data, () => { });
-            }
-          });
-        });
+        }
       });
     } else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);

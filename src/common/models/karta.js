@@ -316,54 +316,70 @@ module.exports = function(Karta) {
 
   // Delete
   Karta.delete = (kartaId, userId, next) => {
-    Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+    Karta.findOne({ where: { "id": kartaId } }, (err, kartaDetails) => {
       if(err){
-        console.log('error while soft deleting karta', err);
+        console.log('error while while finding karta', err);
         return next(err);
       }
-      else {
-        // Delete nodes
-        Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
-            if (err) {
-              console.log('> error while deleting karta', err);
-              next(err);
-            }
-
-            // Delete phases
-            Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+      Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+        if(err){
+          console.log('error while soft deleting karta', err);
+          return next(err);
+        }
+        else {
+          // Delete nodes
+          Karta.app.models.karta_node.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true }}, (err, result) => {
               if (err) {
-                console.log('> error while deleting phase', err);
-                return next(err);
+                console.log('> error while deleting karta', err);
+                next(err);
               }
-            });
-            
-            Karta.getDataSource().connector.connect(function (err, db) {
-              const KartaNodeCollection = db.collection('karta_node');
-              KartaNodeCollection.aggregate([
-                {
-                  $match: {
-                    "kartaDetailId": Karta.getDataSource().ObjectID(kartaId),
-                    "contributorId": { $exists: true }
+  
+              // Delete phases
+              Karta.app.models.karta_phase.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+                if (err) {
+                  console.log('> error while deleting phase', err);
+                  return next(err);
+                }
+              });
+  
+              // Delete version
+              Karta.app.models.karta_version.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+                if (err) {
+                  console.log('> error while deleting phase', err);
+                  return next(err);
+                }
+              });
+  
+              // Delete history
+              Karta.app.models.karta_history.update( { "kartaId": kartaId } , { $set: { "is_deleted": true } }, (err) => {
+                if (err) {
+                  console.log('> error while deleting phase', err);
+                  return next(err);
+                }
+              });
+              
+              Karta.getDataSource().connector.connect(function (err, db) {
+                const KartaNodeCollection = db.collection('karta_node');
+                KartaNodeCollection.aggregate([
+                  {
+                    $match: {
+                      "kartaDetailId": Karta.getDataSource().ObjectID(kartaId),
+                      "contributorId": { $exists: true }
+                    }
                   }
-                }
-              ]).toArray((err, result) => {
-                if(err) {
-                  console.log('> error while finding karta contributors', err);
-                  next(err);
-                }
-                Karta.findOne({ where: { id: kartaId }}, async (err, karta) => {
-                  if (err) {
-                    console.log('> error while finding karta details', err);
+                ]).toArray(async (err, result) => {
+                  if(err) {
+                    console.log('> error while finding karta contributors', err);
                     next(err);
                   }
-
+  
                   if(result.length > 0) {
                     // Prepare notification collection data
                     let notificationData = [];
                     for(let i = 0; i < result.length; i++) {
                       if(result[i].contributorId && userId !== result[i].contributorId.toString()) {
                         let notificationObj = {
-                          title: `${Karta.app.currentUser.fullName} has deleted the karta ${karta.name}`,
+                          title: `${Karta.app.currentUser.fullName} has deleted the karta ${kartaDetails.name}`,
                           type: "karta_deleted",
                           contentId: kartaId,
                           userId: result[i].contributorId
@@ -376,26 +392,25 @@ module.exports = function(Karta) {
                       if (err) console.log('> error while inserting data in notification collection', err);
                     });
 
-                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
                     const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
                     if (userDetails && userDetails.sforceId) {
                       sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt });
                     }
                     next(null, "Karta deleted successfully..!!");
                   } else {
-                    const kartaDetails = await Karta.findOne({ where: { "id": kartaId } });
                     const userDetails = await Karta.app.models.user.findOne({ where: {"id": kartaDetails.userId }});
                     if (userDetails && userDetails.sforceId) {
                       sales_update_user({ sforceId: userDetails.sforceId }, { deleteKarta: kartaDetails.name, kartaLastUpdate: kartaDetails.updatedAt });
                     }
                     next(null, "Karta deleted successfully..!!");
                   }
+
                 });
               });
-            });
-        });
-      }
-    })
+          });
+        }
+      })
+    });
   }
 
   // Create Karta Copy
