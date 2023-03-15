@@ -54,7 +54,7 @@ module.exports = function (Subscription) {
     // PLAN - Monthly/Yearly
     try {
       const userDetails = await Subscription.app.models.user.findOne({ where: { "id": userId }, include: "company" });
-      const findUser = await Subscription.findOne({where: { userId }});
+      const findUser = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
@@ -639,59 +639,89 @@ module.exports = function (Subscription) {
 
   // ------------------- ADMIN PANEL APIS -------------------
 
-  Subscription.getInvoicesForAdmin = async (page, limit, previousId, nextId, startDate = null, endDate = null) => {
-    try {
-      page = parseInt(page, 10) || 1;
-      limit = parseInt(limit, 10) || 10;
-      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
-      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
+  Subscription.getInvoicesForAdmin = (page, limit, searchQuery, previousId, nextId, startDate = null, endDate = null, next) => {
+    page = parseInt(page, 10) || 1;
+    limit = parseInt(limit, 10) || 10;
+    startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
+    endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
 
-      let invoices = await get_invoices_for_admin(page, limit, previousId, nextId, startDate, endDate);
-      if ( invoices.data && invoices.data.length > 0 ) {
+    let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
 
-        let newArr = [];
-        for( let i = 0; i < invoices.data.length; i++) {
-          let inv = invoices.data[i];
-          let newObj = {
-            id: inv.id,
-            planName: inv.lines.data[0].plan.nickname,
-            price: Number(inv.total) / 100,
-            paymentDate : moment(inv.created * 1000),
-            status: inv.status,
+    Subscription.getDataSource().connector.connect(async function (err, db) {
+      const UserCollection = db.collection('company');
+      await UserCollection.aggregate([
+        {
+          $match: {
+            'name': {
+              $regex: search_query,
+              $options: 'i'
+            }
+          }
+        }
+      ]).toArray(async (err, result) => {
+        if(err) {
+          console.log('> error while finding karta contributors', err);
+          next(err);
+        }
+        let customerId = "";
+        if (result.length > 0 && search_query) {
+          let subscriptionData = await Subscription.findOne({ where: { companyId: result[0].id, cardHolder: true }});
+          if (subscriptionData.customerId) customerId = subscriptionData.customerId;
+        }
+
+        if (result.length == 0 && search_query) {
+          next(null, [{
+            metadata: [],
+            data: []
+          }]);
+        }
+
+        let invoices = await get_invoices_for_admin(page, limit, customerId, previousId, nextId, startDate, endDate);
+        if ( invoices.data && invoices.data.length > 0 ) {
+
+          let newArr = [];
+          for( let i = 0; i < invoices.data.length; i++) {
+            let inv = invoices.data[i];
+            let newObj = {
+              id: inv.id,
+              planName: inv.lines.data[0].plan.nickname,
+              price: Number(inv.total) / 100,
+              paymentDate : moment(inv.created * 1000),
+              status: inv.status,
+            };
+
+            let SubscriptionData = await Subscription.findOne({ where: { customerId: inv.customer }});
+
+            if (SubscriptionData) {
+              let UserData = await Subscription.app.models.user.findOne({ where: { id: SubscriptionData.userId }, include: "company" });
+              newObj["username"] = UserData.fullName;
+              newObj["companyName"] = UserData.company().name;
+            } else {
+              newObj["username"] = inv.customer_name;
+              newObj["companyName"] = "N/A";
+            }
+
+            newArr.push(newObj);
           };
 
-          let SubscriptionData = await Subscription.findOne({ where: { customerId: inv.customer }});
+          let finalData = [{
+              metadata: [{
+                total: invoices.total_count || 0,
+                page: page || 0,
+                count: newArr.length
+              }],
+              data: newArr
+          }];
 
-          if (SubscriptionData) {
-            let UserData = await Subscription.app.models.user.findOne({ where: { id: SubscriptionData.userId }});
-            newObj["username"] = UserData.fullName;
-          } else {
-            newObj["username"] = inv.customer_name;
-          }
-
-          newArr.push(newObj);
-        };
-
-        let finalData = [{
-            metadata: [{
-              total: invoices.total_count || 0,
-              page: page || 0,
-              count: newArr.length
-            }],
-            data: newArr
-        }];
-
-        return finalData;
-      } else {
-        return [{
-          metadata: [],
-          data: []
-        }];
-      }
-    } catch (err) {
-      console.log(err);
-      throw Error(err);
-    }
+          next(null, finalData);
+        } else {
+          next(null, [{
+            metadata: [],
+            data: []
+          }]);
+        }
+      });
+    });
   }
 
   Subscription.getInvoicesForAdminChart = async (startDate, endDate) => {

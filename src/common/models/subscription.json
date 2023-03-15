@@ -310,6 +310,10 @@
           "type": "number"
         },
         {
+          "arg": "searchQuery",
+          "type": "string"
+        },
+        {
           "arg": "previousId",
           "type": "string"
         },
