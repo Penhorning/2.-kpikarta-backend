@@ -1,7 +1,5 @@
 'use strict';
 
-const e = require("cors");
-
 module.exports = function(Kartahistory) {
 
     Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, randomKey, next) => {
