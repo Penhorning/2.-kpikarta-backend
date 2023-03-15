@@ -3,7 +3,11 @@
   "base": "PersistedModel",
   "idInjection": true,
   "options": {
-    "validateUpsert": true
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "karta_version",
+      "allowExtendedOperators": true
+    }
   },
   "mixins": {
     "TimeStamp": {
@@ -20,6 +24,14 @@
     "kartaId": {
       "type": "string",
       "required": true
+    },
+    "is_deleted": {
+      "type": "boolean",
+      "default": false
+    },
+    "is_copied": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],

@@ -493,7 +493,7 @@ exports.get_invoices = async (customerId) => {
 }
 
 // GET INVOICES FOR ADMIN
-exports.get_invoices_for_admin = async (page, limit, previousId, nextId, startDate, endDate) => {
+exports.get_invoices_for_admin = async (page, limit, customerId, previousId, nextId, startDate, endDate) => {
     try {
         let query = {
             // query: 'status>\'paid\'',
@@ -506,6 +506,7 @@ exports.get_invoices_for_admin = async (page, limit, previousId, nextId, startDa
         startDate && endDate ? query["created"] = {gte: startDate, lte: endDate} : null;
         previousId ? query["ending_before"] = previousId : null;
         nextId ? query["starting_after"] = nextId : null;
+        customerId ? query["customer"] = customerId : null;
         const invoices = await stripe.invoices.list(query);
         // const invoices = await stripe.invoices.search(query);
         return invoices;
