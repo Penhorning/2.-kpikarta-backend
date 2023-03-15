@@ -195,16 +195,16 @@ module.exports = function(Kartahistory) {
                             await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
                             // await findChildNodes(currentHistory.kartaNodeId, "create");
                             await Kartahistory.app.models.karta_phase.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, currentHistory.event_options.created );
-                            if(i == 0) lastHistory = currentHistory;
+                            if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                         } else if ( currentHistory.event == "phase_updated" ) {
                             await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
                             await Kartahistory.app.models.karta_phase.update({ "id": currentHistory.kartaNodeId }, currentHistory.event_options.updated );
-                            if(i == 0) lastHistory = currentHistory;
+                            if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                         } else if ( currentHistory.event == "phase_removed" ) {
                             await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
                             // await findChildNodes(currentHistory.kartaNodeId, "create");
                             await Kartahistory.app.models.karta_phase.update({ "id": currentHistory.kartaNodeId, "is_deleted": false }, { "is_deleted": true });
-                            if(i == 0) lastHistory = currentHistory;
+                            if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                         }
                     }
 

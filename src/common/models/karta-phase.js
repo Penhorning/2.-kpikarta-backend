@@ -257,7 +257,7 @@ module.exports = function(Kartaphase) {
             }
 
             // Find the child phase of deleted phase
-            const childPhase = await Kartaphase.findOne({ where: { "parentId": phaseId }});
+            const childPhase = await Kartaphase.findOne({ where: { "parentId": phaseId, "is_deleted": false }});
             if (childPhase) {
                 // Reconnect child phase to the deleted parent phase
                 await Kartaphase.update({ "id": childPhase.id } , { $set: { "parentId": currentPhase.parentId } });
