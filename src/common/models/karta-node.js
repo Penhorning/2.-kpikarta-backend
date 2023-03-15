@@ -687,44 +687,49 @@ module.exports = function (Kartanode) {
           // Fetch whole year history month wise
           for (let item of result[0].data) {
             item["nodes"] = [];
-            const query = {
+            const karta_history_query = {
               "kartaNodeId": item._id,
               "event": "node_updated",
               "old_options.achieved_value": { exists: true }
             }
             // if year is less than current year
-            const currentYear = moment().year();
-            const currentMonth = moment().month();
-            let totalMonths = 12;
-            if (year >= currentYear) totalMonths = currentMonth;
-            for (let i=0; i<totalMonths; i++) {
-              query["createdAt"] = {
-                  gte: moment().month(i).startOf('month').toDate(),
-                  lte: moment().month(i).endOf('month').toDate()
-              }
-              const sort_query = { "sort": { "createdAt": -1 }, "limit": 1 };
-              const achieved_history = await Kartanode.app.models.karta_history.find({ where: query, sort_query });
-              const target_query = {
-                "kartaNodeId": item._id,
-                "randomKey": achieved_history.randomKey,
-                "event": "node_updated",
-                "old_options.target": { exists: true }
-              }
-              const target_history = await Kartanode.app.models.karta_history.findOne({ where: target_query });
-              const formula_query = {
-                "kartaNodeId": item._id,
-                "randomKey": achieved_history.randomKey,
-                "event": "node_updated",
-                "old_options.node_formula": { exists: true }
-              }
-              const formula_history = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
-              item.nodes.push(
-                {
-                  achieved: JSON.parse(JSON.stringify(achieved_history[0])),
-                  target: JSON.parse(JSON.stringify(target_history)),
-                  formula: JSON.parse(JSON.stringify(formula_history))
+            // const currentYear = moment().year();
+            // const currentMonth = moment().month();
+            // let totalMonths = 11;
+            // if (year >= currentYear) totalMonths = currentMonth;
+            for (let i=0; i<=11; i++) {
+              karta_history_query["and"] = [
+                { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
+                { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
+              ]
+              const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
+              if (achievedHistory.length > 0) {
+                const target_query = {
+                  "kartaNodeId": item._id,
+                  "randomKey": achievedHistory[0].randomKey,
+                  "event": "node_updated",
+                  "old_options.target": { exists: true }
                 }
-              );
+                const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query });
+                const formula_query = {
+                  "kartaNodeId": item._id,
+                  "randomKey": targetHistory.randomKey,
+                  "event": "node_updated",
+                  "old_options.node_formula": { exists: true }
+                }
+                const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+                item.nodes[i] = {
+                  achieved: JSON.parse(JSON.stringify(achievedHistory[0])),
+                  target: JSON.parse(JSON.stringify(targetHistory)),
+                  formula: JSON.parse(JSON.stringify(formulaHistory))
+                }
+              } else {
+                item.nodes[i] = {
+                  achieved: null,
+                  target: null,
+                  formula: null
+                }
+              }
             }
           }
         }

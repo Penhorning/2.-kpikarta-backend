@@ -565,7 +565,8 @@ module.exports = function(User) {
   };
 
   function forgotWithRole(email, next, role) {
-    User.findOne({ where: {email}, include: 'roles' }, (err, user) => {
+    email = email.toLowerCase();
+    User.findOne({ where: { email }, include: 'roles' }, (err, user) => {
       if (err) return next(err);
       if (user) {
         user.roles((e, roles) => {
@@ -596,6 +597,7 @@ module.exports = function(User) {
   };
 
   function loginWithRole(email, password, next, role) {
+    email = email.toLowerCase();
     User.login({ email, password }, 'user', (err, token) => {
       if (err) return next(err);
       token.user((_e, user) => {

@@ -57,7 +57,7 @@ module.exports = function(Kartaphase) {
     }
 
     // Delete extra added child phase and reconnect it's child to the above phase
-    Kartaphase.delete = async (kartaId, phaseId, nextPhaseId) => {
+    Kartaphase.delete2 = async (kartaId, phaseId, nextPhaseId) => {
         try {
             // Random key
             const randomKey = new Date().getTime();
@@ -175,6 +175,134 @@ module.exports = function(Kartaphase) {
                 }
                 return "Phase deleted successfully!";
             }
+        } catch (err) {
+            console.log("===>>> Error in deleting child phase ", err);
+            return err;
+        }
+    }
+
+    // Delete extra added child phase and reconnect it's child to the above phase
+    Kartaphase.delete = async (kartaId, phaseId, nextPhaseId) => {
+        try {
+
+            // Random key
+            const randomKey = new Date().getTime();
+            // Find Karta Details
+            const kartaDetails = await Kartaphase.app.models.karta.findOne({ where: { "_id": kartaId } });
+            // Find phase details
+            const currentPhase = await Kartaphase.findOne({ where: { "_id": phaseId } });
+
+            // Find nodes that are attached to current phase
+            const deletingNodes = await Kartaphase.app.models.karta_node.find({ where: { "kartaDetailId": kartaId, phaseId } });
+            if (deletingNodes.length > 0) {
+                for (let j=0; j<deletingNodes.length; j++) {
+                    const deletingNode = deletingNodes[j];
+                    // Find childrens of deleted node
+                    const childrens = await Kartaphase.app.models.karta_node.find({ where: { "parentId": deletingNode.id }});
+                    if (childrens.length > 0) {
+                        for (let k=0; k<childrens.length; k++) {
+                            let currentNode = childrens[k].__data;
+                            // Reconnect child nodes to another parent
+                            await Kartaphase.app.models.karta_node.update({ "id": currentNode.id }, { $set: { "parentId": deletingNode.parentId } }); 
+                            let history_data = {
+                                event: "node_updated",
+                                kartaNodeId: currentNode.id,
+                                userId: Kartaphase.app.currentUser.id,
+                                versionId: kartaDetails.versionId,
+                                kartaId: kartaId,
+                                parentNodeId: deletingNode.id,
+                                historyType: 'main',
+                                event_options: {
+                                  created: null,
+                                  updated: { "parentId": deletingNode.parentId },
+                                  removed: null,
+                                },
+                                old_options: { "parentId": deletingNode.id },
+                                randomKey
+                            }
+                            // Create history of updated node
+                            let history = await Kartaphase.app.models.karta_history.create(history_data);
+                            if ( k == childrens.length - 1) await Kartaphase.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
+                        }
+                    }
+
+                    // Set the status of node to deleted along with its history
+                    await Kartaphase.app.models.karta_node.update({ "_id": deletingNode.id }, { $set: { "is_deleted": true } });
+                    let removed_node = JSON.stringify(deletingNode.__data, function (key, value) {
+                        if (key == 'children') return [];
+                        return value;
+                    });
+                    let history_data = {
+                        event: "node_removed",
+                        kartaNodeId: deletingNode.id,
+                        userId: Kartaphase.app.currentUser.id,
+                        versionId: kartaDetails.versionId,
+                        kartaId: kartaId,
+                        parentNodeId: deletingNode.parentId,
+                        historyType: 'main',
+                        event_options: {
+                          created: null,
+                          updated: null,
+                          removed: JSON.parse(removed_node),
+                        },
+                        randomKey
+                    };
+                    // // Create history
+                    await Kartaphase.app.models.karta_history.create(history_data);
+                }
+                // Readjust weightage
+                for (let node of deletingNodes) {
+                    await reAdjustWeightage(kartaId, node.parentId, nextPhaseId, randomKey);
+                }
+            }
+
+            // Find the child phase of deleted phase
+            const childPhase = await Kartaphase.findOne({ where: { "parentId": phaseId, "is_deleted": false }});
+            if (childPhase) {
+                // Reconnect child phase to the deleted parent phase
+                await Kartaphase.update({ "id": childPhase.id } , { $set: { "parentId": currentPhase.parentId } });
+                let history_data = {
+                    event: "phase_updated",
+                    kartaNodeId: childPhase.id,
+                    userId: Kartaphase.app.currentUser.id,
+                    versionId: kartaDetails.versionId,
+                    kartaId: kartaId,
+                    parentNodeId: childPhase.parentId,
+                    historyType: 'main',
+                    event_options: {
+                        created: null,
+                        updated: { "parentId": currentPhase.parentId },
+                        removed: null,
+                    },
+                    old_options: { "parentId": childPhase.parentId },
+                    randomKey
+                }
+                // Create history of updated phase
+                await Kartaphase.app.models.karta_history.create(history_data);
+            }
+
+            let removed_phase = currentPhase.__data;
+            delete removed_phase["id"];
+            // Set the status of phase to deleted along with its history
+            await Kartaphase.update({ "_id": phaseId, "is_child": true } , { $set: { "is_deleted": true } });
+            let history_data = {
+                event: "phase_removed",
+                kartaNodeId: phaseId,
+                userId: Kartaphase.app.currentUser.id,
+                versionId: kartaDetails.versionId,
+                kartaId: kartaId,
+                parentNodeId: currentPhase.parentId,
+                historyType: 'main',
+                event_options: {
+                  created: null,
+                  updated: null,
+                  removed: removed_phase,
+                },
+                randomKey
+            }
+            await Kartaphase.app.models.karta_history.create(history_data);
+
+            return "Phase deleted successfully!";
         } catch (err) {
             console.log("===>>> Error in deleting child phase ", err);
             return err;
