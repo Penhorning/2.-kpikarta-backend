@@ -110,13 +110,6 @@
     "last_alert_sent_on": {
       "type": "date"
     },
-    "sharedTo": {
-      "type": [
-        {
-          "userId": "string"
-        }
-      ]
-    },
     "sample": {
       "type": "boolean"
     }
@@ -209,28 +202,6 @@
     }
   ],
   "methods": {
-    "share": {
-      "accepts": [
-        {
-          "arg": "nodeId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userIds",
-          "type": "array",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/share",
-        "verb": "post"
-      }
-    },
     "kpiCreators": {
       "accepts": [
         {

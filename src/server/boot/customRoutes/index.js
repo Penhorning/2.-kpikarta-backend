@@ -3,6 +3,7 @@
 const keygen = require('keygenerator');
 const { sales_update_user } = require('../../../helper/salesforce');
 const moment = require('moment');
+const { sendEmail } = require('../../../helper/sendEmail');
 
 module.exports = function (app) {
     // Success redirect url for social login
@@ -60,12 +61,28 @@ module.exports = function (app) {
     });
 
     // Stripe webhook url
-    app.post("/webhook", (req, res) => {
-        console.log(req.body, 'data');
-        console.log(req.body.data, 'data2');
-        req.app.models.subscription.update({ subscriptionId: req.body.data.object.id, customerId: req.body.data.object.customer }, { nextSubscriptionDate: req.body.data.object.current_period_end, currentSubscriptionDate: req.body.data.object.current_period_start }, (err) => {
-            if (err) return console.log('> error while updating subscription on webhook..!!');
-            res.send("webhook working..!!");
-        });
+    app.post("/webhook", async (req, res) => {
+        // const { data, type } = req.body; 
+        // console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
+
+        switch(type) {
+            case "invoice.created":
+                // const customerId = data.customer;
+                // const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
+                // const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
+
+                // const emailObj = {
+                //     subject: `KPI Invoice`,
+                //     template: "invoice.ejs",
+                //     email: userDetails.email,
+                //     user: userDetails,
+                //     amount: data.amount_paid,
+                //     date: moment(data.created * 1000).format("MM-DD-yyyy"),
+                // };
+
+                // sendEmail(app, emailObj, () => {});
+
+                res.send("Invoice Email sent successfully..!!");
+        }
     });
 };
