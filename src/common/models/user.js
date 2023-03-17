@@ -291,9 +291,11 @@ module.exports = function(User) {
 
   // Add user via invite member
   User.inviteMember = (data, next) => {
-    const { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
+    let { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
 
     const password = generatePassword();
+
+    email = email.toLowerCase();
     
     // Create user
     User.create({ fullName, email, "emailVerified": true, "paymentVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
@@ -572,9 +574,9 @@ module.exports = function(User) {
         user.roles((e, roles) => {
           roles = roles.map(r => r.name);
           if (roles.indexOf(role) > -1) {
-            User.resetPassword({email}, next);
+            User.resetPassword({ email }, next);
           } else if (role === 'not_admin' && roles[0] !== 'admin') {
-            User.resetPassword({email}, next);
+            User.resetPassword({ email }, next);
           } else {
             let error = new Error("You are not allowed to reset password here");
             error.status = 400;

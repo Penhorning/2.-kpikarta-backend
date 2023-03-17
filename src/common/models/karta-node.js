@@ -301,48 +301,6 @@ module.exports = function (Kartanode) {
     }
   }
 
-  // Share karta node to multiple users
-  Kartanode.share = (nodeId, userIds, next) => {
-    if (userIds.length > 0) {
-      Kartanode.update({ "_id": nodeId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err) => {
-        if (err) {
-          console.log('> error while updating the node sharedTo property ', err);
-          next(err);
-        } else {
-          Kartanode.findOne({where: { id: nodeId }}, (err, node) => {
-            if (err) {
-              console.log('> error while fetching the node data ', err);
-              next(err);
-            }   
-
-            // Prepare notification collection data
-            let notificationData = [];
-            for(let i = 0; i < userIds.length; i++) {
-              let notificationObj = {
-                title: `${Kartanode.app.currentUser.fullName} shared the node ${node.name}`,
-                type: "karta_node_shared",
-                contentId: nodeId,
-                userId: userIds[i].userId
-              };
-              notificationData.push(notificationObj);
-            }
-  
-            // Insert data in notification collection
-            Kartanode.app.models.notification.create(notificationData, err => {
-              if (err) console.log('> error while inserting data in notification collection', err);
-            });
-            
-            next(null, "Node shared successfully!");
-          });
-        }
-      });
-    } else {
-      let error = new Error("Please send an userId array");
-      error.status = 400;
-      next(error);
-    }
-  }
-
   // Get unique creators by contributorId
   Kartanode.kpiCreators = (userId, next) => {
 
@@ -436,7 +394,7 @@ module.exports = function (Kartanode) {
     limit = parseInt(limit, 10) || 100;
 
     let search_query = searchQuery ? searchQuery.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&') : "";
-    let query;
+    let query = { "contributorId": convertIdToBSON(userId) };
 
     // Filter nodes by creator's id
     let creator_query = {};
@@ -445,13 +403,9 @@ module.exports = function (Kartanode) {
       creator_query = { "karta.userId" : { $in: kartaCreatorIds } };
     }
 
-    // Find shared or assigned nodes
-    if (kpiType === "shared") query = { "sharedTo.userId": userId };
-    else query = { "contributorId": convertIdToBSON(userId) };
-
     // Fetch all kpis of creator
     let all_kpi_query = {};
-    if (kpiType === "created") {
+    if (kpiType === "all") {
       query = {};
       all_kpi_query = { "karta.userId": convertIdToBSON(userId), $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }]};
     }
@@ -635,6 +589,8 @@ module.exports = function (Kartanode) {
             "kpi_calc_period": 1,
             "karta": 1,
             "assigned_date": 1,
+            "start_date": 1,
+            "due_date": 1,
             "updatedAt": 1,
             "achieved_value": {
               $cond: [ "$node.event_options.updated.achieved_value", "$node.event_options.updated.achieved_value", "$achieved_value" ]
