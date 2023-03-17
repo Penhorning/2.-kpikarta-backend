@@ -546,7 +546,6 @@ module.exports = function(Karta) {
             nodeData["parentId"] ? nodeData["parentId"] = mapper[nodeData.parentId] : null;
             nodeData["phaseId"] ? nodeData["phaseId"] = phaseMapping[nodeData.phaseId] : null;
             nodeData["kartaId"] ? nodeData["kartaId"] = newKarta.id : nodeData["kartaDetailId"] = newKarta.id;
-            console.log(nodeData, 'nodeData');
             let newNode = "";
             if (i == kartaVersions.length - 1) {
               nodeData["id"] ? delete nodeData["id"] : null;
