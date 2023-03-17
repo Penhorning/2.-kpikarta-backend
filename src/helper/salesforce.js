@@ -4,7 +4,7 @@ const moment = require('moment');
 const salesForceInfo = {
     username: process.env.SALESFORCE_USERNAME,
     password: process.env.SALESFORCE_PASSWORD,
-    token: "LxSfZRr4Roea0U5YLuMXRgImf",
+    token: "l6tRW35tpJXzas57zHHqDofyt",
     contactModel: "Contact",
     userModel: "KPIUser__c",
     userLoginModel: "KPIUserLogin__c",
