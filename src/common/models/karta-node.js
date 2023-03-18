@@ -208,11 +208,11 @@ module.exports = function (Kartanode) {
     }
 
     if (phase.global_name === "Goal") data.kartaId = kartaId;
-    else if (phase.global_name !== "Goal" && parent) {
+    if (phase.global_name !== "Goal" && parent) {
       data.parentId = parent.id;
       data.kartaDetailId = kartaId;
     }
-    else if (phase.global_name === "KPI") {
+    if (phase.global_name === "KPI") {
       data.node_type = node.node_type || "measure";
       if (node.node_type === "metrics") {
         data.node_formula = {
