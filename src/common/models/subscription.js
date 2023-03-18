@@ -117,9 +117,9 @@ module.exports = function (Subscription) {
       } else {
         // Creating Test Clock for testing
         let testClock = null;
-        // testClock = await stripe.testHelpers.testClocks.create({
-        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        // });
+        testClock = await stripe.testHelpers.testClocks.create({
+          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        });
 
         // Create Customer on Stripe
         let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
@@ -665,7 +665,7 @@ module.exports = function (Subscription) {
         }
         let customerId = "";
         if (result.length > 0 && search_query) {
-          let subscriptionData = await Subscription.findOne({ where: { companyId: result[0].id, cardHolder: true }});
+          let subscriptionData = await Subscription.findOne({ where: { companyId: result[0]._id, cardHolder: true }});
           if (subscriptionData.customerId) customerId = subscriptionData.customerId;
         }
 
@@ -740,9 +740,9 @@ module.exports = function (Subscription) {
         for (let i = 0; i < invoices.data.length; i++ ) {
           let date = moment(invoices.data[i].created * 1000).format("MM-DD-yyyy");
           if( invoice_obj[date] ) {
-            invoice_obj[date] = invoice_obj[date] + invoices.data[i].amount_paid
+            invoice_obj[date] = Number(invoice_obj[date]) + Number(invoices.data[i].amount_paid / 100)
           } else {
-            invoice_obj[date] = invoices.data[i].amount_paid / 100
+            invoice_obj[date] = Number(invoices.data[i].amount_paid) / 100
           }
         }
   
