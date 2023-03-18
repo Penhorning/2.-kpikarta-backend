@@ -482,7 +482,9 @@ exports.deactivate_subscription_plan = async (params) => {
 // GET INVOICES
 exports.get_invoices = async (customerId) => {
     try {
-        let query = {};
+        let query = {
+            status: "paid"
+        };
         customerId ? query['customer'] =  customerId : null;
         const invoices = await stripe.invoices.list(query);
         return invoices;

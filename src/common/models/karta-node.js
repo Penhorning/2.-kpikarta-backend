@@ -206,12 +206,12 @@ module.exports = function (Kartanode) {
       weightage: node.weightage,
       phaseId: phase.id
     }
+
     if (phase.global_name === "Goal") data.kartaId = kartaId;
     if (phase.global_name !== "Goal" && parent) {
       data.parentId = parent.id;
       data.kartaDetailId = kartaId;
     }
-
     if (phase.global_name === "KPI") {
       data.node_type = node.node_type || "measure";
       if (node.node_type === "metrics") {
@@ -269,7 +269,6 @@ module.exports = function (Kartanode) {
 
     // Get all phases
     const phases = await getAllPhases(kartaId);
-    const kartaDetails = await Kartanode.app.models.karta.findOne({where: {id: kartaId}});
     const randomKey = new Date().getTime();
     
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
