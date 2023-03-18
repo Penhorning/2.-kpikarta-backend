@@ -414,7 +414,7 @@ module.exports = function(Karta) {
   }
 
   // Create Karta Copy
-  Karta.copyagain = async (kartaId, next) => {
+  Karta.oldCopy = async (kartaId, next) => {
     try {
         // Fetching Karta Details and creating a new Karta
        const kartaDetails = await Karta.findOne({ where: { "id": kartaId }});
@@ -499,6 +499,7 @@ module.exports = function(Karta) {
 
       // Phase and Node Mappers
       let phaseMapping = {};
+      let phaseDataMapping = {};
       let mapper = {};
       
       //Creating new Phases for new karta
@@ -513,17 +514,20 @@ module.exports = function(Karta) {
          };
          delete phaseData.id;
          phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData["parentId"]] : null;
-         const newPhase = await Karta.app.models.karta_phase.create(phaseData);
+         let newPhase = await Karta.app.models.karta_phase.create(phaseData);
+         newPhase = JSON.parse(JSON.stringify(newPhase));
          phaseMapping[currentPhase.id] = newPhase.id;
+         phaseDataMapping[currentPhase.id] = newPhase;
        }
       }
 
       // Fetching karta versions
-      const kartaVersions = await Karta.app.models.karta_version.find({ where: { "kartaId": kartaId }});
+      const kartaVersions = await Karta.app.models.karta_version.find({ where: { "kartaId": kartaId }, order: "createdAt ASC"});
       let newVersionId = "";
+      let lastHistoryId = "";
 
       // Looping through each version
-      for (let i = kartaVersions.length - 1; i >= 0; i--) {
+      for (let i = 0; i < kartaVersions.length; i++) {
         let currentVersion = JSON.parse(JSON.stringify(kartaVersions[i]));
 
         // Creating new version
@@ -531,7 +535,7 @@ module.exports = function(Karta) {
           name: currentVersion.name,
           kartaId: newKarta.id
         };
-        (i != kartaVersions.length - 1) ? versionData["is_copied"] = true : null;
+        (i < kartaVersions.length - 1) ? versionData["is_copied"] = true : null;
         const newVersion = await Karta.app.models.karta_version.create(versionData);
 
         // Fetching history of current version
@@ -543,16 +547,24 @@ module.exports = function(Karta) {
           
           if( currentHistory.event == "node_created" ) {
             let nodeData = {...currentHistory.event_options.created};
+
+            // delete nodeData["id"];
+            delete nodeData.children;
+            delete nodeData.phase;
+            nodeData["contributorId"] ? delete nodeData["contributorId"] : null;
+            nodeData["notify_type"] ? delete nodeData["notify_type"] : null;
+            nodeData["notifyUserId"] ? delete nodeData["notifyUserId"] : null;
+            nodeData["kartaId"] ? nodeData["kartaId"] = newKarta.id : nodeData["kartaDetailId"] = newKarta.id;
             nodeData["parentId"] ? nodeData["parentId"] = mapper[nodeData.parentId] : null;
             nodeData["phaseId"] ? nodeData["phaseId"] = phaseMapping[nodeData.phaseId] : null;
-            nodeData["kartaId"] ? nodeData["kartaId"] = newKarta.id : nodeData["kartaDetailId"] = newKarta.id;
+
             let newNode = "";
             if (i == kartaVersions.length - 1) {
               nodeData["id"] ? delete nodeData["id"] : null;
               newNode = await Karta.app.models.karta_node.create(nodeData);
               mapper[currentHistory.kartaNodeId] = newNode.id;
             } else {
-              nodeData["id"] ? mapper[currentHistory.kartaNodeId] : null;
+              mapper[currentHistory.kartaNodeId] = currentHistory.kartaNodeId;
             }
 
             // Creating History
@@ -563,19 +575,20 @@ module.exports = function(Karta) {
               kartaNodeId: newNode.id || mapper[currentHistory.kartaNodeId],
               event_options: {
                 ...currentHistory.event_options,
-                created: newNode || nodeData
+                created: JSON.parse(JSON.stringify(newNode)) || JSON.parse(JSON.stringify(nodeData))
               }
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
-            await Karta.app.models.karta_history.create(newHistory);
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "node_updated" ) {
             let newData = {
               ...currentHistory.event_options.updated
             };
             newData["parentId"] ? newData["parentId"] = mapper[newData["parentId"].toString()] : null;
-            newData["phaseId"] ? newData["phaseId"] = mapper[newData["phaseId"].toString()] : null;
+            newData["phaseId"] ? newData["phaseId"] = phaseMapping[newData["phaseId"].toString()] : null;
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_node.update({ "id": mapper[currentHistory.kartaNodeId] }, newData );
             }
@@ -591,9 +604,9 @@ module.exports = function(Karta) {
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
             currentHistory.event_options.updated["parentId"] ? newHistory.event_options.updated["parentId"] = mapper[currentHistory.event_options.updated["parentId"]] : null;
-            currentHistory.event_options.updated["phaseId"] ? newHistory.event_options.updated["phaseId"] = mapper[currentHistory.event_options.updated["phaseId"]] : null;
-            await Karta.app.models.karta_history.create(newHistory);
-
+            currentHistory.event_options.updated["phaseId"] ? newHistory.event_options.updated["phaseId"] = phaseMapping[currentHistory.event_options.updated["phaseId"]] : null;
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "node_removed" ) {
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_node.update({ "id": mapper[currentHistory.kartaNodeId] }, { "is_deleted": true } );
@@ -609,13 +622,14 @@ module.exports = function(Karta) {
 
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
-            await Karta.app.models.karta_history.create(newHistory);
-
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "phase_created" ) {
-
             let phaseData = {...currentHistory.event_options.created};
-            phaseData["id"] ? delete phaseData["id"] : null;
+
+            // delete phaseData["id"];
             phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData.parentId] : null;
+            phaseData["phaseId"] ? phaseData["phaseId"] = phaseMapping[phaseData.phaseId] : null;
             phaseData["kartaId"] ? phaseData["kartaId"] = newKarta.id : null;
             // let newPhase = await Karta.app.models.karta_phase.create(phaseData);
             // phaseMapping[currentHistory.kartaNodeId] = newPhase.id;
@@ -625,13 +639,18 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: phaseMapping[currentHistory.kartaNodeId]
+              kartaNodeId: phaseMapping[currentHistory.kartaNodeId],
+              event_options: {
+                created: phaseDataMapping[currentHistory.kartaNodeId],
+                updated: null,
+                removed: null
+              }
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = phaseMapping[currentHistory.parentNodeId] : null;
-            await Karta.app.models.karta_history.create(newHistory);
-
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "phase_updated" ) {
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, currentHistory.event_options.updated );
@@ -647,8 +666,8 @@ module.exports = function(Karta) {
 
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = phaseMapping[currentHistory.parentNodeId] : null;
-            await Karta.app.models.karta_history.create(newHistory);
-
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "phase_removed" ) {
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, { "is_deleted": true } );
@@ -664,7 +683,8 @@ module.exports = function(Karta) {
 
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = phaseMapping[currentHistory.parentNodeId] : null;
-            await Karta.app.models.karta_history.create(newHistory);
+            let history = await Karta.app.models.karta_history.create(newHistory);
+            if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           }
         }
 
@@ -674,7 +694,7 @@ module.exports = function(Karta) {
       }
 
       await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
-      await Karta.update( { "id": newKarta.id }, { versionId: newVersionId } );
+      await Karta.update( { "id": newKarta.id }, { versionId: newVersionId, historyId: lastHistoryId } );
       return "Karta copy created successfully..!!";
     } catch(err) {
       console.log(err);

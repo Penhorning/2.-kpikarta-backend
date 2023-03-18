@@ -62,25 +62,25 @@ module.exports = function (app) {
 
     // Stripe webhook url
     app.post("/webhook", async (req, res) => {
-        // const { data, type } = req.body; 
-        // console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
+        const { data, type } = req.body; 
+        console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
         switch(type) {
             case "invoice.created":
-                // const customerId = data.customer;
-                // const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
-                // const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
+                const customerId = data.object.customer;
+                const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
+                const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
 
-                // const emailObj = {
-                //     subject: `KPI Invoice`,
-                //     template: "invoice.ejs",
-                //     email: userDetails.email,
-                //     user: userDetails,
-                //     amount: data.amount_paid,
-                //     date: moment(data.created * 1000).format("MM-DD-yyyy"),
-                // };
+                const emailObj = {
+                    subject: `KPI Invoice`,
+                    template: "invoice.ejs",
+                    email: userDetails.email,
+                    user: userDetails,
+                    amount: parseFloat(Number(data.object.total) / 100),
+                    date: moment(data.object.created * 1000).format("MMM-DD-yyyy"),
+                };
 
-                // sendEmail(app, emailObj, () => {});
+                sendEmail(app, emailObj, () => {});
 
                 res.send("Invoice Email sent successfully..!!");
         }
