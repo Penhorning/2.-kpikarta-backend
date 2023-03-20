@@ -691,6 +691,30 @@ module.exports = function(User) {
       next(error);
     }
   };
+  // Send mobile login code
+  User.sendMobileLoginCode = function(next) {
+    if (this.app.currentUser.mobileVerified && this.app.currentUser.mobile.e164Number) {
+      let mobileVerificationCode = keygen.number({ length: 6 });
+      this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
+        if (err) return next(err);
+        else {
+          let mobileNumber = this.app.currentUser.mobile.e164Number;
+          sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
+          .then(() => {
+            next(null, "sent");
+          }).catch(err => {
+            let error = err;
+            error.status = 500;
+            return next(error);
+          });
+        }
+      });
+    } else {
+      let error = new Error("Mobile number is not verified!");
+      error.status = 400;
+      next(error);
+    }
+  };
   // Send mobile code
   User.sendMobileCode = function(type, mobile, next) {
     if (this.app.currentUser.mobileVerified && (this.app.currentUser.mobile.e164Number === mobile.e164Number)) {

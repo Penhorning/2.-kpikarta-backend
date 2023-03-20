@@ -159,15 +159,38 @@ module.exports = function(Kartacatalog) {
 
   // Share karta catalog to multiple users
   Kartacatalog.share = (catalogId, userIds, next) => {
-    if (userIds.length > 0) {
-      Kartacatalog.update({ "_id": catalogId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err, result) => {
-        next(err, "Catalog shared successfully!");
-      });
-    } else {
-      let error = new Error("Please send an userId array");
-      error.status = 400;
-      next(error);
-    }
+
+    // Check if catalog is already shared with user or not
+    Kartacatalog.findOne({ where: { "_id": catalogId } }, (err, catalog) => {
+      if (err) next(err);
+      else {
+        let duplicateFlag = false;
+        let alreadySharedList = catalog.sharedTo ? catalog.sharedTo.map(x => x.userId) : [];
+        let ids = userIds.map(item => item.userId);
+        let newIds = ids.filter(id => {
+          if (alreadySharedList.includes(id)) {
+            duplicateFlag = true;
+            return null;
+          } else return id;
+        });
+
+        if (newIds.length > 0) {
+          Kartacatalog.update({ "_id": catalogId }, { $addToSet: { "sharedTo": { $each: userIds } } }, (err, result) => {
+            next(err, "Catalog shared successfully!");
+          });
+        } else {
+          if (duplicateFlag) {
+            let error = new Error("Can't share a catalog twice to the same user!");
+            error.status = 400;
+            next(error);
+          } else {
+            let error = new Error("Please send an userId array");
+            error.status = 400;
+            next(error);
+          }
+        }
+      }
+    });
   }
 
   // Delete
