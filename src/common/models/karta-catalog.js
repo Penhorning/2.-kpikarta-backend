@@ -77,7 +77,7 @@ module.exports = function(Kartacatalog) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
@@ -131,7 +131,7 @@ module.exports = function(Kartacatalog) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }

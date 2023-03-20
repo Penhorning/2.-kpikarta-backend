@@ -241,7 +241,7 @@ module.exports = function(Karta) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
@@ -288,7 +288,7 @@ module.exports = function(Karta) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
