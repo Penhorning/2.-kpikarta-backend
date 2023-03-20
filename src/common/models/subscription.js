@@ -117,9 +117,9 @@ module.exports = function (Subscription) {
       } else {
         // Creating Test Clock for testing
         let testClock = null;
-        testClock = await stripe.testHelpers.testClocks.create({
-          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        });
+        // testClock = await stripe.testHelpers.testClocks.create({
+        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        // });
 
         // Create Customer on Stripe
         let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};

@@ -74,6 +74,10 @@
     },
     "sforceId": {
       "type": "string"
+    },
+    "card_expired": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],

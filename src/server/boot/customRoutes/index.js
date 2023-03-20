@@ -65,12 +65,11 @@ module.exports = function (app) {
         const { data, type } = req.body; 
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
+        const customerId = data.object.customer;
+        const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
+        const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
         switch(type) {
-            case "invoice.created":
-                const customerId = data.object.customer;
-                const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
-                const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
-
+            case "invoice.created": 
                 const emailObj = {
                     subject: `KPI Invoice`,
                     template: "invoice.ejs",
@@ -83,6 +82,10 @@ module.exports = function (app) {
                 sendEmail(app, emailObj, () => {});
 
                 res.send("Invoice Email sent successfully..!!");
+                break;
+            case "customer.source.expiring": 
+                await app.models.user.update({ id: userData.userId }, { card_expired: true });
+                break;
         }
     });
 };
