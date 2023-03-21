@@ -87,18 +87,18 @@ module.exports = function (app) {
 
             case "customer.source.expiring": 
                 for(let user in allCardUsers) {
-                    await app.models.user.update({ id: user.userId }, { card_expired: true });
+                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
                 }
                 res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;
 
             case "charge.failed":
                 for(let user in allCardUsers) {
-                    await app.models.user.update({ id: user.userId }, { card_expired: true });
+                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
                 }
                 res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;
-                
+
             default:
                 res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;
