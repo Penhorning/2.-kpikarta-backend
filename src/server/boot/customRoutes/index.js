@@ -30,6 +30,8 @@ module.exports = function (app) {
                     user_data.profilePic = user.profilePic || "";
                     user_data._2faEnabled = user._2faEnabled || false;
                     user_data.mobileVerified = user.mobileVerified || false;
+                    user_data.paymentVerified = user.paymentVerified || false;
+                    user_data.paymentFailed = user.paymentFailed || false;
                     if (user._2faEnabled && user.mobileVerified) {
                         let mobileVerificationCode = keygen.number({length: 6});
                         req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
@@ -52,7 +54,7 @@ module.exports = function (app) {
                     }
 
                     sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
-                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}`);
+                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}&paymentVerified=${user_data.paymentVerified}&paymentFailed=${user_data.paymentFailed}`);
                 });
             } else {
                 res.redirect(`${process.env.WEB_URL}/sign-up?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}`);
@@ -65,12 +67,12 @@ module.exports = function (app) {
         const { data, type } = req.body; 
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
+        const customerId = data.object.customer;
+        const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
+        const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
+        const allCardUsers = await app.models.subscription.find({ where: { customerId }});
         switch(type) {
-            case "invoice.created":
-                const customerId = data.object.customer;
-                const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
-                const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
-
+            case "invoice.created": 
                 const emailObj = {
                     subject: `KPI Invoice`,
                     template: "invoice.ejs",
@@ -79,10 +81,29 @@ module.exports = function (app) {
                     amount: parseFloat(Number(data.object.total) / 100),
                     date: moment(data.object.created * 1000).format("MMM-DD-yyyy"),
                 };
+                sendEmail(app, emailObj, (err, response) => {
+                    if(err) res.status(500).json({ error: false, status: 500, message: "Error" });
+                    else res.status(200).json({ error: false, status: 200, message: "Success" });
+                });
+                break;
 
-                sendEmail(app, emailObj, () => {});
+            case "customer.source.expiring": 
+                for(let user in allCardUsers) {
+                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
+                }
+                res.status(200).json({ error: false, status: 200, message: "Success" });
+                break;
 
-                res.send("Invoice Email sent successfully..!!");
+            case "charge.failed":
+                for(let user in allCardUsers) {
+                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
+                }
+                res.status(200).json({ error: false, status: 200, message: "Success" });
+                break;
+
+            default:
+                res.status(200).json({ error: false, status: 200, message: "Success" });
+                break;
         }
     });
 };

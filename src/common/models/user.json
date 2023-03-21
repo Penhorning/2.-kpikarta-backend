@@ -46,6 +46,10 @@
       "type": "boolean",
       "default": false
     },
+    "paymentFailed": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
@@ -250,6 +254,17 @@
       "http": {
         "verb": "post",
         "path": "/send-mobile-code"
+      }
+    },
+    "sendMobileLoginCode": {
+      "accepts": [],
+      "returns": {
+        "arg": "status",
+        "type": "string"
+      },
+      "http": {
+        "verb": "post",
+        "path": "/send-mobile-login-code"
       }
     },
     "verifyMobile": {

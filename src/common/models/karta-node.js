@@ -84,7 +84,7 @@ module.exports = function (Kartanode) {
   const FACET = (page, limit) => {
     return {
       $facet: {
-        metadata: [{ $count: "total" }, { $addFields: { 'page': page } }],
+        metadata: [{ $count: "total" }, { $addFields: { "page": page } }],
         data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
       }
     }
@@ -387,6 +387,71 @@ module.exports = function (Kartanode) {
     });
   }
 
+  function prepareQuery(userId) {
+    return new Promise(function(resolve, reject) {
+      // Find current user details
+      Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, async (err, user) => {
+        if (err) reject(err);
+        else {
+          // Find the creator license
+          await Kartanode.app.models.license.findOne({ where: { "name": "Creator" } }, async (err, license) => {
+            if (err) reject(err);
+            else {
+              // Find all creator users of the current user's company
+              await Kartanode.app.models.user.find({ where: { "companyId": user.companyId, "licenseId": license.id, "is_deleted": false } }, (err, creators) => {
+                if (err) reject(err);
+                else {
+                  let creatorUsers = creators.map(item => convertIdToBSON(item.id));
+                  resolve({ "karta.userId": { $in: creatorUsers }, $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] });
+                }
+              });
+            }
+          });
+        }
+      });
+    });
+  }
+
+  function executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next) {
+    Kartanode.getDataSource().connector.connect((err, db) => {
+      const kartaNodeCollection = db.collection('karta_node');
+      kartaNodeCollection.aggregate([
+        {
+          $match: query
+        },
+        {
+          $match: { "is_deleted": false }
+        },
+        {
+          $match: status_query
+        },
+        {
+          $match: percentage_query
+        },
+        {
+          $sort: SORT
+        },
+        KARTA_LOOKUP,
+        UNWIND_KARTA,
+        SEARCH_MATCH,
+        KARTA_USER_LOOKUP,
+        UNWIND_KARTA_USER,
+        KPI_CONTRIBUTOR_LOOKUP,
+        UNWIND_KPI_CONTRIBUTOR,
+        {
+          $match: creator_query
+        },
+        {
+          $match: all_kpi_query
+        },
+        FACET(page, limit)
+      ]).toArray((err, result) => {
+        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        next(err, result);
+      });
+    });
+  }
+
   // Get kpi nodes by contributorId
   Kartanode.kpiNodes = (page, limit, searchQuery, userId, statusType, kartaCreatorIds, kpiType, sortBy, percentage, targetTypes, startUpdatedDate, endUpdatedDate, startDueDate, endDueDate, next) => {
     page = parseInt(page, 10) || 1;
@@ -400,13 +465,6 @@ module.exports = function (Kartanode) {
     if (kartaCreatorIds && kartaCreatorIds.length > 0) {
       kartaCreatorIds = kartaCreatorIds.map(id => convertIdToBSON(id));
       creator_query = { "karta.userId" : { $in: kartaCreatorIds } };
-    }
-
-    // Fetch all kpis of creator
-    let all_kpi_query = {};
-    if (kpiType === "all") {
-      query = {};
-      all_kpi_query = { "karta.userId": convertIdToBSON(userId), $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }]};
     }
 
     // Filter nodes by completed, in-progress and all
@@ -459,13 +517,13 @@ module.exports = function (Kartanode) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           },
           {
             'karta.name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
@@ -473,43 +531,22 @@ module.exports = function (Kartanode) {
       }
     }
 
-    Kartanode.getDataSource().connector.connect(function (err, db) {
-      const kartaNodeCollection = db.collection('karta_node');
-      kartaNodeCollection.aggregate([
-        {
-          $match: query
-        },
-        {
-          $match: { "is_deleted": false }
-        },
-        {
-          $match: status_query
-        },
-        {
-          $match: percentage_query
-        },
-        {
-          $sort: SORT
-        },
-        KARTA_LOOKUP,
-        UNWIND_KARTA,
-        SEARCH_MATCH,
-        KARTA_USER_LOOKUP,
-        UNWIND_KARTA_USER,
-        KPI_CONTRIBUTOR_LOOKUP,
-        UNWIND_KPI_CONTRIBUTOR,
-        {
-          $match: creator_query
-        },
-        {
-          $match: all_kpi_query
-        },
-        FACET(page, limit)
-      ]).toArray((err, result) => {
-        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
-        next(err, result);
+    // Fetch all kpis of creator
+    let all_kpi_query = {};
+    if (kpiType === "all") {
+      query = {};
+      // Find current user details
+      Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
+        Kartanode.app.models.license.findOne({ where: { "name": "Creator" } }, (err, license) => {
+          Kartanode.app.models.user.find({ where: { "companyId": user.companyId, "licenseId": license.id, "is_deleted": false } }, (err, creators) => {
+            let creatorUsers = creators.map(item => convertIdToBSON(item.id));
+            all_kpi_query = { "karta.userId": { $in: creatorUsers}, $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }]};
+            executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
+          })
+        });
       });
-    });
+    }
+    else executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
   }
 
   // View previous kpi nodes by month
@@ -589,6 +626,7 @@ module.exports = function (Kartanode) {
             "karta": 1,
             "assigned_date": 1,
             "start_date": 1,
+            "node_type": 1,
             "due_date": 1,
             "updatedAt": 1,
             "achieved_value": {
