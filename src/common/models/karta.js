@@ -187,7 +187,7 @@ module.exports = function(Karta) {
               let notificationData = [];
               users.forEach(item => {
                 notificationData.push({
-                  title: `${Karta.app.currentUser.fullName} shared the ${karta.name}`,
+                  title: `${Karta.app.currentUser.fullName} shared the Karta - ${karta.name} with you.`,
                   click_type: accessType,
                   type: "karta_shared",
                   contentId: karta._id,
@@ -241,7 +241,7 @@ module.exports = function(Karta) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
@@ -288,7 +288,7 @@ module.exports = function(Karta) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
@@ -548,7 +548,6 @@ module.exports = function(Karta) {
           if( currentHistory.event == "node_created" ) {
             let nodeData = {...currentHistory.event_options.created};
 
-            // delete nodeData["id"];
             delete nodeData.children;
             delete nodeData.phase;
             nodeData["contributorId"] ? delete nodeData["contributorId"] : null;
@@ -587,6 +586,12 @@ module.exports = function(Karta) {
             let newData = {
               ...currentHistory.event_options.updated
             };
+
+            delete newData.children;
+            delete newData.phase;
+            newData["contributorId"] ? delete newData["contributorId"] : null;
+            newData["notify_type"] ? delete newData["notify_type"] : null;
+            newData["notifyUserId"] ? delete newData["notifyUserId"] : null;
             newData["parentId"] ? newData["parentId"] = mapper[newData["parentId"].toString()] : null;
             newData["phaseId"] ? newData["phaseId"] = phaseMapping[newData["phaseId"].toString()] : null;
             if (i == kartaVersions.length - 1) {
@@ -598,7 +603,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: mapper[currentHistory.kartaNodeId]
+              kartaNodeId: mapper[currentHistory.kartaNodeId],
+              parentNodeId: mapper[currentHistory.parentNodeId],
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -653,6 +659,8 @@ module.exports = function(Karta) {
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "phase_updated" ) {
             if (i == kartaVersions.length - 1) {
+              currentHistory.event_options.updated["parentId"] ? currentHistory.event_options.updated["parentId"] = phaseMapping[currentHistory.event_options.updated["parentId"]] : null;
+              currentHistory.event_options.updated["phaseId"] ? currentHistory.event_options.updated["phaseId"] = phaseMapping[currentHistory.event_options.updated["phaseId"]] : null;
               await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, currentHistory.event_options.updated );
             }
 
