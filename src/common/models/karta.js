@@ -603,7 +603,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: mapper[currentHistory.kartaNodeId]
+              kartaNodeId: mapper[currentHistory.kartaNodeId],
+              parentNodeId: mapper[currentHistory.parentNodeId],
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;

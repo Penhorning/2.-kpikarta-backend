@@ -626,6 +626,7 @@ module.exports = function (Kartanode) {
             "karta": 1,
             "assigned_date": 1,
             "start_date": 1,
+            "node_type": 1,
             "due_date": 1,
             "updatedAt": 1,
             "achieved_value": {
