@@ -58,6 +58,13 @@ module.exports = function (Subscription) {
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
+        let currentDate = moment().unix();
+        if ( cardExpiryDate < currentDate ) {
+          let error = new Error("Card expiry date is not valid..!!");
+          error.status = 404;
+          throw error;
+        }
         let token = await create_token({cardNumber, expMonth, expYear, cvc, name: fullName});
         if(token.statusCode == 402 || token.statusCode == 404) {
           let error = new Error(token.raw.message || "Card error..!!");
@@ -129,6 +136,14 @@ module.exports = function (Subscription) {
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
+        let currentDate = moment().unix();
+        if ( cardExpiryDate < currentDate ) {
+          let error = new Error("Card expiry date is not valid..!!");
+          error.status = 404;
+          throw error;
+        }
+        
         let token = await create_token({ cardNumber, expMonth, expYear, cvc });
         if(token.statusCode == 402 || token.statusCode == 404) {
           let error = new Error(token.raw.message || "Card error..!!");
