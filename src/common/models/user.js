@@ -1049,7 +1049,7 @@ module.exports = function(User) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
           error.status = 400;
           next(error);
-        } else if (user.card_expired && (user.role[0].name == "user" || user.role[0].name == "department_admin")) {
+        } else if (user.paymentFailed && (user.role[0].name == "user" || user.role[0].name == "department_admin")) {
           let error = new Error("Your account has some payment issue, please contact to your admin.");
           error.status = 400;
           next(error);

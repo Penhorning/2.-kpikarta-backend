@@ -46,6 +46,10 @@
       "type": "boolean",
       "default": false
     },
+    "paymentFailed": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
@@ -74,10 +78,6 @@
     },
     "sforceId": {
       "type": "string"
-    },
-    "card_expired": {
-      "type": "boolean",
-      "default": false
     }
   },
   "validations": [],
