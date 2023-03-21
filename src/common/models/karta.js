@@ -548,7 +548,6 @@ module.exports = function(Karta) {
           if( currentHistory.event == "node_created" ) {
             let nodeData = {...currentHistory.event_options.created};
 
-            // delete nodeData["id"];
             delete nodeData.children;
             delete nodeData.phase;
             nodeData["contributorId"] ? delete nodeData["contributorId"] : null;
@@ -587,6 +586,12 @@ module.exports = function(Karta) {
             let newData = {
               ...currentHistory.event_options.updated
             };
+
+            delete newData.children;
+            delete newData.phase;
+            newData["contributorId"] ? delete newData["contributorId"] : null;
+            newData["notify_type"] ? delete newData["notify_type"] : null;
+            newData["notifyUserId"] ? delete newData["notifyUserId"] : null;
             newData["parentId"] ? newData["parentId"] = mapper[newData["parentId"].toString()] : null;
             newData["phaseId"] ? newData["phaseId"] = phaseMapping[newData["phaseId"].toString()] : null;
             if (i == kartaVersions.length - 1) {
