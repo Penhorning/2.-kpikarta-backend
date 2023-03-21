@@ -517,13 +517,13 @@ module.exports = function (Kartanode) {
         $or: [
           {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           },
           {
             'karta.name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }

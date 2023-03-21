@@ -424,19 +424,19 @@ module.exports = function(User) {
             $or: [
               {
                 'fullName': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               },
               {
                 'email': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               },
               {
                 'mobile.internationalNumber': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               }
@@ -508,25 +508,25 @@ module.exports = function(User) {
         $or: [
           {
             'fullName': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'email': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'mobile.internationalNumber': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'company.name': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           }

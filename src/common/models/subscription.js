@@ -659,7 +659,7 @@ module.exports = function (Subscription) {
         {
           $match: {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }
