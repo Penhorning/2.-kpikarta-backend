@@ -68,6 +68,7 @@ module.exports = function (app) {
         const customerId = data.object.customer;
         const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
         const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
+        const allCardUsers = await app.models.subscription.find({ where: { customerId }});
         switch(type) {
             case "invoice.created": 
                 const emailObj = {
@@ -78,13 +79,28 @@ module.exports = function (app) {
                     amount: parseFloat(Number(data.object.total) / 100),
                     date: moment(data.object.created * 1000).format("MMM-DD-yyyy"),
                 };
-
-                sendEmail(app, emailObj, () => {});
-
-                res.send("Invoice Email sent successfully..!!");
+                sendEmail(app, emailObj, (err, response) => {
+                    if(err) res.status(500).json({ error: false, status: 500, message: "Error" });
+                    else res.status(200).json({ error: false, status: 200, message: "Success" });
+                });
                 break;
+
             case "customer.source.expiring": 
-                await app.models.user.update({ id: userData.userId }, { card_expired: true });
+                for(let user in allCardUsers) {
+                    await app.models.user.update({ id: user.userId }, { card_expired: true });
+                }
+                res.status(200).json({ error: false, status: 200, message: "Success" });
+                break;
+
+            case "charge.failed":
+                for(let user in allCardUsers) {
+                    await app.models.user.update({ id: user.userId }, { card_expired: true });
+                }
+                res.status(200).json({ error: false, status: 200, message: "Success" });
+                break;
+                
+            default:
+                res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;
         }
     });

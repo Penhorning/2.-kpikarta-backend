@@ -98,6 +98,7 @@ module.exports = function (Subscription) {
             for(let user in allCardUsers) {
               if ( !user.trialActive && user.status ) {
                 await update_subscription(user.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
+                await Subscription.app.models.user.update({ "id": user.userId }, { card_expired: false });
               }
               await Subscription.update({ userId: user.userId }, { tokenId: token.id, cardId: card.id });
             }
