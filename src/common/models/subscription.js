@@ -58,6 +58,13 @@ module.exports = function (Subscription) {
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
+        let currentDate = moment().unix();
+        if ( cardExpiryDate < currentDate ) {
+          let error = new Error("Card expiry date is not valid..!!");
+          error.status = 404;
+          throw error;
+        }
         let token = await create_token({cardNumber, expMonth, expYear, cvc, name: fullName});
         if(token.statusCode == 402 || token.statusCode == 404) {
           let error = new Error(token.raw.message || "Card error..!!");
@@ -76,7 +83,7 @@ module.exports = function (Subscription) {
         if(card) {
           const previousCardId = findUser.cardId;
           // Confirm a payment from the Card
-          const paymentIntent = await create_payment_intent(findUser.customerId, card.id, 1);
+          const paymentIntent = await create_payment_intent(findUser.customerId, card.id, 50);
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
@@ -98,6 +105,7 @@ module.exports = function (Subscription) {
             for(let user in allCardUsers) {
               if ( !user.trialActive && user.status ) {
                 await update_subscription(user.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
+                await Subscription.app.models.user.update({ "id": user.userId }, { paymentFailed: false });
               }
               await Subscription.update({ userId: user.userId }, { tokenId: token.id, cardId: card.id });
             }
@@ -117,9 +125,9 @@ module.exports = function (Subscription) {
       } else {
         // Creating Test Clock for testing
         let testClock = null;
-        testClock = await stripe.testHelpers.testClocks.create({
-          frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
-        });
+        // testClock = await stripe.testHelpers.testClocks.create({
+        //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
+        // });
 
         // Create Customer on Stripe
         let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
@@ -128,6 +136,14 @@ module.exports = function (Subscription) {
 
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
+        let currentDate = moment().unix();
+        if ( cardExpiryDate < currentDate ) {
+          let error = new Error("Card expiry date is not valid..!!");
+          error.status = 404;
+          throw error;
+        }
+        
         let token = await create_token({ cardNumber, expMonth, expYear, cvc });
         if(token.statusCode == 402 || token.statusCode == 404) {
           let error = new Error(token.raw.message || "Card error..!!");
@@ -147,7 +163,7 @@ module.exports = function (Subscription) {
           await update_customer_by_id({ customerId: customer.id, data: { default_source: card.id } });
 
           // Confirm a payment from the Card
-          const paymentIntent = await create_payment_intent(customer.id, card.id, 1);
+          const paymentIntent = await create_payment_intent(customer.id, card.id, 50);
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
@@ -312,20 +328,26 @@ module.exports = function (Subscription) {
           // If Switching between Creator to Champion or vice verse
           let license = await Subscription.app.models.license.findOne({ where: { name: licenseName }});
           let newPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: userSubscription.currentPlan == "monthly" ? "month" : "year" }});
-          const getSubscriptionDetails = await get_subscription_plan_by_id(userSubscription.subscriptionId);
-          let updatedItems = [];
-          for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
-            updatedItems.push({
-              id: getSubscriptionDetails.items.data[j].id,
-              price: newPriceId.priceId
-            });
-          }
-    
-          if ( updatedItems.length > 0 ) {
-            await update_subscription(userSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
-          }
-    
-          await Subscription.update({ userId , trialActive: false, status: true }, { licenseId: license.id });
+
+          // ------------------- Old Code -----------------------
+          // const getSubscriptionDetails = await get_subscription_plan_by_id(userSubscription.subscriptionId);
+          cancel_user_subscription(userSubscription.subscriptionId);
+          // let updatedItems = [];
+          // for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+          //   updatedItems.push({
+          //     id: getSubscriptionDetails.items.data[j].id,
+          //     price: newPriceId.priceId
+          //   });
+          // }
+          // if ( updatedItems.length > 0 ) {
+          //   await update_subscription(userSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
+          // }
+          // await Subscription.update({ userId , trialActive: false, status: true }, { licenseId: license.id });
+          // ------------------- Old Code -----------------------
+
+          let subscription = await create_subscription({ customerId: userSubscription.customerId, items: [{price: newPriceId.priceId, quantity: 1}] });
+          await Subscription.update({ "userId": userId }, { subscriptionId: subscription.id, licenseId: license.id });
+
           return "Subscription updated successfully..!!";
         } else {
 
@@ -653,7 +675,7 @@ module.exports = function (Subscription) {
         {
           $match: {
             'name': {
-              $regex: search_query,
+              $regex: '^' + search_query,
               $options: 'i'
             }
           }

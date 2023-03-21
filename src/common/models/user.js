@@ -424,19 +424,19 @@ module.exports = function(User) {
             $or: [
               {
                 'fullName': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               },
               {
                 'email': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               },
               {
                 'mobile.internationalNumber': {
-                  $regex: searchQuery,
+                  $regex: '^' + searchQuery,
                   $options: 'i'
                 }
               }
@@ -508,25 +508,25 @@ module.exports = function(User) {
         $or: [
           {
             'fullName': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'email': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'mobile.internationalNumber': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           },
           {
             'company.name': {
-              $regex: searchQuery,
+              $regex: '^' + searchQuery,
               $options: 'i'
             }
           }
@@ -687,6 +687,30 @@ module.exports = function(User) {
       });
     } else {
       let error = new Error("Invalid Code");
+      error.status = 400;
+      next(error);
+    }
+  };
+  // Send mobile login code
+  User.sendMobileLoginCode = function(next) {
+    if (this.app.currentUser.mobileVerified && this.app.currentUser.mobile.e164Number) {
+      let mobileVerificationCode = keygen.number({ length: 6 });
+      this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
+        if (err) return next(err);
+        else {
+          let mobileNumber = this.app.currentUser.mobile.e164Number;
+          sendSMS(mobileNumber, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
+          .then(() => {
+            next(null, "sent");
+          }).catch(err => {
+            let error = err;
+            error.status = 500;
+            return next(error);
+          });
+        }
+      });
+    } else {
+      let error = new Error("Mobile number is not verified!");
       error.status = 400;
       next(error);
     }
@@ -1023,6 +1047,10 @@ module.exports = function(User) {
         // Check if user is active or not
         if (!user.active) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
+          error.status = 400;
+          next(error);
+        } else if (user.paymentFailed && (user.role().name == "user" || user.role().name == "department_admin")) {
+          let error = new Error("Your account has some payment issue, please contact to your admin.");
           error.status = 400;
           next(error);
         }
