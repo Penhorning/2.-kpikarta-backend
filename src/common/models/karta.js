@@ -594,6 +594,15 @@ module.exports = function(Karta) {
             newData["notifyUserId"] ? delete newData["notifyUserId"] : null;
             newData["parentId"] ? newData["parentId"] = mapper[newData["parentId"].toString()] : null;
             newData["phaseId"] ? newData["phaseId"] = phaseMapping[newData["phaseId"].toString()] : null;
+            newData["achieved_value"] ? newData["achieved_value"] = 0 : null;
+            if (newData["node_formula"]) {
+              newData["node_formula"] = newData["node_formula"].map(x => {
+                return {
+                  ...x,
+                  fieldValue: 0
+                }
+              });
+            }
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_node.update({ "id": mapper[currentHistory.kartaNodeId] }, newData );
             }
@@ -611,6 +620,15 @@ module.exports = function(Karta) {
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
             currentHistory.event_options.updated["parentId"] ? newHistory.event_options.updated["parentId"] = mapper[currentHistory.event_options.updated["parentId"]] : null;
             currentHistory.event_options.updated["phaseId"] ? newHistory.event_options.updated["phaseId"] = phaseMapping[currentHistory.event_options.updated["phaseId"]] : null;
+            currentHistory.event_options.updated["achieved_value"] ? currentHistory.event_options.updated["achieved_value"] = 0 : null;
+            if (currentHistory.event_options.updated["node_formula"]) {
+              currentHistory.event_options.updated["node_formula"] = currentHistory.event_options.updated["node_formula"].map(x => {
+                return {
+                  ...x,
+                  fieldValue: 0
+                }
+              });
+            }
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "node_removed" ) {

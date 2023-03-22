@@ -58,8 +58,8 @@ module.exports = function (Subscription) {
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
-        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
-        let currentDate = moment().unix();
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).endOf("month").unix();
+        let currentDate = moment().endOf("month").unix();
         if ( cardExpiryDate < currentDate ) {
           let error = new Error("Card expiry date is not valid..!!");
           error.status = 404;
@@ -129,15 +129,10 @@ module.exports = function (Subscription) {
         //   frozen_time: Math.floor(Date.now() / 1000), // Integer Unix Timestamp
         // });
 
-        // Create Customer on Stripe
-        let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
-        testClock ? customerObj["clock"] = testClock.id : null;
-        let customer = await create_customer(customerObj);
-
         // Create a token
         let [ expMonth, expYear ] = expirationDate.split("/");
-        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).startOf("month").unix();
-        let currentDate = moment().unix();
+        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).endOf("month").unix();
+        let currentDate = moment().endOf("month").unix();
         if ( cardExpiryDate < currentDate ) {
           let error = new Error("Card expiry date is not valid..!!");
           error.status = 404;
@@ -150,6 +145,11 @@ module.exports = function (Subscription) {
           error.status = 404;
           throw error;
         }
+
+        // Create Customer on Stripe
+        let customerObj = { name: fullName, description: `Welcome to stripe, ${fullName}`, address: {}};
+        testClock ? customerObj["clock"] = testClock.id : null;
+        let customer = await create_customer(customerObj);
         
         // Create Card
         let card = await create_card({ customerId: customer.id, tokenId: token.id });
