@@ -1050,7 +1050,7 @@ module.exports = function(User) {
           error.status = 400;
           next(error);
         } else if (user.paymentFailed && (user.role().name == "user" || user.role().name == "department_admin")) {
-          let error = new Error("Your account has some payment issue, please contact to your admin.");
+          let error = new Error("Your account has some payment issue! please contact to your admin.");
           error.status = 400;
           next(error);
         }
