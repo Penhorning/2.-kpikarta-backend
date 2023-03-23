@@ -100,6 +100,7 @@ module.exports = function(Kartacatalog) {
             "name": 1,
             "node": 1,
             "node_type": 1,
+            "sharedTo": 1,
             "type": 1,
             "user": 1
           }
