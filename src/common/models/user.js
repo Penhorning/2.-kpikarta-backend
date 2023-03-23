@@ -818,7 +818,7 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
-      // Blocking a member of a company
+      // Unblocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
           const emailObj = {
@@ -832,7 +832,7 @@ module.exports = function(User) {
           next(err, true);
         });
       } 
-      // Blocking the whole company with members
+      // Unblocking the whole company with members
       else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
           if (err) {
@@ -847,18 +847,19 @@ module.exports = function(User) {
               error.status = 404;
               next(error);
             }
-            User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
-              const emailObj = {
-                subject: `Your account is unblocked`,
-                template: "block-unblock.ejs",
-                email: user.email,
-                user: user,
-                type: "unblocked"
-              };
-              sendEmail(User.app, emailObj, () => {});
-              next(err, true);
-            });
-          })
+            if(subscription) {
+              User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {});
+            }
+            const emailObj = {
+              subject: `Your account is unblocked`,
+              template: "block-unblock.ejs",
+              email: user.email,
+              user: user,
+              type: "unblocked"
+            };
+            sendEmail(User.app, emailObj, () => {});
+            next(err, true);
+          });
         });
       }
     });
@@ -1162,12 +1163,25 @@ module.exports = function(User) {
           });
         }
       });
-    } else if (req.body.type === "invited_user") {
+    }
+    // Assign roles, when invite any new member
+    else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
         next();
       });
-    } else {
+    }
+    // Set mobile verified and 2fa enable flag to false, when admin change the number
+    else if (req.body.updatedBy === "admin") {
+      if (user.mobile && (user.mobile.e164Number !== req.body.mobile.e164Number)) {
+        user.updateAttributes({ "mobileVerified": false, "_2faEnabled": false }, {}, (err) => {
+          if (err) next(err);
+          else next();
+        });
+      } else next();
+    }
+    // Remove old profile picture, if user upload any new picture
+    else {
       if (req.body.oldImage) {
         fs.unlink(path.resolve('storage/user/', req.body.oldImage), (err) => { console.log(err) });
       }

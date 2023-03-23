@@ -20,7 +20,7 @@ module.exports = function (Kartanode) {
           } 
         },
         {
-          $project: { "name": 1, "userId": 1 }
+          $project: { "name": 1, "userId": 1, "versionId": 1 }
         }
       ],
       as: 'karta'
@@ -696,7 +696,7 @@ module.exports = function (Kartanode) {
                 { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
               ]
               const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
-              if (achievedHistory.length > 0) {
+              if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
                 const target_query = {
                   "kartaNodeId": item._id,
                   "randomKey": achievedHistory[0].randomKey,
@@ -704,17 +704,25 @@ module.exports = function (Kartanode) {
                   "old_options.target": { exists: true }
                 }
                 const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query });
-                const formula_query = {
-                  "kartaNodeId": item._id,
-                  "randomKey": targetHistory.randomKey,
-                  "event": "node_updated",
-                  "old_options.node_formula": { exists: true }
-                }
-                const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
-                item.nodes[i] = {
-                  achieved: JSON.parse(JSON.stringify(achievedHistory[0])),
-                  target: JSON.parse(JSON.stringify(targetHistory)),
-                  formula: JSON.parse(JSON.stringify(formulaHistory))
+                if (targetHistory && targetHistory.randomKey) {
+                  const formula_query = {
+                    "kartaNodeId": item._id,
+                    "randomKey": targetHistory.randomKey,
+                    "event": "node_updated",
+                    "old_options.node_formula": { exists: true }
+                  }
+                  const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+                  item.nodes[i] = {
+                    achieved: JSON.parse(JSON.stringify(achievedHistory[0])),
+                    target: JSON.parse(JSON.stringify(targetHistory)),
+                    formula: JSON.parse(JSON.stringify(formulaHistory))
+                  }
+                } else {
+                  item.nodes[i] = {
+                    achieved: null,
+                    target: null,
+                    formula: null
+                  }
                 }
               } else {
                 item.nodes[i] = {
