@@ -6,39 +6,45 @@ module.exports = function(Kartaversion) {
     Kartaversion.createVersion = async (name, kartaId, versionId) => {
         try {
             const newVersion = await Kartaversion.create({ name, kartaId });
-            const findHistoryTemp = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "temp" }});
-            const findHistoryMain = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "main" }});
+            let findHistoryTemp = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "temp" }});
+            let findHistoryMain = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "main" }});
 
             if (findHistoryTemp.length > 0 ){
                 for (let i = 0; i < findHistoryTemp.length; i++ ) {
+                    let tempObj = JSON.parse(JSON.stringify(findHistoryTemp[i]));
                     let newObj = {
-                        event: findHistoryTemp[i].event,
-                        event_options: findHistoryTemp[i].event_options,
-                        kartaNodeId: findHistoryTemp[i].kartaNodeId,
-                        userId: findHistoryTemp[i].userId,
+                        ...tempObj,
+                        event: tempObj.event,
+                        event_options: tempObj.event_options,
+                        kartaNodeId: tempObj.kartaNodeId,
+                        userId: tempObj.userId,
                         versionId: newVersion.id,
-                        kartaId: findHistoryTemp[i].kartaId,
+                        kartaId: tempObj.kartaId,
                         historyType: 'temp'
                     };
-                    if(findHistoryTemp[i].event == "node_updated" || findHistoryTemp[i].event == "phase_updated") newObj["old_options"] = findHistoryTemp[i].old_options;
-                    findHistoryTemp[i].parentNodeId ? newObj['parentNodeId'] = findHistoryTemp[i].parentNodeId : null;
+                    delete newObj["id"];
+                    if(tempObj.event == "node_updated" || tempObj.event == "phase_updated") newObj["old_options"] = tempObj.old_options;
+                    tempObj.parentNodeId ? newObj['parentNodeId'] = tempObj.parentNodeId : null;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
 
-            if( findHistoryMain.length > 0 ){
+            if( findHistoryMain.length > 0 ) {
                 for( let i = 0; i < findHistoryMain.length; i++ ) {
+                    let mainObj = JSON.parse(JSON.stringify(findHistoryMain[i]));
                     let newObj = {
-                        event: findHistoryMain[i].event,
-                        event_options: findHistoryMain[i].event_options,
-                        kartaNodeId: findHistoryMain[i].kartaNodeId,
-                        userId: findHistoryMain[i].userId,
+                        ...mainObj,
+                        event: mainObj.event,
+                        event_options: mainObj.event_options,
+                        kartaNodeId: mainObj.kartaNodeId,
+                        userId: mainObj.userId,
                         versionId: newVersion.id,
-                        kartaId: findHistoryMain[i].kartaId,
+                        kartaId: mainObj.kartaId,
                         historyType: 'temp'
                     };
-                    if(findHistoryMain[i].event == "node_updated" || findHistoryMain[i].event == "phase_updated") newObj["old_options"] = findHistoryMain[i].old_options;
-                    findHistoryMain[i].parentNodeId ? newObj['parentNodeId'] = findHistoryMain[i].parentNodeId : null;
+                    delete newObj["id"];
+                    if(mainObj.event == "node_updated" || mainObj.event == "phase_updated") newObj["old_options"] = mainObj.old_options;
+                    mainObj.parentNodeId ? newObj['parentNodeId'] = mainObj.parentNodeId : null;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
