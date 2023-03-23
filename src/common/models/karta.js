@@ -649,13 +649,13 @@ module.exports = function(Karta) {
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
           } else if ( currentHistory.event == "phase_created" ) {
-            let phaseData = {...currentHistory.event_options.created};
-
-            // delete phaseData["id"];
+            let phaseData = JSON.parse(JSON.stringify(currentVersionHistory[j].event_options.created));
+            delete phaseData["id"];
             phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData.parentId] : null;
             phaseData["phaseId"] ? phaseData["phaseId"] = phaseMapping[phaseData.phaseId] : null;
             phaseData["kartaId"] ? phaseData["kartaId"] = newKarta.id : null;
             await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId], "is_deleted": true }, { "is_deleted": false } );
+            await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, phaseData );
             // let newPhase = await Karta.app.models.karta_phase.create(phaseData);
             // phaseMapping[currentHistory.kartaNodeId] = newPhase.id;
 
