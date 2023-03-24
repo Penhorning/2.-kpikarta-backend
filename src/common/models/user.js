@@ -1090,6 +1090,19 @@ module.exports = function(User) {
     } else next();
   });
 
+  // Before user udpate
+  User.beforeRemote('prototype.patchAttributes', function(context, instance, next) {
+    const req = context.req;
+    const user = context.instance;
+    // Set mobile verified and 2fa enable flag to false, when admin change the number
+    if (req.body.updatedBy === "admin" && (user.mobile && (user.mobile.e164Number !== req.body.mobile.e164Number))) {
+      user.updateAttributes({ "mobileVerified": false, "_2faEnabled": false }, {}, (err) => {
+        if (err) next(err);
+        else next();
+      });
+    } else next();
+  });
+
   // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
     const user = User.app.currentUser;
@@ -1170,15 +1183,6 @@ module.exports = function(User) {
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
         next();
       });
-    }
-    // Set mobile verified and 2fa enable flag to false, when admin change the number
-    else if (req.body.updatedBy === "admin") {
-      if (user.mobile && (user.mobile.e164Number !== req.body.mobile.e164Number)) {
-        user.updateAttributes({ "mobileVerified": false, "_2faEnabled": false }, {}, (err) => {
-          if (err) next(err);
-          else next();
-        });
-      } else next();
     }
     // Remove old profile picture, if user upload any new picture
     else {
