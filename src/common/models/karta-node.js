@@ -800,8 +800,9 @@ module.exports = function (Kartanode) {
       await createHistory(kartaId, old_data, updated_data, randomKey);
     }
     // Check if children exists or not
-    if (nodeData.children && nodeData.children.length > 0) {
-      for (let children of nodeData.children) {
+    const node_children = nodeData.children || nodeData._children;
+    if (node_children && node_children.length > 0) {
+      for (let children of node_children) {
         // Get all phases
         const phases = await getAllPhases(kartaId);
         const phaseId = phases[findPhaseIndex(phases, nodeData.phaseId) + 1].id;
