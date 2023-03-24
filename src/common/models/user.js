@@ -818,7 +818,7 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
-      // Blocking a member of a company
+      // Unblocking a member of a company
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
           const emailObj = {
@@ -832,7 +832,7 @@ module.exports = function(User) {
           next(err, true);
         });
       } 
-      // Blocking the whole company with members
+      // Unblocking the whole company with members
       else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
           if (err) {
@@ -847,18 +847,19 @@ module.exports = function(User) {
               error.status = 404;
               next(error);
             }
-            User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {
-              const emailObj = {
-                subject: `Your account is unblocked`,
-                template: "block-unblock.ejs",
-                email: user.email,
-                user: user,
-                type: "unblocked"
-              };
-              sendEmail(User.app, emailObj, () => {});
-              next(err, true);
-            });
-          })
+            if(subscription) {
+              User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {});
+            }
+            const emailObj = {
+              subject: `Your account is unblocked`,
+              template: "block-unblock.ejs",
+              email: user.email,
+              user: user,
+              type: "unblocked"
+            };
+            sendEmail(User.app, emailObj, () => {});
+            next(err, true);
+          });
         });
       }
     });
