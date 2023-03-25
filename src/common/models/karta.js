@@ -576,7 +576,8 @@ module.exports = function(Karta) {
               event_options: {
                 ...currentHistory.event_options,
                 created: JSON.parse(JSON.stringify(newNode)) || JSON.parse(JSON.stringify(nodeData))
-              }
+              },
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -615,6 +616,7 @@ module.exports = function(Karta) {
               versionId: newVersion.id,
               kartaNodeId: mapper[currentHistory.kartaNodeId],
               parentNodeId: mapper[currentHistory.parentNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -642,7 +644,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: mapper[currentHistory.kartaNodeId]
+              kartaNodeId: mapper[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -672,6 +675,7 @@ module.exports = function(Karta) {
               kartaId: newKarta.id,
               versionId: newVersion.id,
               kartaNodeId: phaseMapping[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -693,7 +697,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: phaseMapping[currentHistory.kartaNodeId]
+              kartaNodeId: phaseMapping[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -712,8 +717,9 @@ module.exports = function(Karta) {
               event_options: {
                 created: null,
                 updated: null,
-                removed: phaseDataMapping[currentHistory.kartaNodeId]
-              }
+                removed: phaseDataMapping[currentHistory.kartaNodeId],
+              },
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -783,6 +789,8 @@ module.exports = function(Karta) {
 
               if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
                 Object.keys(lastHistoryObject.old_options).forEach(key => {
+                  console.log(x.old_options, 'x.old_options[key]');
+                  console.log(lastHistoryObject.old_options, 'lastHistoryObject.old_options[key]');
                   if (newObj.hasOwnProperty(key)) {
                     if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
                       newObj[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
