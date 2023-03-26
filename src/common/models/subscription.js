@@ -102,7 +102,7 @@ module.exports = function (Subscription) {
             // Update Customer & Subscription
             const allCardUsers = await Subscription.find({ where: { cardId: findUser.cardId}});
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-            for(let user in allCardUsers) {
+            for(let user of allCardUsers) {
               if ( !user.trialActive && user.status ) {
                 await update_subscription(user.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
                 await Subscription.app.models.user.update({ "id": user.userId }, { paymentFailed: false });
@@ -232,7 +232,7 @@ module.exports = function (Subscription) {
       if (userDetails) {
         let cardDetails = await get_all_cards( userDetails.customerId );
         if (cardDetails) {
-          return cardDetails;
+          return cardDetails.data[cardDetails.data.length - 1];
         } else {
           throw Error("Card details not found..!!");
         }

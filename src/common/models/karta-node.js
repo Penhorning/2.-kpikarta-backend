@@ -154,7 +154,7 @@ module.exports = function (Kartanode) {
         kartaId: kartaId,
         parentNodeId: node.parentId,
         historyType: 'main',
-        randomKey
+        randomKey: randomKey.toString()
       }
       event == "node_removed" ? history_data["event_options"] = {
         created: null,
@@ -252,7 +252,7 @@ module.exports = function (Kartanode) {
         updated: null,
         removed: null,
       },
-      randomKey
+      randomKey: randomKey.toString()
     }
     const history = await Kartanode.app.models.karta_history.create(history_data);
     await Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
@@ -269,7 +269,7 @@ module.exports = function (Kartanode) {
 
     // Get all phases
     const phases = await getAllPhases(kartaId);
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
     
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
       let index = 0;
@@ -739,26 +739,38 @@ module.exports = function (Kartanode) {
     });
   }
 
-  // Update kpi nodes
+  // Update kpi nodes by CSV
   Kartanode.updateKpiNodes = (nodes, next) => {
     if (nodes.length > 0) {
       nodes = nodes.filter(item => item !== null);
-      nodes.forEach(async (item, index) => {
-        let updateQuery = { "achieved_value": item.achieved_value, "target.0.percentage": item.percentage };
+      nodes.forEach(async (node, index) => {
+        // Find node details
+        const nodeData = await Kartanode.findOne({ where: { "_id": node.id, "contributorId": Kartanode.app.currentUser.id } });
+
+        // Prepare history params
+        let randomKey = new Date().getTime().toString();
+        let updatingParameters = [
+          { "achieved_value": node.achieved_value },
+          { "target": nodeData.target }
+        ];
+
+        // Prepare updating query
+        let updateQuery = { "achieved_value": node.achieved_value, "target.0.percentage": node.percentage };
         // If node has formula
-        if (item.hasOwnProperty("node_formula")) {
-          // Find node details with it's original formula
-          const nodeData = await Kartanode.findOne({ where: { "_id": item.id, "contributorId": Kartanode.app.currentUser.id } });
+        if (node.hasOwnProperty("node_formula")) {
+          updatingParameters.push({ "node_formula": nodeData.node_formula.__data });
           // Assign it's original formula
-          updateQuery.node_formula = nodeData.node_formula.__data;
+          updateQuery["node_formula"] = nodeData.node_formula.__data;
           // Update only fields values
-          updateQuery.node_formula.fields = item.node_formula.fields;
+          updateQuery["node_formula"]["fields"] = node.node_formula.fields;
         }
-        Kartanode.update({ "_id": item.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
+        Kartanode.update({ "_id": node.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
           if (err) {
             console.log('error while update kpi nodes', err);
             next(err);
           }
+          // Creating history
+          for (let param of updatingParameters) createHistory(nodeData.kartaDetailId, nodeData, param, randomKey);
           if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
         });
       });
@@ -824,7 +836,7 @@ module.exports = function (Kartanode) {
   // Drag and drop node
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     try {
-      const randomKey = new Date().getTime();
+      const randomKey = new Date().getTime().toString();
       await updateNodeAndAssignWeightage(kartaId, draggingNode, randomKey, previousDraggedPhaseId, previousDraggedParentId );
       // Readjust the weightage of previous parent's children
       await reAdjustWeightage(kartaId, previousDraggedParentId, previousDraggedPhaseId, randomKey);
@@ -838,27 +850,29 @@ module.exports = function (Kartanode) {
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
     // Creating a random key for history event
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
     // Finding the node to delete it
     Kartanode.findOne({ where: { "_id": nodeId } }, (err, node) => {
-      // Creating history of the node which will be deleted
-      createHistory(kartaId, JSON.parse(JSON.stringify(node)), JSON.parse(JSON.stringify(node)), randomKey, "node_removed");
-      // Deleting the node
-      Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
-        if (err) {
-          console.log('error while soft deleting karta Nodes', err);
-          return next(err);
-        } else {
-          // Finding the child nodes of the deleted node
-          Kartanode.find({ where: { "parentId": nodeId, is_deleted: false } }, (err, result) => {
-            if (err) console.log('> error while finding child nodes', err);
-            // Deleting the nested child nodes
-            else if (result.length > 0) deleteChildNodes(result, randomKey);
-          });
-          reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
-          return next(null, "Node deleted successfully..!!");
-        }
-      })
+      if (node) {
+        // Creating history of the node which will be deleted
+        createHistory(kartaId, JSON.parse(JSON.stringify(node)), JSON.parse(JSON.stringify(node)), randomKey, "node_removed");
+        // Deleting the node
+        Kartanode.update( { "_id": nodeId } , { $set: { "is_deleted": true } }, async (err) => {
+          if (err) {
+            console.log('error while soft deleting karta Nodes', err);
+            return next(err);
+          } else {
+            // Finding the child nodes of the deleted node
+            Kartanode.find({ where: { "parentId": nodeId, is_deleted: false } }, (err, result) => {
+              if (err) console.log('> error while finding child nodes', err);
+              // Deleting the nested child nodes
+              else if (result.length > 0) deleteChildNodes(result, randomKey);
+            });
+            reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
+            return next(null, "Node deleted successfully..!!");
+          }
+        });
+      }
     });
   }
 
@@ -1139,7 +1153,7 @@ module.exports = function (Kartanode) {
     const phaseId = node.phaseId;
     const parentId = node.parentId;
     const nextPhaseId = context.req.body.nextPhaseId;
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
 
     if (kartaId) {
       // Find details of current karta

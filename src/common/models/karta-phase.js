@@ -14,7 +14,7 @@ module.exports = function(Kartaphase) {
             kartaId: kartaId,
             parentNodeId: node.parentId,
             historyType: 'main',
-            randomKey
+            randomKey: randomKey.toString()
         }
         event == "node_removed" ? history_data["event_options"] = {
             created: null,
@@ -60,7 +60,7 @@ module.exports = function(Kartaphase) {
     Kartaphase.delete2 = async (kartaId, phaseId, nextPhaseId) => {
         try {
             // Random key
-            const randomKey = new Date().getTime();
+            const randomKey = new Date().getTime().toString();
             // Find Karta Details
             const kartaDetails = await Kartaphase.app.models.karta.findOne({ where: { "_id": kartaId } });
             // Find phase details
@@ -186,7 +186,7 @@ module.exports = function(Kartaphase) {
         try {
 
             // Random key
-            const randomKey = new Date().getTime();
+            const randomKey = new Date().getTime().toString();
             // Find Karta Details
             const kartaDetails = await Kartaphase.app.models.karta.findOne({ where: { "_id": kartaId } });
             // Find phase details
@@ -314,7 +314,7 @@ module.exports = function(Kartaphase) {
         const { addEmptyNodes, nextPhaseId } = context.req.body;
         
         try {
-            const randomKey = new Date().getTime();
+            const randomKey = new Date().getTime().toString();
             const kartaDetails = await Kartaphase.app.models.karta.findOne({where: { id: phase.kartaId }});
             // Creating Phase history
             let created_phase = phase.__data;
