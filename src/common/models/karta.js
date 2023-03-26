@@ -576,7 +576,8 @@ module.exports = function(Karta) {
               event_options: {
                 ...currentHistory.event_options,
                 created: JSON.parse(JSON.stringify(newNode)) || JSON.parse(JSON.stringify(nodeData))
-              }
+              },
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -615,6 +616,7 @@ module.exports = function(Karta) {
               versionId: newVersion.id,
               kartaNodeId: mapper[currentHistory.kartaNodeId],
               parentNodeId: mapper[currentHistory.parentNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -642,7 +644,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: mapper[currentHistory.kartaNodeId]
+              kartaNodeId: mapper[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -672,6 +675,7 @@ module.exports = function(Karta) {
               kartaId: newKarta.id,
               versionId: newVersion.id,
               kartaNodeId: phaseMapping[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -693,7 +697,8 @@ module.exports = function(Karta) {
               ...currentHistory,
               kartaId: newKarta.id,
               versionId: newVersion.id,
-              kartaNodeId: phaseMapping[currentHistory.kartaNodeId]
+              kartaNodeId: phaseMapping[currentHistory.kartaNodeId],
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -712,8 +717,9 @@ module.exports = function(Karta) {
               event_options: {
                 created: null,
                 updated: null,
-                removed: phaseDataMapping[currentHistory.kartaNodeId]
-              }
+                removed: phaseDataMapping[currentHistory.kartaNodeId],
+              },
+              is_copied: true
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
@@ -744,7 +750,7 @@ module.exports = function(Karta) {
       // Formatting data
       let kartaData = JSON.parse(JSON.stringify(kartaInfo[0]));
       // Find all the history of the current karta with current version id
-      const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId } });
+      const latestKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": kartaData.versionId }, order: "createdAt DESC" });
 
       // Prepare query according to requested parameters
       let query = { kartaId };
@@ -778,22 +784,28 @@ module.exports = function(Karta) {
             }
             // If node is updated, then return the last updated history index
             else if (x.event === "node_updated") {
-              const newObj = JSON.parse(JSON.stringify(x.old_options));
+              const currentOldOptions = JSON.parse(JSON.stringify(x.old_options));
               let flagCheck = false;
 
-              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
+              // First check for comparing the length of the keys between both objects
+              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(currentOldOptions).length) {
+
+                // Second check for comparing the keys between both objects
                 Object.keys(lastHistoryObject.old_options).forEach(key => {
-                  if (newObj.hasOwnProperty(key)) {
+                  if (currentOldOptions.hasOwnProperty(key)) {
+
+                    // Third check to compare the type of the values
                     if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
-                      newObj[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
+                      currentOldOptions[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
                     } else if (typeof lastHistoryObject.old_options[key] === 'object') {
-                      Object.keys(newObj[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
+                      Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
                     } else {
-                      newObj[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
+                      currentOldOptions[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
                     }
                   } else flagCheck = false;
                 });
               } else flagCheck = false;
+
               if (flagCheck) return x;
             }
             // If phase is updated, then return the last updated history index
@@ -809,13 +821,14 @@ module.exports = function(Karta) {
         });
 
         // Latest Karta History - Requested Karta History = History to Undo from main karta data 
-        const filteredHistory = latestKartaHistory.slice(historyIndex + 1, latestKartaHistory.length);
+        const filteredHistory = latestKartaHistory.slice(0, historyIndex + 1);
         
         // Performing Undo functionality on main kartaData
         let kartaNode = kartaData.node;
         let phaseIds = [];
         let updatedPhaseIds = {};
-        for (let i = filteredHistory.length - 1; i >= 0; i--) {
+        // for (let i = filteredHistory.length - 1; i >= 0; i--) {
+        for (let i = 0; i < filteredHistory.length; i++) {
           let currentHistoryObj = filteredHistory[i];
           // CHECKING FOR NODES
           if (currentHistoryObj.event == "node_created") {
