@@ -347,7 +347,7 @@ exports.get_all_cards = async (customerId) => {
     try {
         const response = await stripe.customers.listSources(
             customerId,
-            {object: 'card', limit: 3}
+            {object: 'card', limit: 1}
         );
         return response;
     } catch (err) {
