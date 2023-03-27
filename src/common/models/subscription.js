@@ -58,7 +58,7 @@ module.exports = function (Subscription) {
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
-        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).endOf("month").unix();
+        let cardExpiryDate = moment(`${expMonth.toString()}-01-${expYear.toString()}`).endOf("month").unix();
         let currentDate = moment().endOf("month").unix();
         if ( cardExpiryDate < currentDate ) {
           let error = new Error("Card expiry date is not valid..!!");
