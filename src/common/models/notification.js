@@ -64,4 +64,11 @@ module.exports = function(Notification) {
             });
         });
     }
+
+    Notification.updateNotificationStatus = (userId, next) => {
+        Notification.updateAll( { userId }, {is_read: true}, (err, response) => {
+            if(err) next(err);
+            else next(null, "All notifications are read..!!");
+        });
+    }
 };

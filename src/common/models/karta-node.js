@@ -154,7 +154,7 @@ module.exports = function (Kartanode) {
         kartaId: kartaId,
         parentNodeId: node.parentId,
         historyType: 'main',
-        randomKey
+        randomKey: randomKey.toString()
       }
       event == "node_removed" ? history_data["event_options"] = {
         created: null,
@@ -253,7 +253,7 @@ module.exports = function (Kartanode) {
         updated: null,
         removed: null,
       },
-      randomKey
+      randomKey: randomKey.toString()
     }
     const history = await Kartanode.app.models.karta_history.create(history_data);
     await Kartanode.app.models.karta.update({ "id": kartaId }, { "historyId": history.id });
@@ -270,7 +270,7 @@ module.exports = function (Kartanode) {
 
     // Get all phases
     const phases = await getAllPhases(kartaId);
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
     
     const setCreateNodeParam = async (nodeData, parentData, phaseId) => {
       let index = 0;
@@ -837,7 +837,7 @@ module.exports = function (Kartanode) {
   // Drag and drop node
   Kartanode.updateNodeAndWeightage = async (kartaId, draggingNode, previousDraggedParentId, previousDraggedPhaseId, next) => {
     try {
-      const randomKey = new Date().getTime();
+      const randomKey = new Date().getTime().toString();
       await updateNodeAndAssignWeightage(kartaId, draggingNode, randomKey, previousDraggedPhaseId, previousDraggedParentId );
       // Readjust the weightage of previous parent's children
       await reAdjustWeightage(kartaId, previousDraggedParentId, previousDraggedPhaseId, randomKey);
@@ -851,7 +851,7 @@ module.exports = function (Kartanode) {
   // Soft delete Karta Nodes
   Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
     // Creating a random key for history event
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
     // Finding the node to delete it
     Kartanode.findOne({ where: { "_id": nodeId } }, (err, node) => {
       if (node) {
@@ -1154,7 +1154,7 @@ module.exports = function (Kartanode) {
     const phaseId = node.phaseId;
     const parentId = node.parentId;
     const nextPhaseId = context.req.body.nextPhaseId;
-    const randomKey = new Date().getTime();
+    const randomKey = new Date().getTime().toString();
 
     if (kartaId) {
       // Find details of current karta

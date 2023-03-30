@@ -58,7 +58,7 @@ module.exports = function (Subscription) {
       if(findUser) {
         // Create a token
         let [expMonth, expYear] = expirationDate.split("/");
-        let cardExpiryDate = moment(`${expMonth.toString()}/01/${expYear.toString()}`).endOf("month").unix();
+        let cardExpiryDate = moment(`${expMonth.toString()}-01-${expYear.toString()}`).endOf("month").unix();
         let currentDate = moment().endOf("month").unix();
         if ( cardExpiryDate < currentDate ) {
           let error = new Error("Card expiry date is not valid..!!");
@@ -102,7 +102,7 @@ module.exports = function (Subscription) {
             // Update Customer & Subscription
             const allCardUsers = await Subscription.find({ where: { cardId: findUser.cardId}});
             await update_customer_by_id({ customerId: findUser.customerId, data: { default_source: card.id } });
-            for(let user in allCardUsers) {
+            for(let user of allCardUsers) {
               if ( !user.trialActive && user.status ) {
                 await update_subscription(user.subscriptionId, { default_source: card.id, proration_behavior: 'none' });
                 await Subscription.app.models.user.update({ "id": user.userId }, { paymentFailed: false });
@@ -188,8 +188,8 @@ module.exports = function (Subscription) {
               customerId: customer.id, 
               cardId: card.id, 
               tokenId: token.id, 
-              trialEnds: moment().add(4, 'minutes').unix(), 
-              // trialEnds: trialDays,
+              // trialEnds: moment().add(4, 'minutes').unix(), 
+              trialEnds: trialDays,
               trialActive: true,
               companyId: userDetails.companyId,
               cardHolder: true,
@@ -232,7 +232,7 @@ module.exports = function (Subscription) {
       if (userDetails) {
         let cardDetails = await get_all_cards( userDetails.customerId );
         if (cardDetails) {
-          return cardDetails;
+          return cardDetails.data[cardDetails.data.length - 1];
         } else {
           throw Error("Card details not found..!!");
         }

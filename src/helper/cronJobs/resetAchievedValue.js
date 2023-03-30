@@ -16,7 +16,7 @@ exports.resetAchievedValueCron = (app) => {
         kartaId: kartaId,
         parentNodeId: node.parentId,
         historyType: 'main',
-        randomKey
+        randomKey: randomKey.toString()
     }
     event == "node_removed" ? history_data["event_options"] = {
         created: null,
@@ -53,7 +53,7 @@ exports.resetAchievedValueCron = (app) => {
         for (let node of nodes) {
           node = JSON.parse(JSON.stringify(node));
           await app.models.KartaNode.update({ "_id": node.id }, { "achieved_value": 0 });
-          let randomKey = new Date().getTime();
+          let randomKey = new Date().getTime().toString();
           console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE RESET`);
           await createHistory(node.kartaDetailId, node, { "achieved_value": 0 }, randomKey);
           await createHistory(node.kartaDetailId, node, { "target": node.target }, randomKey);
