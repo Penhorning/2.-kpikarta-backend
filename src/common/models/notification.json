@@ -28,6 +28,10 @@
     "click_type": {
       "type": "string",
       "required": false
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false
     }
   },
   "validations": [],
@@ -80,6 +84,23 @@
       },
       "http": {
         "path": "/get-notifications",
+        "verb": "post"
+      }
+    },
+    "updateNotificationStatus": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "notifications",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-notifications-status",
         "verb": "post"
       }
     }
