@@ -213,8 +213,9 @@ module.exports = function (Kartanode) {
       data.kartaDetailId = kartaId;
     }
     if (phase.global_name === "KPI") {
-      data.node_type = node.node_type || "measure";
-      if (node.node_type === "metrics") {
+      data.node_type = "measure";
+      if (node.node_type === "metrics" && node.node_formula) {
+        data.node_type = "metrics";
         data.node_formula = {
           fields: [],
           formula: ""
