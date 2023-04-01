@@ -659,7 +659,6 @@ module.exports = function(Karta) {
             }
             delete phaseData["id"];
             phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData.parentId] : null;
-            phaseData["phaseId"] ? phaseData["phaseId"] = phaseMapping[phaseData.phaseId] : null;
             phaseData["kartaId"] ? phaseData["kartaId"] = newKarta.id : null;
             // await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId], "is_deleted": true }, { "is_deleted": false } );
             // await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, phaseData );
