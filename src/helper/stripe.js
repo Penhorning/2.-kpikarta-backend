@@ -476,6 +476,17 @@ exports.deactivate_subscription_plan = async (params) => {
 }
 //----------------
 
+// ----------------- CHARGES APIS --------------------
+exports.get_charge = async (chargeId) => {
+    try {
+        const charge = await stripe.charges.retrieve(chargeId);
+        return charge;
+    } catch ( err ) {
+        console.log(err);
+        return err;
+    }
+}
+
 
 // ----------------- INVOICES APIS --------------------
 
