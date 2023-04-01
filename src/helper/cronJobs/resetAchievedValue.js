@@ -11,7 +11,7 @@ exports.resetAchievedValueCron = (app) => {
     let history_data = {
         event,
         kartaNodeId: node.id,
-        userId: userIdValue,
+        userId: karta.userId || userIdValue,
         versionId: karta.versionId,
         kartaId: kartaId,
         parentNodeId: node.parentId,
