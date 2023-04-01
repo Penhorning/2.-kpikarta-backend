@@ -23,7 +23,8 @@ const {
   update_price_by_id,
   cancel_user_subscription,
   delete_card,
-  create_source
+  create_source,
+  get_charge
 } = require("../../helper/stripe");
 const moment = require('moment');
 const { sales_delete_user } = require("../../helper/salesforce");
@@ -648,6 +649,13 @@ module.exports = function (Subscription) {
       if(subscriptionDetails) {
         let invoices = await get_invoices( subscriptionDetails.customerId );
         if ( invoices.data.length > 0 ) {
+          let updatedInvoices = [];
+          for(let invoice of invoices.data) {
+            let charge = await get_charge(invoice.charge);
+            invoice["receipt_url"] = charge.receipt_url;
+            updatedInvoices.push(invoice);
+          }
+          invoices["data"] = updatedInvoices;
           return invoices;
         } else {
           return [];
