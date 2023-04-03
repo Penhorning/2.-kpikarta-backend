@@ -113,7 +113,7 @@ module.exports = async function(app) {
         // If not exists, then create
         const createdPhase = await app.models.karta_phase.create({ name });
         console.log('[DB] ADD PHASE: ' + name + ' -> DONE');
-        // If phase created, then update old ids
+        // If phase created, then find the old phases related to old kartas
         const oldPhase = await app.models.karta_phase.findOne({ where: { "global_name": name, "is_global": true } });
         if (oldPhase) {
           // Updating suggestions phaseId
