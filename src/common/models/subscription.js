@@ -327,36 +327,49 @@ module.exports = function (Subscription) {
 
         if (licenseName !== "Spectator") {
           // If Switching between Creator to Champion or vice verse
+
+          let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
+          // 1. Find cardHolder subscription
+          const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
           let license = await Subscription.app.models.license.findOne({ where: { name: licenseName }});
-          let newPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: userSubscription.currentPlan == "monthly" ? "month" : "year" }});
-
-          // ------------------- Old Code -----------------------
-          // const getSubscriptionDetails = await get_subscription_plan_by_id(userSubscription.subscriptionId);
-          cancel_user_subscription(userSubscription.subscriptionId);
-          // let updatedItems = [];
-          // for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
-          //   updatedItems.push({
-          //     id: getSubscriptionDetails.items.data[j].id,
-          //     price: newPriceId.priceId
-          //   });
-          // }
-          // if ( updatedItems.length > 0 ) {
-          //   await update_subscription(userSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
-          // }
-          // await Subscription.update({ userId , trialActive: false, status: true }, { licenseId: license.id });
-          // ------------------- Old Code -----------------------
-
-          let subscription = await create_subscription({ customerId: userSubscription.customerId, items: [{price: newPriceId.priceId, quantity: 1}] });
-          await Subscription.update({ "userId": userId }, { subscriptionId: subscription.id, licenseId: license.id });
-
-          return "Subscription updated successfully..!!";
+          if (cardHolder.subscriptionId && cardHolder.subscriptionId !== "deactivated" && cardHolder.status == true) {
+            let newPriceId = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: userSubscription.currentPlan == "monthly" ? "month" : "year" }});
+            // ------------------- Old Code -----------------------
+            // const getSubscriptionDetails = await get_subscription_plan_by_id(userSubscription.subscriptionId);
+            cancel_user_subscription(userSubscription.subscriptionId);
+            // let updatedItems = [];
+            // for( let j = 0; j < getSubscriptionDetails.items.data.length; j++ ) {
+            //   updatedItems.push({
+            //     id: getSubscriptionDetails.items.data[j].id,
+            //     price: newPriceId.priceId
+            //   });
+            // }
+            // if ( updatedItems.length > 0 ) {
+            //   await update_subscription(userSubscription.subscriptionId, { items: updatedItems, proration_behavior: 'none' });
+            // }
+            // await Subscription.update({ userId , trialActive: false, status: true }, { licenseId: license.id });
+            // ------------------- Old Code -----------------------
+            let subscription = await create_subscription({ customerId: userSubscription.customerId, items: [{price: newPriceId.priceId, quantity: 1}] });
+            await Subscription.update({ "userId": userId }, { subscriptionId: subscription.id, licenseId: license.id });
+            return "Subscription updated successfully..!!";
+          } else {
+            await Subscription.update({ "userId": userId }, { licenseId: license.id });
+            return "Subscription updated successfully..!!";
+          }
         } else {
-
-          // If switching from Creator/Champion to Spectator
-          await cancel_user_subscription(userSubscription.subscriptionId);
-          await Subscription.deleteAll({ userId });
-
-          return "Subscription updated successfully..!!";
+          let userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
+          // 1. Find cardHolder subscription
+          const cardHolder = await Subscription.findOne({ where: { companyId: userDetails.companyId, cardHolder: true }});
+          let license = await Subscription.app.models.license.findOne({ where: { name: licenseName }});
+          if (cardHolder.subscriptionId && cardHolder.subscriptionId !== "deactivated" && cardHolder.status == true) {
+            // If switching from Creator/Champion to Spectator
+            await cancel_user_subscription(userSubscription.subscriptionId);
+            await Subscription.deleteAll({ userId });
+            return "Subscription updated successfully..!!";
+          } else {
+            await Subscription.deleteAll({ userId });
+            return "Subscription updated successfully..!!";
+          }
         }
 
       } else {
