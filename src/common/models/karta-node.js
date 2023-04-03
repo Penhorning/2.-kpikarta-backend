@@ -542,6 +542,9 @@ module.exports = function (Kartanode) {
           Kartanode.app.models.user.find({ where: { "companyId": user.companyId, "licenseId": license.id, "is_deleted": false } }, (err, creators) => {
             let creatorUsers = creators.map(item => convertIdToBSON(item.id));
             all_kpi_query = { "karta.userId": { $in: creatorUsers}, $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }]};
+            if (targetTypes && targetTypes.length > 0) {
+              all_kpi_query["target.0.frequency"] = { $in: targetTypes }
+            }
             executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
           })
         });
