@@ -429,9 +429,6 @@ module.exports = function (Kartanode) {
         {
           $match: percentage_query
         },
-        {
-          $sort: SORT
-        },
         KARTA_LOOKUP,
         UNWIND_KARTA,
         SEARCH_MATCH,
@@ -444,6 +441,9 @@ module.exports = function (Kartanode) {
         },
         {
           $match: all_kpi_query
+        },
+        {
+          $sort: SORT
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
@@ -508,8 +508,8 @@ module.exports = function (Kartanode) {
     }
 
     // Sort nodes by date and percentage
-    let SORT = { "assigned_date": -1 };
-    if (sortBy === "oldest") SORT = { "assigned_date": 1 };
+    let SORT = { "assigned_date": -1, "createdAt": -1 };
+    if (sortBy === "oldest") SORT = { "assigned_date": 1, "createdAt": 1 };
     else if (sortBy === "worst") SORT = { "target.0.percentage": 1 };
     else if (sortBy === "best") SORT = { "target.0.percentage": -1 };
 
