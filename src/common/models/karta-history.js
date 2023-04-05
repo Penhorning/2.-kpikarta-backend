@@ -201,12 +201,12 @@ module.exports = function(Kartahistory) {
                             } else if ( currentHistory.event == "phase_created" ) {
                                 await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
                                 // await findChildNodes(currentHistory.kartaNodeId, "create");
-                                let createData = currentHistory.__data.event_options.created ? currentHistory.__data.event_options.created : currentHistory.event_options.created;
+                                let createData = currentHistory.__data ? currentHistory.__data.event_options.created : currentHistory.event_options.created;
                                 await Kartahistory.app.models.karta_phase.update({ "id": currentHistory.kartaNodeId, "is_deleted": true }, createData );
                                 if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                             } else if ( currentHistory.event == "phase_updated" ) {
                                 await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : false });
-                                let updateData = currentHistory.__data.event_options.updated ? currentHistory.__data.event_options.updated : currentHistory.event_options.updated;
+                                let updateData = currentHistory.__data ? currentHistory.__data.event_options.updated : currentHistory.event_options.updated;
                                 await Kartahistory.app.models.karta_phase.update({ "id": currentHistory.kartaNodeId }, updateData );
                                 if(i == finalHistoryData.length - 1) lastHistory = currentHistory;
                             } else if ( currentHistory.event == "phase_removed" ) {

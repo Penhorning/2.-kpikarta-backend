@@ -554,6 +554,7 @@ module.exports = function(Karta) {
             nodeData["contributorId"] ? delete nodeData["contributorId"] : null;
             nodeData["notify_type"] ? delete nodeData["notify_type"] : null;
             nodeData["notifyUserId"] ? delete nodeData["notifyUserId"] : null;
+            nodeData["target"] ? nodeData.target[0].percentage = 0 : null;
             nodeData["kartaId"] ? nodeData["kartaId"] = newKarta.id : nodeData["kartaDetailId"] = newKarta.id;
             nodeData["parentId"] ? nodeData["parentId"] = mapper[nodeData.parentId] : null;
             nodeData["phaseId"] ? nodeData["phaseId"] = phaseMapping[nodeData.phaseId] : null;
