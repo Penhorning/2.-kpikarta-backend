@@ -14,7 +14,7 @@ exports.sendEmail = (app, params, callback) => {
         app.models.Email.send({
             to: params.email,
             from: app.dataSources.email.settings.transports[0].auth.user,
-            subject: `${params.subject} | ${app.get('name')}`,
+            subject: params.subject,
             html
         }, function(err) {
             console.log(`=> sending ${params.subject.split(' | ')[0].toLowerCase()} email to:`, params.email);
