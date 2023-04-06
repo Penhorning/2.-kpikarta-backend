@@ -547,14 +547,13 @@ module.exports = function(Karta) {
           let currentHistory = currentVersionHistory[j];
           
           if( currentHistory.event == "node_created" ) {
-            let nodeData = {...currentHistory.event_options.created};
+            let nodeData = JSON.parse(JSON.stringify({...currentHistory.event_options.created}));
 
             delete nodeData.children;
             delete nodeData.phase;
             nodeData["contributorId"] ? delete nodeData["contributorId"] : null;
             nodeData["notify_type"] ? delete nodeData["notify_type"] : null;
             nodeData["notifyUserId"] ? delete nodeData["notifyUserId"] : null;
-            nodeData["target"] ? nodeData.target[0].percentage = 0 : null;
             nodeData["kartaId"] ? nodeData["kartaId"] = newKarta.id : nodeData["kartaDetailId"] = newKarta.id;
             nodeData["parentId"] ? nodeData["parentId"] = mapper[nodeData.parentId] : null;
             nodeData["phaseId"] ? nodeData["phaseId"] = phaseMapping[nodeData.phaseId] : null;
@@ -597,6 +596,9 @@ module.exports = function(Karta) {
             newData["notifyUserId"] ? delete newData["notifyUserId"] : null;
             newData["parentId"] ? newData["parentId"] = mapper[newData["parentId"].toString()] : null;
             newData["phaseId"] ? newData["phaseId"] = phaseMapping[newData["phaseId"].toString()] : null;
+            if (newData["target"] && newData["target"].length > 0) {
+              newData["target"][0].percentage = 0;
+            }
             newData["achieved_value"] ? newData["achieved_value"] = 0 : null;
             if (newData["node_formula"]) {
               newData["node_formula"]["fields"] = newData["node_formula"]["fields"].map(x => {
