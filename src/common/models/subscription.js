@@ -469,7 +469,7 @@ module.exports = function (Subscription) {
       const findUser = await Subscription.app.models.user.findOne({ where: { id: userId }});
       const cardHolder = await Subscription.findOne({ where: { companyId: findUser.companyId, cardHolder: true }});
 
-      if (userDetails && userDetails.subscriptionId && userDetails.trialActive == false ) {
+      if (userDetails && userDetails.subscriptionId && userDetails.trialActive == false) {
         if(userDetails.cardHolder) {
           const findCompany = await Subscription.find({ where: { companyId: userDetails.companyId }});
           for ( let user of findCompany) {
@@ -486,7 +486,7 @@ module.exports = function (Subscription) {
           await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
           return "Subscription created successfully..!!";
         }
-      } else {
+      } else if (!userDetails.trialActive) {
         let error = new Error("User not found..!!");
         error.status = 404;
         throw error;
