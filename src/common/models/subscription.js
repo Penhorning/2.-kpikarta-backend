@@ -486,11 +486,7 @@ module.exports = function (Subscription) {
           await Subscription.app.models.subscription.update({ "userId": userId }, { subscriptionId: subscription.id, status: true, trialActive: false });
           return "Subscription created successfully..!!";
         }
-      } else if (!userDetails.trialActive) {
-        let error = new Error("User not found..!!");
-        error.status = 404;
-        throw error;
-      }
+      } else return "Success";
     } catch (err) {
       console.log(err);
       throw err;
