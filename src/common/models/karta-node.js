@@ -388,31 +388,6 @@ module.exports = function (Kartanode) {
     });
   }
 
-  function prepareQuery(userId) {
-    return new Promise(function(resolve, reject) {
-      // Find current user details
-      Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, async (err, user) => {
-        if (err) reject(err);
-        else {
-          // Find the creator license
-          await Kartanode.app.models.license.findOne({ where: { "name": "Creator" } }, async (err, license) => {
-            if (err) reject(err);
-            else {
-              // Find all creator users of the current user's company
-              await Kartanode.app.models.user.find({ where: { "companyId": user.companyId, "licenseId": license.id, "is_deleted": false } }, (err, creators) => {
-                if (err) reject(err);
-                else {
-                  let creatorUsers = creators.map(item => convertIdToBSON(item.id));
-                  resolve({ "karta.userId": { $in: creatorUsers }, $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] });
-                }
-              });
-            }
-          });
-        }
-      });
-    });
-  }
-
   function executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next) {
     Kartanode.getDataSource().connector.connect((err, db) => {
       const kartaNodeCollection = db.collection('karta_node');
@@ -689,11 +664,6 @@ module.exports = function (Kartanode) {
               "event": "node_updated",
               "old_options.achieved_value": { exists: true }
             }
-            // if year is less than current year
-            // const currentYear = moment().year();
-            // const currentMonth = moment().month();
-            // let totalMonths = 11;
-            // if (year >= currentYear) totalMonths = currentMonth;
             for (let i=0; i<=11; i++) {
               karta_history_query["and"] = [
                 { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
@@ -822,12 +792,13 @@ module.exports = function (Kartanode) {
         // Get all phases
         const phases = await getAllPhases(kartaId);
         const phaseId = phases[findPhaseIndex(phases, nodeData.phaseId) + 1].id;
+        const phaseName = phases[findPhaseIndex(phases, nodeData.phaseId) + 1].global_name;
         // Previous phase id
         let previousChildrenPhaseId = children.phaseId;
         let previousChildrenParentId = children.parentId;
         // Changing phase id
         children.phaseId = phaseId;
-        if (children.hasOwnProperty("node_type")) {
+        if (children.hasOwnProperty("node_type") && phaseName !== "KPI") {
           let updateQuery = { "contributorId": null, "target": null, "node_type": null };
           await createHistory(kartaId, children, updateQuery, randomKey);
           await Kartanode.update({ "_id": children.id }, updateQuery);
