@@ -33,7 +33,7 @@ app.middleware('parse', bodyParser.json({ limit: '10mb' }));
 
 // parse application/x-www-form-urlencoded
 app.use(cors());
-app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.urlencoded({ extended: false }));
 
 require('dotenv').config();
 app.set('view engine', 'ejs');
@@ -44,6 +44,11 @@ app.use(morgan('dev')); // log every request to the console
 
 app.use(function(req, res, next) {
   var tokenId = false;
+  // Redirect user to correct domain
+  if (req.hostname !== new URL(process.env.API_URL).hostname && req.hostname !== "localhost") {
+    return res.redirect(process.env.API_URL);
+  }
+  // Check for access token
   if (req.query && req.query.access_token) {
     tokenId = req.query.access_token;
   } else if (req.headers.authorization) {
