@@ -49,8 +49,8 @@ exports.createSubscriptionCron = (app) => {
     });
 
     // SEND WEB/EMAIL NOTIFICATION 3 DAYS BEFORE TRIAL ENDS
-    cron.schedule('*/5 * * * * *', async () => {
-    // cron.schedule('0 4 * * *', async () => {
+    // cron.schedule('*/5 * * * * *', async () => {
+    cron.schedule('0 4 * * *', async () => {
         try {
             const threeDaysLaterStart = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').startOf("day").unix();
             const threeDaysLaterEnd = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').endOf("day").unix();
@@ -92,13 +92,13 @@ exports.createSubscriptionCron = (app) => {
                 }
       
                 // Insert data in notification collection
-                // await app.models.notification.create(notificationData);
+                await app.models.notification.create(notificationData);
 
                 // Send Email - Need Testing here
                 if(emailData.length > 0) {
                     for(let j = 0; j < emailData.length; j++ ) {
                         let email = emailData[j];
-                        // sendEmail(app, email, () => {});
+                        sendEmail(app, email, () => {});
                     }
                 }
 
