@@ -49,31 +49,39 @@ exports.createSubscriptionCron = (app) => {
     });
 
     // SEND WEB/EMAIL NOTIFICATION 3 DAYS BEFORE TRIAL ENDS
-    // cron.schedule('*/5 * * * * *', async () => {
-    cron.schedule('0 4 * * *', async () => {
+    cron.schedule('*/5 * * * * *', async () => {
+    // cron.schedule('0 4 * * *', async () => {
         try {
             const threeDaysLaterStart = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').startOf("day").unix();
             const threeDaysLaterEnd = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').endOf("day").unix();
-            const subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { gte: threeDaysLaterStart, lte: threeDaysLaterEnd }, status: false }});
+            let subscribedUsers = await app.models.subscription.find({ where: { trialActive: true, trialEnds: { gte: threeDaysLaterStart, lte: threeDaysLaterEnd }, status: false }});
+            subscribedUsers = JSON.parse(JSON.stringify(subscribedUsers));
 
-            if(subscribedUsers.length > 0) {
+            let filteredUsers = [];
+            for(let j = 0; j < subscribedUsers.length; j++) {
+                if(threeDaysLaterStart <= subscribedUsers[j].trialEnds && subscribedUsers[j].trialEnds <= threeDaysLaterEnd ) {
+                    filteredUsers.push(subscribedUsers[j])
+                }
+            }
+
+            if(filteredUsers.length > 0) {
                 // Prepare notification collection data
                 let notificationData = [];
                 let emailData = [];
-                for(let i = 0; i < subscribedUsers.length; i++) {
+                for(let i = 0; i < filteredUsers.length; i++) {
                     // Notification Data
                     let notificationObj = {
                         // title: `${app.currentUser.fullName} shared the node ${node.name}`,
                         title: `Your trial period will be over after 3 days.`,
                         type: "trial_period",
-                        contentId: subscribedUsers[i].id,
-                        userId: subscribedUsers[i].userId
+                        contentId: filteredUsers[i].id,
+                        userId: filteredUsers[i].userId
                     };
                     notificationData.push(notificationObj);
 
                     // Email Data
-                    const userDetails = await app.models.user.findOne({ where: { id: subscribedUsers[i].userId }});
-                    userDetails['lastDate'] = moment.unix(subscribedUsers[i].trialEnds).format("MM/DD/YYYY");
+                    const userDetails = await app.models.user.findOne({ where: { id: filteredUsers[i].userId }});
+                    userDetails['lastDate'] = moment.unix(filteredUsers[i].trialEnds).format("MM/DD/YYYY");
                     const emailObj = {
                         subject: `KPI trial period reminder`,
                         template: "trial-period.ejs",
@@ -84,13 +92,13 @@ exports.createSubscriptionCron = (app) => {
                 }
       
                 // Insert data in notification collection
-                await app.models.notification.create(notificationData);
+                // await app.models.notification.create(notificationData);
 
                 // Send Email - Need Testing here
                 if(emailData.length > 0) {
                     for(let j = 0; j < emailData.length; j++ ) {
                         let email = emailData[j];
-                        sendEmail(app, email, () => {});
+                        // sendEmail(app, email, () => {});
                     }
                 }
 
