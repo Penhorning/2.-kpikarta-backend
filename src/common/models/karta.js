@@ -623,6 +623,9 @@ module.exports = function(Karta) {
             }
 
             newHistory["id"] ? delete newHistory["id"] : null;
+            newHistory.event_options.updated["contributorId"] ? delete newHistory.event_options.updated["contributorId"] : null;
+            newHistory.event_options.updated["notify_type"] ? delete newHistory.event_options.updated["notify_type"] : null;
+            newHistory.event_options.updated["notifyUserId"] ? delete newHistory.event_options.updated["notifyUserId"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
             currentHistory.event_options.updated["parentId"] ? newHistory.event_options.updated["parentId"] = mapper[currentHistory.event_options.updated["parentId"]] : null;
             currentHistory.event_options.updated["phaseId"] ? newHistory.event_options.updated["phaseId"] = phaseMapping[currentHistory.event_options.updated["phaseId"]] : null;
