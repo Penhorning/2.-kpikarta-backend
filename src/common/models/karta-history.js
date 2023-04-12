@@ -67,6 +67,9 @@ module.exports = function(Kartahistory) {
                     delete nodeData.id;
                     await Kartahistory.app.models.karta_node.update( { "_id": finalHistoryData[j].kartaNodeId, "is_deleted": true }, nodeData );
                 } else if (finalHistoryData[j].event == "node_updated") {
+                    finalHistoryData[j].event_options.updated["contributorId"] ? delete finalHistoryData[j].event_options.updated["contributorId"] : null;
+                    finalHistoryData[j].event_options.updated["notify_type"] ? delete finalHistoryData[j].event_options.updated["notify_type"] : null;
+                    finalHistoryData[j].event_options.updated["notifyUserId"] ? delete finalHistoryData[j].event_options.updated["notifyUserId"] : null;
                     await Kartahistory.app.models.karta_node.update( { "_id": finalHistoryData[j].kartaNodeId, "is_deleted": false }, finalHistoryData[j].event_options.updated );
                 } else if (finalHistoryData[j].event == "node_removed") {
                     await Kartahistory.app.models.karta_node.update( { "_id": finalHistoryData[j].kartaNodeId, "is_deleted": false }, { "is_deleted": true } );
