@@ -27,6 +27,10 @@
     "emailVerificationCode": {
       "type": "string"
     },
+    "emailVerified": {
+      "type": "boolean",
+      "default": false
+    },
     "mobile": {
       "type": "object",
       "required": false

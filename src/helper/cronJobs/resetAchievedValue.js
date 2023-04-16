@@ -1,5 +1,6 @@
 'use strict';
 const cron = require('node-cron');
+const moment = require('moment-timezone');
 
 exports.resetAchievedValueCron = (app) => {
 
@@ -44,26 +45,50 @@ exports.resetAchievedValueCron = (app) => {
     });
   }
 
-  // CronJob for 1st day of month
-  cron.schedule('* * 1 * *', async () => {
+  // CronJob at 04:30 EDT & 08:00 UTC & 14:00 IST
+  // cron.schedule('00 14 * * *', async () => {
+  cron.schedule('*/2 * * * *', async () => {
     try {
-      const nodes = await app.models.KartaNode.find({ where: { "is_deleted": false, "contributorId": { exists: true } } });
+      const todayDate = moment().endOf('day').toDate();
+
+      const query = {
+        "is_deleted": false,
+        $and: [{ "contributorId": { exists: true } }, { "contributorId": { $ne: null } }],
+        "due_date": { $lte: todayDate }
+      }
+      const nodes = await app.models.KartaNode.find({ where: query });
       if (nodes && nodes.length > 0) {
-        console.log(`==========>>>>> ${nodes.length} NODES FOUND FOR RESETTING THE ACHIEVED VALUE`);
+        console.log(`==========>>>>> ${nodes.length} NODES FOUND FOR RESETTING THE ACHIEVED VALUE & DUE DATE`);
         for (let node of nodes) {
           node = JSON.parse(JSON.stringify(node));
-          await app.models.KartaNode.update({ "_id": node.id }, { "achieved_value": 0 });
+          // Set new due date
+          let new_due_date = moment();
+          if (node.target[0].frequency === "weekly") {
+            new_due_date = moment().add(1, 'weeks');
+          } else if (node.target[0].frequency === "monthly") {
+            new_due_date = moment().add(1, 'months');
+          } else if (node.target[0].frequency === "quarterly") {
+            new_due_date = moment().add(3, 'months');
+          } else if (node.target[0].frequency === "yearly") {
+            new_due_date = moment().add(1, 'years');
+          }
+          await app.models.KartaNode.update({ "_id": node.id }, { "achieved_value": 0, "due_date": new_due_date });
+
+          console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET`);
+          
+          // Create history
           let randomKey = new Date().getTime().toString();
-          console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE RESET`);
           await createHistory(node.kartaDetailId, node, { "achieved_value": 0 }, randomKey);
+          await createHistory(node.kartaDetailId, node, { "due_date": new_due_date }, randomKey);
           await createHistory(node.kartaDetailId, node, { "target": node.target }, randomKey);
+
           if (node.node_type === "metrics" && node.node_formula) {
             await createHistory(node.kartaDetailId, node, { "node_formula": node.node_formula }, randomKey);
           }
         }
       }
     } catch (err) {
-      console.log(`==========>>>>> WHILE RESET ACHIEVED VALUE CRON (${new Date()}) = Someting went wrong `, err);
+      console.log(`==========>>>>> WHILE RESET ACHIEVED VALUE & DUE DATE CRON (${new Date()}) = Someting went wrong `, err);
       throw err;
     }
   },

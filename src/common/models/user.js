@@ -965,7 +965,8 @@ module.exports = function(User) {
               role: role.name
             }
             let ret = await sales_user_details(userDetails);
-            if(ret && ret.id) {
+            // Assign roleId, licenseId and companyId
+            if (ret && ret.id) {
               User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
                   if (err) {
                     console.log('> error while updating user', err);
@@ -978,9 +979,8 @@ module.exports = function(User) {
                   console.log('> error while updating user', err);
                   return next(err);
                 }
-            });
+              });
             }
-            // Assign roleId, licenseId and companyId
           });
         });
         // Create token

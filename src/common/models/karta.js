@@ -190,7 +190,7 @@ module.exports = function(Karta) {
                   title: `${Karta.app.currentUser.fullName} shared the Karta - ${karta.name} with you.`,
                   click_type: accessType,
                   type: "karta_shared",
-                  contentId: karta._id,
+                  contentId: kartaId,
                   userId: item.id
                 });
               });

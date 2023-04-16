@@ -513,16 +513,17 @@ module.exports = function (Kartanode) {
       query = {};
       // Find current user details
       Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
-        Kartanode.app.models.license.findOne({ where: { "name": "Creator" } }, (err, license) => {
-          Kartanode.app.models.user.find({ where: { "companyId": user.companyId, "licenseId": license.id, "is_deleted": false } }, (err, creators) => {
-            let creatorUsers = creators.map(item => convertIdToBSON(item.id));
-            all_kpi_query = { "karta.userId": { $in: creatorUsers}, $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }]};
-            if (targetTypes && targetTypes.length > 0) {
-              all_kpi_query["target.0.frequency"] = { $in: targetTypes }
-            }
-            executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
-          })
-        });
+        all_kpi_query = {
+          $and: [
+            // { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
+            // { $or: [{ "karta.userId": convertIdToBSON(userId) }, { "karta.sharedTo.email": user.email }, { "contributorId": convertIdToBSON(userId) }] }
+            { $or: [{ "karta.sharedTo.accessType": "view" }] }
+          ]
+        };
+        if (targetTypes && targetTypes.length > 0) {
+          all_kpi_query["target.0.frequency"] = { $in: targetTypes }
+        }
+        executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
       });
     }
     else executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
