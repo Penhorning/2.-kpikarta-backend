@@ -50,6 +50,10 @@
       "type": "boolean",
       "default": false
     },
+    "trialCancelled": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
