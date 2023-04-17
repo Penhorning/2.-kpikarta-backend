@@ -984,4 +984,76 @@ module.exports = function (Subscription) {
       throw err;
     }
   }
+
+  Subscription.cancelTrial = async (userId) => {
+    try {
+      const trialEnds = moment().unix();
+      const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      const subscriptionDetails = await Subscription.find({ where: { companyId: userDetails.companyId }});
+      const sameCompanyUsers = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }});
+
+      for ( let subUser of subscriptionDetails ) {
+        await Subscription.update({ userId: subUser.userId }, { trialActive: false, trialEnds });
+      };
+
+      for ( let user of sameCompanyUsers ) {
+        await Subscription.app.models.user.update({ id: user.id }, { trialCancelled: true });
+      };
+
+      return "Trial cancelled successfully..!!";
+
+    } catch(err) {
+      console.log(err);
+      throw err;
+    }
+  }
+
+  Subscription.startSubscription = async (userId, plan) => {
+    try {
+      // plan - monthly / yearly
+      const userDetails = await Subscription.app.models.user.findOne({ where: { id: userId }});
+      const subscriptionDetails = await Subscription.find({ where: { companyId: userDetails.companyId }, include: "license" });
+      const sameCompanyUsers = await Subscription.app.models.user.find({ where: { companyId: userDetails.companyId }});
+
+      let randomUser = subscriptionDetails[0];
+      // Confirm a payment from the Card
+      const paymentIntent = await create_payment_intent(randomUser.customerId, randomUser.cardId, 50);
+      if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
+        let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
+        error.status = 404;
+        throw error;
+      }
+
+      if (paymentIntent.status == "succeeded") {
+        // Payment Refund
+        const refundData = await create_refund(paymentIntent.id); 
+        if(refundData.statusCode == 402 || refundData.statusCode == 404) {
+          let error = new Error(refundData.raw.message || "Refund Payment error..!!");
+          error.status = 404;
+          throw error;
+        }
+
+        for ( let subUser of subscriptionDetails ) {
+          const priceData = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: subUser.license().name, interval: plan == "monthly" ? "month": "year" }});
+          let subscription = await create_subscription({ customerId: subUser.customerId, items: [{price: priceData.priceId, quantity: 1}] });
+          await Subscription.app.models.subscription.update({ "id": subUser.id }, { trialActive: false, subscriptionId: subscription.id, status: true, cronCheck: false, currentPlan: plan });
+        };
+  
+        for ( let user of sameCompanyUsers ) {
+          await Subscription.app.models.user.update({ id: user.id }, { trialCancelled: false });
+        };
+  
+        return "Subscription started successfully..!!";
+
+      } else {
+        let error = new Error(paymentIntent.raw.message || "Card error..!!");
+        error.status = 404;
+        throw error;
+      }
+
+    } catch(err) {
+      console.log(err);
+      throw err;
+    }
+  }
 };

@@ -483,6 +483,42 @@
         "path": "/get-user-count",
         "verb": "get"
       }
+    },
+    "cancelTrial": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "trialResponse",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-trial",
+        "verb": "post"
+      }
+    },
+    "startSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "startSubscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/start-subscription",
+        "verb": "post"
+      }
     }
   }
 }
