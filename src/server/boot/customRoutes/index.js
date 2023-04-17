@@ -70,7 +70,8 @@ module.exports = function (app) {
         const customerId = data.object.customer;
         const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
         const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
-        const allCardUsers = await app.models.subscription.find({ where: { customerId }});
+        const allCardSubs = await app.models.subscription.find({ where: { customerId }});
+        const allCardUsers = await app.models.user.find({ where: { companyId: userData.companyId }});
         switch(type) {
             case "invoice.created": 
                 const emailObj = {
@@ -88,15 +89,15 @@ module.exports = function (app) {
                 break;
 
             case "customer.source.expiring": 
-                for(let user in allCardUsers) {
-                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
+                for(let user of allCardUsers) {
+                    await app.models.user.update({ id: user.id }, { paymentFailed: true });
                 }
                 res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;
 
             case "charge.failed":
-                for(let user in allCardUsers) {
-                    await app.models.user.update({ id: user.userId }, { paymentFailed: true });
+                for(let user of allCardUsers) {
+                    await app.models.user.update({ id: user.id }, { paymentFailed: true });
                 }
                 res.status(200).json({ error: false, status: 200, message: "Success" });
                 break;

@@ -1054,6 +1054,10 @@ module.exports = function(User) {
           let error = new Error("Your account has some payment issue! please contact to your admin.");
           error.status = 400;
           next(error);
+        } else if (user.trialCancelled && (user.role().name == "user" || user.role().name == "department_admin")) {
+          let error = new Error("Your account has been deactivated due to trial cancellation! Please contact to your admin.");
+          error.status = 400;
+          next(error);
         }
         // If email is not verified
         else if (!user.emailVerified) {
