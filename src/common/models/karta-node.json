@@ -434,6 +434,28 @@
         "verb": "post"
       }
     },
+    "getKpisData": {
+      "accepts": [
+        {
+          "arg": "kartaId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "type",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "nodes",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-kpis-data",
+        "verb": "post"
+      }
+    },
     "updateKpiNodes": {
       "accepts": [
         {
