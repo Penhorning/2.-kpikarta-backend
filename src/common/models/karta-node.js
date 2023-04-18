@@ -722,10 +722,6 @@ module.exports = function (Kartanode) {
   Kartanode.getKpisData = (kartaId, type, next) => {
 
     kartaId = convertIdToBSON(kartaId);
-
-    // Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC" }, (err, result) => {
-    //   next(err, result);
-    // });
   
     Kartanode.getDataSource().connector.connect(function (err, db) {
       const kartaNodeCollection = db.collection('karta_node');
@@ -746,37 +742,31 @@ module.exports = function (Kartanode) {
       ]).toArray(async (err, result) => {
         if (result) {
           result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
-          // Fetch whole year history month wise
+          // Fetch past achieved values
           for (let item of result[0].data) {
-            item["nodes"] = [];
+            item.aggregateAchievedValue = 0;
+
             const karta_history_query = {
               "kartaId": kartaId,
+              "kartaNodeId": item._id,
               "is_deleted": false,
               "event": "node_updated",
               "old_options.achieved_value": { exists: true }
             }
+            let start = 0, end = 11;
             if (type === "quarterly") {
-              karta_history_query.createdAt = {
-                gte: moment().startOf('quarter').toDate(),
-                lte: moment().endOf('quarter').toDate()
-              }
-            }
+              start = moment(moment().startOf('quarter').toDate()).month();        
+              end = moment(moment().endOf('quarter').toDate()).month();
+            }      
 
-            for (let i=0; i<=11; i++) {
+            for (let i=start; i<=end; i++) {
               karta_history_query["and"] = [
                 { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
                 { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
               ]
               const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
-              if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
-                item.nodes[i] = {
-                  achieved: JSON.parse(JSON.stringify(achievedHistory[0]))
-                }
-              } else {
-                item.nodes[i] = {
-                  achieved: null,
-                  target: null
-                }
+              if (achievedHistory.length > 0) {
+                item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
               }
             }
           }
