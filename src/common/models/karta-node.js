@@ -1,6 +1,6 @@
 'use strict';
 
-const moment = require('moment');
+const moment = require('moment-timezone');
 const { sales_update_user } = require('../../helper/salesforce');
 
 module.exports = function (Kartanode) {
@@ -20,7 +20,12 @@ module.exports = function (Kartanode) {
           } 
         },
         {
-          $project: { "name": 1, "userId": 1, "versionId": 1 }
+          $project: {
+            "name": 1,
+            "userId": 1,
+            "versionId": 1,
+            "sharedTo": 1
+          }
         }
       ],
       as: 'karta'
@@ -515,9 +520,8 @@ module.exports = function (Kartanode) {
       Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
         all_kpi_query = {
           $and: [
-            // { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
-            // { $or: [{ "karta.userId": convertIdToBSON(userId) }, { "karta.sharedTo.email": user.email }, { "contributorId": convertIdToBSON(userId) }] }
-            { $or: [{ "karta.sharedTo.accessType": "view" }] }
+            { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
+            { $or: [{ "karta.userId": convertIdToBSON(userId) }, { "karta.sharedTo.email": user.email }, { "contributorId": convertIdToBSON(userId) }] }
           ]
         };
         if (targetTypes && targetTypes.length > 0) {
@@ -704,6 +708,74 @@ module.exports = function (Kartanode) {
                   achieved: null,
                   target: null,
                   formula: null
+                }
+              }
+            }
+          }
+        }
+        next(err, result);
+      });
+    });
+  }
+
+  // Get kpis data by quarterly and yearly
+  Kartanode.getKpisData = (kartaId, type, next) => {
+
+    kartaId = convertIdToBSON(kartaId);
+
+    // Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC" }, (err, result) => {
+    //   next(err, result);
+    // });
+  
+    Kartanode.getDataSource().connector.connect(function (err, db) {
+      const kartaNodeCollection = db.collection('karta_node');
+      kartaNodeCollection.aggregate([
+        {
+          $match: {
+            "kartaDetailId": kartaId,
+            "is_deleted": false,
+            $or: [
+              { "node_type": "measure" },
+              { "node_type": "metrics" }
+            ]
+          }
+        },
+        KARTA_LOOKUP,
+        UNWIND_KARTA,
+        FACET(1, 1000)
+      ]).toArray(async (err, result) => {
+        if (result) {
+          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+          // Fetch whole year history month wise
+          for (let item of result[0].data) {
+            item["nodes"] = [];
+            const karta_history_query = {
+              "kartaId": kartaId,
+              "is_deleted": false,
+              "event": "node_updated",
+              "old_options.achieved_value": { exists: true }
+            }
+            if (type === "quarterly") {
+              karta_history_query.createdAt = {
+                gte: moment().startOf('quarter').toDate(),
+                lte: moment().endOf('quarter').toDate()
+              }
+            }
+
+            for (let i=0; i<=11; i++) {
+              karta_history_query["and"] = [
+                { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
+                { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
+              ]
+              const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
+              if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
+                item.nodes[i] = {
+                  achieved: JSON.parse(JSON.stringify(achievedHistory[0]))
+                }
+              } else {
+                item.nodes[i] = {
+                  achieved: null,
+                  target: null
                 }
               }
             }

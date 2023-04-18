@@ -45,16 +45,19 @@ exports.resetAchievedValueCron = (app) => {
     });
   }
 
-  // CronJob at 04:30 EDT & 08:00 UTC & 14:00 IST
-  // cron.schedule('00 14 * * *', async () => {
-  cron.schedule('*/2 * * * *', async () => {
+  // CronJob at 04:30 EDT & 08:30 UTC & 14:00 IST
+  cron.schedule('00 14 * * *', async () => {
+  // cron.schedule('*/2 * * * * *', async () => {
     try {
       const todayDate = moment().endOf('day').toDate();
 
       const query = {
         "is_deleted": false,
-        $and: [{ "contributorId": { exists: true } }, { "contributorId": { $ne: null } }],
-        "due_date": { $lte: todayDate }
+        or: [
+          { "node_type" : "measure" },
+          { "node_type" : "metrics" }
+        ],
+        "due_date": { lte: todayDate }
       }
       const nodes = await app.models.KartaNode.find({ where: query });
       if (nodes && nodes.length > 0) {
@@ -79,7 +82,7 @@ exports.resetAchievedValueCron = (app) => {
           // Create history
           let randomKey = new Date().getTime().toString();
           await createHistory(node.kartaDetailId, node, { "achieved_value": 0 }, randomKey);
-          await createHistory(node.kartaDetailId, node, { "due_date": new_due_date }, randomKey);
+          await createHistory(node.kartaDetailId, node, { "due_date": new_due_date._d }, randomKey);
           await createHistory(node.kartaDetailId, node, { "target": node.target }, randomKey);
 
           if (node.node_type === "metrics" && node.node_formula) {

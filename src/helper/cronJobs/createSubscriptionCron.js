@@ -2,13 +2,13 @@
 
 const cron = require('node-cron');
 const moment = require('moment-timezone');
-const { create_subscription, update_subscription } = require('../stripe');
+const { create_subscription } = require('../stripe');
 const { sendEmail } = require('../../helper/sendEmail');
 
 exports.createSubscriptionCron = (app) => {
     
     // CronJob for Starting Subscriptions after trial ends
-    // cron.schedule('0 0 * * *', async () => {
+    // CronJob runs in every 2 seconds
     cron.schedule('*/2 * * * * *', async () => {
         try {
             // Start subscription for the users whose trial is over
@@ -49,8 +49,9 @@ exports.createSubscriptionCron = (app) => {
     });
 
     // SEND WEB/EMAIL NOTIFICATION 3 DAYS BEFORE TRIAL ENDS
+    // CronJob at 06:30pm EDT & 10:30pm UTC & 04:00am IST
     // cron.schedule('*/5 * * * * *', async () => {
-    cron.schedule('0 4 * * *', async () => {
+    cron.schedule('00 04 * * *', async () => {
         try {
             const threeDaysLaterStart = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').startOf("day").unix();
             const threeDaysLaterEnd = moment().add(process.env.TRIAL_EMAIL_CRON, 'days').endOf("day").unix();
