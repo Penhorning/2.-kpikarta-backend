@@ -1,11 +1,10 @@
 'use strict';
 
 const cron = require('node-cron');
-const moment = require('moment-timezone');
 const { sendEmail } = require('../../helper/sendEmail');
 
 exports.profileStatusCron = (app) => {
-    // CronJob for everyday at midnight
+    // CronJob runs at every friday
     cron.schedule('0 0 * * 5', async () => {
     // cron.schedule('*/4 * * * * *', () => {
         try {
