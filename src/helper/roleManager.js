@@ -39,7 +39,7 @@ ROLE_MANAGER.addRoles = function(app, rolesToAdd, forUserId, cb) {
 
 ROLE_MANAGER.assignRoles = function(app, roles_to_assign, forUserId, cb) {
   var roles_ids = roles_to_assign;
-  app.models.user.findById(forUserId, {'include': 'roles'}, (err, user) =>{
+  app.models.user.findById(forUserId, {'include': 'roles'}, (err, user) =>{ 
     app.models.RoleMapping.find({where: {principalType: app.models.RoleMapping.USER, principalId: forUserId}}, (err, user_roles)=>{
       var currentRoleIds = user_roles.map((r)=>r.roleId);
       var rolesToRemove = currentRoleIds.filter((r)=>{
