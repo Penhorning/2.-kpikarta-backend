@@ -765,8 +765,8 @@ module.exports = function (Subscription) {
 
   Subscription.getInvoicesForAdminChart = async (startDate, endDate) => {
     try {
-      startDate = moment(new Date(startDate), 'DD.MM.YYYY').unix();
-      endDate = moment(new Date(endDate), 'DD.MM.YYYY').unix();
+      startDate = moment(new Date(startDate), 'DD.MM.YYYY').startOf('day').unix();
+      endDate = moment(new Date(endDate), 'DD.MM.YYYY').endOf('day').unix();
 
       let finalMapping = [];
       let invoices = await get_invoices_for_admin_chart(startDate, endDate);

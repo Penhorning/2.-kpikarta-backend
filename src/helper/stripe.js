@@ -537,6 +537,7 @@ exports.get_invoices_for_admin_chart = async (startDate, endDate) => {
                 gte: startDate,
                 lte: endDate
             },
+            limit: 5000,
             status: "paid",
         };
         const invoices = await stripe.invoices.list(query);

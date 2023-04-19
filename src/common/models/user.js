@@ -917,6 +917,7 @@ module.exports = function(User) {
       resetLink,
       appName: User.app.get('name')
     }
+    // setTimeout(() => sendEmail(User.app, data, () => {}), 10000);
     sendEmail(User.app, data, () => { });
   });
 
