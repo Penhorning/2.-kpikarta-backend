@@ -60,6 +60,48 @@ module.exports = function(Karta) {
 
 
 /* =============================CUSTOM METHODS=========================================================== */
+
+// Create history
+const createHistory = async (kartaId, node, updatedData, randomKey, event = "node_updated") => {
+  const userIdValue = Karta.app.currentUser.id;
+  Karta.app.models.karta.findOne({ where: { "_id": kartaId } }, {}, (err, karta) => {
+    // Prepare history data
+    let history_data = {
+      event,
+      kartaNodeId: node.id,
+      userId: userIdValue,
+      versionId: karta.versionId,
+      kartaId: kartaId,
+      parentNodeId: node.parentId,
+      historyType: 'main',
+      randomKey: randomKey.toString()
+    }
+    event == "node_removed" ? history_data["event_options"] = {
+      created: null,
+      updated: null,
+      removed: updatedData
+    } : event == "node_updated" ? history_data["event_options"] = {
+      created: null,
+      updated: updatedData,
+      removed: null
+    } : history_data["event_options"] = {
+      created: updatedData,
+      updated: null,
+      removed: null
+    }
+    if (event == "node_updated") {
+      let oldOptions = {};
+      Object.keys(updatedData).forEach(el => oldOptions[el] = node[el]);
+      history_data["old_options"] = oldOptions;
+    }
+    // Create history of current node
+    Karta.app.models.karta_history.create(history_data, {}, (err, response) => {
+      if (err) console.log(err, 'err');
+      Karta.app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+    });
+  });
+}
+
   // Copy Karta Functions Starts----------------
   // Might face issue while copying because phase is not updating while creating this new history - Debug event_options
   async function createCopyKartaHistory(oldVersionHistory, newVersion, newKarta) {
@@ -979,7 +1021,29 @@ module.exports = function(Karta) {
                     if (phaseErr2) {
                       console.log('> error while creating all global phases', phaseErr2);
                       return next(err);
-                    } else next();
+                    } 
+                    Karta.app.models.karta_phase.findOne({ where: { "kartaId": karta.id, name: "Goal" }}, (phaseErr3, phaseResult3) => {
+                      if (phaseErr3) {
+                        console.log('> error while finding goal phase', phaseErr3);
+                        return next(err);
+                      } 
+                      // Create Karta Goal Node
+                      let data = {
+                        name: "Goal",
+                        phaseId: phaseResult3.id,
+                        kartaId: karta.id
+                      };
+                      Karta.app.models.karta_node.create(data, {} , (kartaNodeErr, kartaNodeResult) => {
+                        if (kartaNodeErr) {
+                          console.log('> error while creating Goal Node', kartaNodeErr);
+                          return next(err);
+                        }
+                        let goalNode = JSON.parse(JSON.stringify(kartaNodeResult));
+                        let randomKey = new Date().getTime();
+                        createHistory(karta.id, goalNode, goalNode, randomKey, "node_created");
+                        return next();
+                      });
+                    });
                   });
                 }
               });
