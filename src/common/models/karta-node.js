@@ -518,16 +518,24 @@ module.exports = function (Kartanode) {
       query = {};
       // Find current user details
       Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
-        all_kpi_query = {
-          $and: [
-            { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
-            { $or: [{ "karta.userId": convertIdToBSON(userId) }, { "karta.sharedTo.email": user.email }, { "contributorId": convertIdToBSON(userId) }] }
-          ]
-        };
-        if (targetTypes && targetTypes.length > 0) {
-          all_kpi_query["target.0.frequency"] = { $in: targetTypes }
-        }
-        executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
+        let kartaId = "";
+        Kartanode.findOne({ where: { "contributorId": userId, "is_deleted": false } }, (err, result) => {
+          if (result) kartaId = result.kartaDetailId;
+          all_kpi_query = {
+            $and: [
+              { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
+              { $or: [
+                { "karta.userId": convertIdToBSON(userId) },
+                { "karta.sharedTo.email": user.email },
+                { "kartaDetailId": kartaId }
+              ] }
+            ]
+          };
+          if (targetTypes && targetTypes.length > 0) {
+            all_kpi_query["target.0.frequency"] = { $in: targetTypes }
+          }
+          executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
+        });
       });
     }
     else executeKPINodeQuery(page, limit, query, SEARCH_MATCH, status_query, percentage_query, SORT, creator_query, all_kpi_query, next);
