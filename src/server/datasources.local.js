@@ -38,7 +38,7 @@ module.exports = {
     "provider": "filesystem",
     "root": "./storage",
     "nameConflict": "makeUnique",
-    "maxFileSize": "20000000",
+    "maxFileSize": "20000000",  // 20mb
     "allowedContentTypes": [
       "image/jpeg",
       "image/jpg",
