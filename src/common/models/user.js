@@ -758,15 +758,15 @@ module.exports = function(User) {
   };
   // Enable/Disable 2FA
   User.toggle2FA = function(type, next) {
+    const toggle = () => {
+      this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
+        next(err, type);
+      });
+    }
     if (type && this.app.currentUser.mobile && this.app.currentUser.mobileVerified) {
-      this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
-        next(err, type);
-      });
-    } else if (!type) {
-      this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
-        next(err, type);
-      });
-    } else {
+      toggle();
+    } else if (type === false) toggle();
+    else {
       let error = new Error("You cannot enable Two Factor Authorization, before mobile verification");
       error.status = 400;
       next(error);

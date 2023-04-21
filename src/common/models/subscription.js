@@ -200,13 +200,11 @@ module.exports = function (Subscription) {
             testClock ? subscriptionObj["testClock"] = testClock.id : null;
             await Subscription.create(subscriptionObj);
 
-            const superAdmin = await Subscription.app.models.user.findOne({ where: { licenseId: { exists : false }, companyId: { exists : false } }});
             const emailObj = {
               subject: `A new user has signed up..!!`,
               template: "admin-notify.ejs",
-              email: superAdmin.email,
+              email: "info@kpikarta.com",
               user: userDetails,
-              admin: superAdmin,
               company: userDetails.company().name
             };
             sendEmail(Subscription.app, emailObj, () => {});
