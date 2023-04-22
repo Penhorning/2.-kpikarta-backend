@@ -107,7 +107,7 @@ module.exports = function(Kartacatalog) {
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
         next(err, result);
       });
     });
@@ -152,7 +152,7 @@ module.exports = function(Kartacatalog) {
         SORT,
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
         next(err, result);
       });
     });

@@ -59,7 +59,7 @@ module.exports = function(Notification) {
                 SORT,
                 FACET(page, limit)
             ]).toArray((err, result) => {
-                if (result) result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
+                if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
                 next(err, result);
             });
         });
