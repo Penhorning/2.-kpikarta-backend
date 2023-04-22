@@ -245,7 +245,7 @@ module.exports = function (Subscription) {
   Subscription.createPrice = async (nickname, amount, interval, userId, licenseType) => {
     try {
       // LicenseType - Creator/Champion
-      // INTERVAL - Month/Year
+      // INTERVAL - month/year
       const allProducts = await get_all_products();
       const findProductByInterval = allProducts.findIndex(prod => prod.name == interval && prod.active == true );
       if ( findProductByInterval == -1 ) {
