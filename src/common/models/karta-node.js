@@ -313,30 +313,39 @@ module.exports = function (Kartanode) {
     
     Kartanode.getDataSource().connector.connect(function (err, db) {
       const kartaNodeCollection = db.collection('karta_node');
-      kartaNodeCollection.aggregate([
-        {
-          $match: { "contributorId": userId }
-        },
-        {
-          $sort: { "createdAt": -1 }
-        },
-        KARTA_LOOKUP,
-        UNWIND_KARTA,
-        {
-          $group: {
-            "_id": null,
-            "userId": { $addToSet: "$karta.userId" }
+      // Find current user details
+      Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
+        kartaNodeCollection.aggregate([
+          {
+            $sort: { "createdAt": -1 }
+          },
+          KARTA_LOOKUP,
+          UNWIND_KARTA,
+          {
+            $match: {
+              $or: [
+                { "karta.userId": userId },
+                { "karta.sharedTo.email": user.email },
+                { "contributorId": userId }
+              ]
+            }
+          },
+          {
+            $group: {
+              "_id": null,
+              "userId": { $addToSet: "$karta.userId" }
+            }
           }
-        }
-      ]).toArray((err, result) => {
-        if (err) next (err);
-        else {
-          if (result.length > 0) {
-            Kartanode.app.models.user.find({ where: { "_id": { $in: result[0].userId } }, fields: { "id": true, "email": true, fullName: true } }, (err2, result2) => {
-              next(err2, result2);
-            });
-          } else next(null, result);
-        }
+        ]).toArray((err, result) => {
+          if (err) next (err);
+          else {
+            if (result.length > 0) {
+              Kartanode.app.models.user.find({ where: { "_id": { $in: result[0].userId } }, fields: { "id": true, "email": true, fullName: true } }, (err2, result2) => {
+                next(err2, result2);
+              });
+            } else next(null, result);
+          }
+        });
       });
     });
   }
@@ -808,6 +817,11 @@ module.exports = function (Kartanode) {
           updateQuery["node_formula"] = nodeData.node_formula.__data;
           // Update only fields values
           updateQuery["node_formula"]["fields"] = node.node_formula.fields;
+        }
+        // Check if completed_date exists
+        if (node.hasOwnProperty("completed_date")) {
+          updateQuery["completed_date"] = node.completed_date;
+          updatingParameters.push({ "completed_date": node.completed_date });
         }
         Kartanode.update({ "_id": node.id, "contributorId": Kartanode.app.currentUser.id }, { $set: updateQuery }, (err, result) => {
           if (err) {
