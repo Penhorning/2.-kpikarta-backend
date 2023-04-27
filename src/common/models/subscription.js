@@ -197,13 +197,13 @@ module.exports = function (Subscription) {
               currentPlan: plan,
               licenseId: userDetails.licenseId
             };
-            testClock ? subscriptionObj["testClock"] = testClock.id : null;
+            if(testClock) subscriptionObj["testClock"] = testClock.id;
             await Subscription.create(subscriptionObj);
 
             const emailObj = {
               subject: `A new user has signed up..!!`,
               template: "admin-notify.ejs",
-              email: "info@kpikarta.com",
+              email: process.env.SMTP_USER,
               user: userDetails,
               company: userDetails.company().name
             };
