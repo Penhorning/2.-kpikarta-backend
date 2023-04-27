@@ -455,77 +455,6 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
     });
   }
 
-  // Create Karta Copy
-  Karta.oldCopy = async (kartaId, next) => {
-    try {
-        // Fetching Karta Details and creating a new Karta
-       const kartaDetails = await Karta.findOne({ where: { "id": kartaId }});
-       let newObj = {
-        name: kartaDetails.name ? kartaDetails.selfCopyCount == 0 ? kartaDetails.name + " - Copy" : `${kartaDetails.name} - Copy (${kartaDetails.selfCopyCount + 1})` : null,
-        userId: kartaDetails.userId ? kartaDetails.userId : null,
-        status: kartaDetails.status ? kartaDetails.status : null,
-        type: kartaDetails.type ? kartaDetails.type : null
-       }
-       const newKarta = await Karta.create(newObj);
-
-       //Creating new Phases for new karta
-       let phaseMapping = {};
-       const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId }});
-       if (getPhases.length > 0) {
-        for ( let x = 0; x < getPhases.length; x++ ) {
-          let currentPhase = {
-            ...getPhases[x].__data,
-            kartaId: newKarta.id,
-          };
-          delete currentPhase.id;
-          currentPhase["parentId"] ? currentPhase["parentId"] = phaseMapping[currentPhase["parentId"]] : null;
-          const newPhase = await Karta.app.models.karta_phase.create(currentPhase);
-          phaseMapping[getPhases[x].id] = newPhase.id;
-        }
-       }
-
-       // Creating a new Version for new Karta 
-       const newVersion = await Karta.app.models.karta_version.create({ "name" : "1", "kartaId": newKarta.id });
-       await Karta.update({ "id": newKarta.id }, { versionId: newVersion.id });
-
-       // Creating Copy of Karta Nodes
-       const kartaNodeMapping = {};
-       const kartaNodes = await Karta.app.models.karta_node.find({ where: { or: [{ "kartaId": kartaId }, { "kartaDetailId": kartaId } ], is_deleted: false } });
-       if ( kartaNodes.length > 0 ) {
-        for( let i = 0; i < kartaNodes.length; i++ ) {
-          let currentNode = kartaNodes[i].__data;
-          let newKartaNode = {
-            ...currentNode,
-            phaseId: phaseMapping[currentNode.phaseId],
-            versionId: newVersion.id,
-          };
-          delete newKartaNode.id;
-          delete newKartaNode.children;
-          delete newKartaNode.phase;
-          newKartaNode["contributorId"] ? delete newKartaNode["contributorId"] : null;
-          newKartaNode["notify_type"] ? delete newKartaNode["notify_type"] : null;
-          newKartaNode["notifyUserId"] ? delete newKartaNode["notifyUserId"] : null;
-          newKartaNode["kartaId"] ? newKartaNode["kartaId"] = newKarta.id : newKartaNode["kartaDetailId"] = newKarta.id;
-          const newNode = await Karta.app.models.karta_node.create(newKartaNode);
-          kartaNodeMapping[currentNode.id.toString()] = newNode.id.toString();
-        }
-
-        for (let j = 0; j < kartaNodes.length; j++ ) {
-          let currentNode = kartaNodes[j].__data;
-          if(currentNode["parentId"]) {
-            await Karta.app.models.karta_node.update({"id": kartaNodeMapping[currentNode.id]}, {"parentId": kartaNodeMapping[currentNode.parentId]});
-          }
-        }
-       }
-      
-      await Karta.update( { "id": kartaDetails.id }, { selfCopyCount: parseInt(kartaDetails.selfCopyCount) + 1 } );
-      return "Karta copy created successfully..!!";
-    }
-    catch(err) {
-      console.log(err);
-    }
-  }
-
   // Create Karta Copy based on History
   Karta.copy = async (kartaId, next) => {
     try {
@@ -588,7 +517,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         for (let j = 0; j < currentVersionHistory.length; j++) {
           let currentHistory = currentVersionHistory[j];
           
-          if( currentHistory.event == "node_created" ) {
+          if( currentHistory.event == "node_created" && !currentHistory.undoCheck ) {
             let nodeData = JSON.parse(JSON.stringify({...currentHistory.event_options.created}));
 
             delete nodeData.children;
@@ -608,7 +537,6 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             } else {
               mapper[currentHistory.kartaNodeId] = currentHistory.kartaNodeId;
             }
-
             // Creating History
             let newHistory = {
               ...currentHistory,
@@ -621,12 +549,12 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
               },
               is_copied: true
             }
-
             newHistory["id"] ? delete newHistory["id"] : null;
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
-          } else if ( currentHistory.event == "node_updated" ) {
+
+          } else if ( currentHistory.event == "node_updated" && !currentHistory.undoCheck ) {
             let newData = {
               ...currentHistory.event_options.updated
             };
@@ -682,7 +610,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             }
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
-          } else if ( currentHistory.event == "node_removed" ) {
+          } else if ( currentHistory.event == "node_removed" && !currentHistory.undoCheck ) {
             if (i == kartaVersions.length - 1) {
               await Karta.app.models.karta_node.update({ "id": mapper[currentHistory.kartaNodeId] }, { "is_deleted": true } );
             }
@@ -700,7 +628,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = mapper[currentHistory.parentNodeId] : null;
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
-          } else if ( currentHistory.event == "phase_created" ) {
+          } else if ( currentHistory.event == "phase_created" && !currentHistory.undoCheck ) {
             let phaseData = currentHistory.event_options.created;
             if (phaseData.__data) {
               phaseData = JSON.parse(JSON.stringify(phaseData.__data));
@@ -734,7 +662,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = phaseMapping[currentHistory.parentNodeId] : null;
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
-          } else if ( currentHistory.event == "phase_updated" ) {
+          } else if ( currentHistory.event == "phase_updated" && !currentHistory.undoCheck ) {
             currentHistory.event_options.updated["parentId"] ? currentHistory.event_options.updated["parentId"] = phaseMapping[currentHistory.event_options.updated["parentId"]] : null;
             currentHistory.event_options.updated["phaseId"] ? currentHistory.event_options.updated["phaseId"] = phaseMapping[currentHistory.event_options.updated["phaseId"]] : null;
             await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, currentHistory.event_options.updated );
@@ -752,7 +680,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             currentHistory.parentNodeId ? newHistory["parentNodeId"] = phaseMapping[currentHistory.parentNodeId] : null;
             let history = await Karta.app.models.karta_history.create(newHistory);
             if(j == currentVersionHistory.length - 1) lastHistoryId = history.id;
-          } else if ( currentHistory.event == "phase_removed" ) {
+          } else if ( currentHistory.event == "phase_removed" && !currentHistory.undoCheck ) {
             await Karta.app.models.karta_phase.update({ "id": phaseMapping[currentHistory.kartaNodeId] }, { "is_deleted": true } );
 
             // Creating History
