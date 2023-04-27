@@ -197,7 +197,7 @@ module.exports = function (Subscription) {
               currentPlan: plan,
               licenseId: userDetails.licenseId
             };
-            testClock ? subscriptionObj["testClock"] = testClock.id : null;
+            if(testClock) subscriptionObj["testClock"] = testClock.id;
             await Subscription.create(subscriptionObj);
 
             const emailObj = {

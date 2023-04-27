@@ -6,12 +6,12 @@ module.exports = function(Kartaversion) {
     Kartaversion.createVersion = async (name, kartaId, versionId) => {
         try {
             const newVersion = await Kartaversion.create({ name, kartaId });
-            let findHistoryTemp = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "temp" }});
-            let findHistoryMain = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "main" }});
+            let findHistoryTemp = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "temp", undoCheck: false }});
+            let findHistoryMain = await Kartaversion.app.models.karta_history.find({ where: { kartaId, versionId, historyType: "main", undoCheck: false }});
 
             if (findHistoryTemp.length > 0 ){
-                for (let i = 0; i < findHistoryTemp.length; i++ ) {
-                    let tempObj = JSON.parse(JSON.stringify(findHistoryTemp[i]));
+                for (const element of findHistoryTemp) {
+                    let tempObj = JSON.parse(JSON.stringify(element));
                     let newObj = {
                         ...tempObj,
                         event: tempObj.event,
@@ -24,14 +24,14 @@ module.exports = function(Kartaversion) {
                     };
                     delete newObj["id"];
                     if(tempObj.event == "node_updated" || tempObj.event == "phase_updated") newObj["old_options"] = tempObj.old_options;
-                    tempObj.parentNodeId ? newObj['parentNodeId'] = tempObj.parentNodeId : null;
+                    if(tempObj.parentNodeId) newObj['parentNodeId'] = tempObj.parentNodeId;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
 
             if( findHistoryMain.length > 0 ) {
-                for( let i = 0; i < findHistoryMain.length; i++ ) {
-                    let mainObj = JSON.parse(JSON.stringify(findHistoryMain[i]));
+                for(const element of findHistoryMain) {
+                    let mainObj = JSON.parse(JSON.stringify(element));
                     let newObj = {
                         ...mainObj,
                         event: mainObj.event,
@@ -44,7 +44,7 @@ module.exports = function(Kartaversion) {
                     };
                     delete newObj["id"];
                     if(mainObj.event == "node_updated" || mainObj.event == "phase_updated") newObj["old_options"] = mainObj.old_options;
-                    mainObj.parentNodeId ? newObj['parentNodeId'] = mainObj.parentNodeId : null;
+                    if(mainObj.parentNodeId) newObj['parentNodeId'] = mainObj.parentNodeId;
                     await Kartaversion.app.models.karta_history.create(newObj);
                 }
             }
