@@ -62,8 +62,8 @@ module.exports = async function(app) {
         const globalPhases = await app.models.karta_phase.find({ where: { kartaId: { exists: false }}});
         let parentId = "";
         if(globalPhases.length > 0) {
-          for(let i = 0; i < globalPhases.length; i++) {
-            let currentPhase = globalPhases[i];
+          for(const element of globalPhases) {
+            let currentPhase = element;
             let data = {};
             if(currentPhase.name == "Goal") {
               data = {
