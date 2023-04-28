@@ -203,7 +203,7 @@ module.exports = function (Subscription) {
             const emailObj = {
               subject: `A new user has signed up..!!`,
               template: "admin-notify.ejs",
-              email: "info@kpikarta.com",
+              email: process.env.SMTP_USER,
               user: userDetails,
               company: userDetails.company().name
             };
