@@ -69,13 +69,13 @@ module.exports = async function(app) {
             let data = {};
             if (currentPhase.name == "Goal") {
               data = {
-                name: "SAMPLE_GOAL",
+                name: "INTRO_GOAL",
                 phaseId: currentPhase.id,
                 kartaId: sampleKarta.id
               };
             } else {
               data = {
-                name: "SAMPLE",
+                name: "INTRO",
                 kartaDetailId: sampleKarta.id,
                 phaseId: currentPhase.id,
                 parentId: parentId,
