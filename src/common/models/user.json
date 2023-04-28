@@ -80,6 +80,9 @@
       "type": "boolean",
       "default": true
     },
+    "isMaster": {
+      "type": "boolean"
+    },
     "is_deleted": {
       "type": "boolean",
       "default": false
