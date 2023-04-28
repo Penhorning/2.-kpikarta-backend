@@ -1,6 +1,6 @@
 /* eslint-disable max-len */
 'use strict';
-var async = require('async');
+const async = require('async');
 
 module.exports = async function(app) {
   function setupRole(role, users, done) {
@@ -21,8 +21,8 @@ module.exports = async function(app) {
         callback(err, created);
       });
     }], function(er, results) {
-      var role = results[0];
-      var users = results[1];
+      let role = results[0];
+      let users = results[1];
       async.forEach(users, function(user, callback) {
         role.principals.create({
           principalType: app.models.RoleMapping.USER,
@@ -49,37 +49,39 @@ module.exports = async function(app) {
     });
   });
 
-  async function createDummyKarta() {
+  // Create intro karta for onboarding guide
+  async function createIntroKarta() {
     try {
-      const kartaDetails = await app.models.karta.findOne({ where: { or: [ { sample: true, name: "SAMPLE_KARTA" }, { sample: { exists: true }} ]}});
+      const kartaDetails = await app.models.karta.findOne({ where: { sample: true, name: "INTRO_KARTA" } });
       if (!kartaDetails) {
         // Creating Karta
-        const sampleKarta = await app.models.karta.create({ name: "SAMPLE_KARTA", sample: true });
+        const sampleKarta = await app.models.karta.create({ name: "INTRO_KARTA", sample: true });
         const sampleVersion = await app.models.karta_version.create({ "name" : "1", "kartaId": sampleKarta.id });
         await app.models.karta.update({ "id" : sampleKarta.id }, { "versionId" : sampleVersion.id });
-
+        
         // Creating Karta Nodes
         const globalPhases = await app.models.karta_phase.find({ where: { kartaId: { exists: false }}});
         let parentId = "";
-        if(globalPhases.length > 0) {
-          for(const element of globalPhases) {
+        if (globalPhases.length > 0) {
+
+          for (const element of globalPhases) {
             let currentPhase = element;
             let data = {};
-            if(currentPhase.name == "Goal") {
+            if (currentPhase.name == "Goal") {
               data = {
-                name: "SAMPLE_GOAL",
+                name: "INTRO_GOAL",
                 phaseId: currentPhase.id,
                 kartaId: sampleKarta.id
               };
             } else {
               data = {
-                name: "SAMPLE",
+                name: "INTRO",
                 kartaDetailId: sampleKarta.id,
                 phaseId: currentPhase.id,
                 parentId: parentId,
                 weightage: 100
               }
-              if(currentPhase.name == "KPI") {
+              if (currentPhase.name == "KPI") {
                 data.node_type = "measure";
                 data.target = [{ frequency: 'monthly', value: 0, percentage: 0 }];
                 data.achieved_value = 0;
@@ -141,5 +143,5 @@ module.exports = async function(app) {
     await createGlobalPhase(phase);
   }
   
-  await createDummyKarta();
+  await createIntroKarta();
 };
