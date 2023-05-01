@@ -12,7 +12,7 @@ const salesForceInfo = {
 }
 
 const salesForceModels = {
-    fullName: "Name",
+    fullName: "FullName__c",
     userName: "Name",
     mobile: "MobilePhone",
     mobileVerified: "MobileVerified__c",
@@ -48,6 +48,7 @@ exports.sales_login = () => {
 
 exports.sales_user_details = async (user) => {
     try {
+        user = JSON.parse(JSON.stringify(user));
         let mobile = user.mobile ? user.mobile.e164Number.split(user.mobile.dialCode).join("") : ( user.__data.mobile ? user.__data.mobile.e164Number.split(user.__data.mobile.dialCode).join("") : null);
         let userObject = {
             FullName__c: user.fullName || user.userName || user.__data.fullName || user.__data.userName || "-",
@@ -61,7 +62,7 @@ exports.sales_user_details = async (user) => {
             UserLastUpdated__c: moment(user.updatedAt).format('DD/MM/YYYY, HH:mm A') || moment(user.__data.updatedAt).format('DD/MM/YYYY, HH:mm A'),
             CompanyName__c: user.companyName || "-",
             Designation__c: user.role || "-",
-            Department: user.department || "-",
+            Department: user.__data ? user.__data.department : ( user.department || "-" ),
             License__c: user.license || user.__data.license || "-",
             Address__c: user.address || "-"
         }
@@ -83,10 +84,17 @@ exports.sales_update_user = (user, data) => {
             Id : user.sforceId,
         };
         Object.keys(data).forEach(key => {
+            // For timestamp values and simple values
             if (salesForceModels[key]) {
                 updateObj[salesForceModels[key]] = timeValues.includes(key) ? moment(data[key]).format('DD/MM/YYYY, HH:mm A') : data[key];
             }
-        })
+            // For mobile value
+            if (key == "mobile") {
+                let mobile = (key == "mobile") ? data[key].e164Number.split(data[key].dialCode).join("") : ( data.__data[key] ? data.__data[key].e164Number.split(data.__data[key].dialCode).join("") : null);
+                updateObj[salesForceModels[key]] = mobile;
+            }
+        });
+        delete updateObj["Name"];
         conn.sobject(salesForceInfo.contactModel).update( updateObj , function(err, ret) {
             if (err || !ret.success) { 
                 console.error(err, ret); 

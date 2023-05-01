@@ -682,8 +682,12 @@ module.exports = function(User) {
       if (mobile) query = { mobile, mobileVerified: true, mobileVerificationCode: '' }
       else query = { mobileVerified: true, mobileVerificationCode: '' }
 
-      this.app.currentUser.updateAttributes(query, (err)=>{
-        next(null, true);
+      this.app.currentUser.updateAttributes(query, (err) => {
+        if (err) next(err);
+        else {
+          sales_update_user( this.app.currentUser, { mobileVerified: true });
+          next(null, true);
+        }
       });
     } else {
       let error = new Error("Invalid Code");
@@ -760,6 +764,7 @@ module.exports = function(User) {
   User.toggle2FA = function(type, next) {
     const toggle = () => {
       this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
+        sales_update_user( this.app.currentUser, { _2faEnabled: type });
         next(err, type);
       });
     }
@@ -1186,6 +1191,15 @@ module.exports = function(User) {
     else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
+        User.app.models.user.findOne({ where: { id: req.body.userId }, include: ["department", "role"]}, ( err, changedUser ) => {
+          if (err) next(err);
+          else {
+            changedUser = JSON.parse(JSON.stringify(changedUser));
+            req.body['department'] = changedUser.department ? changedUser.department.name : "-";
+            req.body['designation'] = changedUser.role.name;
+          }
+          sales_update_user( changedUser, req.body );
+        });
         next();
       });
     }
