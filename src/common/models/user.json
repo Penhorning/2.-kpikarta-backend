@@ -610,7 +610,7 @@
         "path": "/unblock"
       }
     },
-    "delete": {
+    "deleteUser": {
       "accepts": [
         {
           "arg": "userId",
@@ -622,8 +622,8 @@
         "type": "boolean"
       },
       "http": {
-        "verb": "put",
-        "path": "/delete"
+        "verb": "post",
+        "path": "/delete-user"
       }
     },
     "getRoles": {
