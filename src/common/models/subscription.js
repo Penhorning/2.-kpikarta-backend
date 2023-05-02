@@ -497,7 +497,8 @@ module.exports = function (Subscription) {
       if (cardHolder) {
         const findUsers = await Subscription.find({ where: { companyId }, include: ["license", {relation: "user", scope: { where: { is_deleted: false }}}] });
         let userObj = {
-          interval: ""
+          interval: "",
+          trialEnds: "",
         };
         let tracker = {
           Creator: {
@@ -549,6 +550,7 @@ module.exports = function (Subscription) {
         } else {
           for ( let i = 0; i < findUsers.length; i++) {
             let currentUser = findUsers[i];
+            userObj.trialEnds = moment(Number(currentUser.trialEnds) * 1000).format("DD/MM/yyyy");
             let licenseName = currentUser.license().name;
             let interval = currentUser.currentPlan;
             let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });

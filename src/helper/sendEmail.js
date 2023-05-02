@@ -13,7 +13,7 @@ exports.sendEmail = (app, params, callback) => {
         }
         app.models.Email.send({
             to: params.email,
-            from: app.dataSources.email.settings.transports[0].auth.user,
+            from: `<${process.env.APP_NAME}>${app.dataSources.email.settings.transports[0].auth.user}`,
             subject: params.subject,
             html
         }, function(err) {
