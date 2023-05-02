@@ -1,6 +1,6 @@
 module.exports = {
   "db": {
-    "host": "localhost",
+    "host": "127.0.0.1",
     "database": process.env.DB,
     "name": "db",
     "connector": "mongodb",

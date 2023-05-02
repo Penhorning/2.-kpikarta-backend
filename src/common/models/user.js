@@ -1273,7 +1273,7 @@ module.exports = function(User) {
                   }
                   // Assign roleId, licenseId and companyId
                   let userDetails = {
-                    ...user,
+                    ...user.__data,
                     companyName: company.name,
                     license: license.name,
                     role: role.name
