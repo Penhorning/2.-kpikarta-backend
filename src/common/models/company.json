@@ -22,6 +22,9 @@
     },
     "job_title": {
       "type": "string"
+    },
+    "is_deleted": {
+      "type": "boolean"
     }
   },
   "validations": [],
