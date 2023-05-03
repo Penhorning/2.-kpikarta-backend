@@ -28,6 +28,9 @@
       "is_global": {
         "type": "boolean"
       },
+      "is_deleted": {
+        "type": "boolean"
+      },
       "required": true
     }
   },

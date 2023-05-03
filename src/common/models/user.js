@@ -9,6 +9,7 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
+const { cancel_user_subscription, delete_customer_by_id } = require("../../helper/stripe");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -315,7 +316,7 @@ module.exports = function(User) {
             const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
             const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
             let userDetails = {
-              ...user,
+              ...user.__data,
               companyName: creator.companyName,
               license: licenseDetails.name,
               role: roleDetails.name,
@@ -682,8 +683,12 @@ module.exports = function(User) {
       if (mobile) query = { mobile, mobileVerified: true, mobileVerificationCode: '' }
       else query = { mobileVerified: true, mobileVerificationCode: '' }
 
-      this.app.currentUser.updateAttributes(query, (err)=>{
-        next(null, true);
+      this.app.currentUser.updateAttributes(query, (err) => {
+        if (err) next(err);
+        else {
+          sales_update_user( this.app.currentUser, { mobileVerified: true });
+          next(null, true);
+        }
       });
     } else {
       let error = new Error("Invalid Code");
@@ -760,6 +765,7 @@ module.exports = function(User) {
   User.toggle2FA = function(type, next) {
     const toggle = () => {
       this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
+        sales_update_user( this.app.currentUser, { _2faEnabled: type });
         next(err, type);
       });
     }
@@ -865,18 +871,144 @@ module.exports = function(User) {
     });
   }
 
-  // Delete user
-  User.delete = function(userId, next) {
-    User.findOne({ where: { "_id": userId } }, (err, user) => {
+  // Migrate data to other user
+  const DataMigration = (user, userId) => {
+    if (user.creatorId) {
+      // 1. Delete user from salesforce
+      sales_delete_user(user.sforceId);
+
+      // 2. Reassigning the kartas of the deleted user to it's creator
+      User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
+        if (err) return err;
+      });
+
+      // 3. Reassigning the inventories of the deleted user to it's creator
+      User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
+        if (err) return err;
+      });
+
+      // 4. Reassigning the color settings of the deleted user to it's creator
+      User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
+        if (err) return err;
+      });
+
+      // 5. Reassigning the suggestions of the deleted user to it's creator
+      User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
+        if (err) return err;
+      });
+
+      // 6. Reassigning the karta phase of the deleted user to it's creator
+      User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
+        if (err) return err;
+      });
+
+      // 7. Delete Subscription after Check weather the user has Spectator licene or not
+      if (user.license().name !== "Spectator") {
+        // If not, then find the user on subscription model
+        User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
+          if (err) return err;
+          else {
+            // Cancel its subscription
+            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
+              cancel_user_subscription(subscription.subcriptionId);
+            }
+            User.app.models.subscription.deleteAll({ userId }, (err, subscriptionDelete) => {
+              if (err) return err;
+            });
+          }
+        })
+      }
+
+      // 8. Find and delete its invited members
+      User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
+        if (err) return err;
+      });
+
+    } else {
+      // 1. Delete users from salesforce
+      User.find({ where: { companyId: user.companyId }}, (err, users) => {
+        if(err) return err;
+        else {
+          for (let companyUser of users) {
+            sales_delete_user(companyUser.sforceId);
+          }
+        }
+      });
+
+      // 2. Reassigning the kartas of the deleted user to it's creator
+      User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
+        if (err) return err;
+      });
+
+      // 3. deleting the inventories of the deleted user
+      User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
+        if (err) return err;
+      });
+
+      // 4. Reassigning the color settings of the deleted user to it's creator
+      User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
+        if (err) return err;
+      });
+
+      // 5. Reassigning the suggestions of the deleted user to it's creator
+      User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
+        if (err) return err;
+      });
+
+      // 6. Reassigning the karta phase of the deleted user to it's creator
+      User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
+        if (err) return err;
+      });
+
+      // 7. Delete Subscription after Check weather the user has Spectator licene or not
+      User.app.models.subscription.find({ where: { companyId: user.companyId }}, (err, subscriptions) => {
+        if (subscriptions.length > 0) {
+          for (let i = 0; i < subscriptions.length; i++) {
+            let subscription = subscriptions[i];
+            // Cancel its subscription
+            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
+              cancel_user_subscription(subscription.subcriptionId);
+              if(i == subscriptions.length - 1 && subscription.customerId) delete_customer_by_id(subscription.customerId);
+            }
+            User.app.models.subscription.deleteAll({ userId: subscription.userId }, (err, subscriptionDelete) => {
+              if (err) return err;
+            });
+          }
+        }
+      });
+
+      // 8. Find and delete all members of company admin
+      User.find({ where: { companyId: user.companyId }}, (err, members) => {
+        if (err) return err;
+        else {
+          if (members.length > 0) {
+            for (let member of members) {
+              member.is_deleted = true;
+              member.active = false;
+              member.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
+              member.save();
+            }
+          }
+        }
+      });
+    }
+  }
+
+  // Delete user/member from admin panel
+  User.deleteUser = (userId, next) => {
+    // Find User
+    User.findOne({ where: { "_id": userId }, include: "license" }, (err, user) => {
       if (err) next(err);
       else if (!user) {
         let error = new Error("User not found!");
         error.status = 404;
         next(error);
       } else {
+        // To check if its a social user
         User.app.models.userIdentity.findOne({ userId }, (err, resp) => {
           if (err) next(err);
           if (resp) {
+            // Delete the user from social table
             User.app.models.userIdentity.remove({ userId }, (err, resp) => {
               if (err) next(err);
             });
@@ -886,11 +1018,14 @@ module.exports = function(User) {
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
         user.save();
-        sales_delete_user(user.sforceId);
-        next(null, true);
+
+        // It migrates the data
+        const errorCheck = DataMigration(user, userId);
+        if (errorCheck) next(errorCheck);
+        else next(null, true);
       }
     });
-  };
+  }
 
   // Get Roles
   User.getRoles = function(next) {
@@ -1186,6 +1321,15 @@ module.exports = function(User) {
     else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
+        User.app.models.user.findOne({ where: { id: req.body.userId }, include: ["department", "role"]}, ( err, changedUser ) => {
+          if (err) next(err);
+          else {
+            changedUser = JSON.parse(JSON.stringify(changedUser));
+            req.body['department'] = changedUser.department ? changedUser.department.name : "-";
+            req.body['designation'] = changedUser.role.name;
+          }
+          sales_update_user( changedUser, req.body );
+        });
         next();
       });
     }
