@@ -229,6 +229,17 @@ exports.attach_payment_method = async (paymentMethodId, cutomerId) => {
         return err;
     }
 }
+
+// DELETE CUSTOMER
+exports.delete_customer_by_id = async (customerId) => {
+    try {
+        const response = await stripe.customers.del(customerId);
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
 //----------------
 
 // ----------------- SETUPINTENT APIS --------------------
