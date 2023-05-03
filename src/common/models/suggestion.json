@@ -23,6 +23,9 @@
           "description": "string"
         }
       ]
+    },
+    "is_deleted": {
+      "type": "boolean"
     }
   },
   "validations": [],
