@@ -527,16 +527,16 @@ module.exports = function (Kartanode) {
       query = {};
       // Find current user details
       Kartanode.app.models.user.findOne({ where: { "_id": userId, "is_deleted": false } }, (err, user) => {
-        let kartaId = "";
-        Kartanode.findOne({ where: { "contributorId": userId, "is_deleted": false } }, (err, result) => {
-          if (result) kartaId = result.kartaDetailId;
+        let kartaIds = [];
+        Kartanode.find({ where: { "contributorId": userId, "is_deleted": false } }, (err, result) => {
+          if (result) kartaIds = result.map(item => item.kartaDetailId);
           all_kpi_query = {
             $and: [
               { $or: [{ "node_type" : "measure" }, { "node_type" : "metrics" }] },
               { $or: [
                 { "karta.userId": convertIdToBSON(userId) },
                 { "karta.sharedTo.email": user.email },
-                { "kartaDetailId": kartaId }
+                { "kartaDetailId": { $in: kartaIds } }
               ] }
             ]
           };

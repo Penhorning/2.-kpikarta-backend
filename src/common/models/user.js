@@ -882,6 +882,11 @@ module.exports = function(User) {
         if (err) return err;
       });
 
+      // Resetting contributor's id
+      User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
+        if (err) return err;
+      });
+
       // 3. Reassigning the inventories of the deleted user to it's creator
       User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
         if (err) return err;

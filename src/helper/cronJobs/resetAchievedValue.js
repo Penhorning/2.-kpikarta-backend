@@ -59,6 +59,11 @@ exports.resetAchievedValueCron = (app) => {
         ],
         "due_date": { lte: todayDate }
       }
+
+      // Prevent sample karta from reset
+      const sampleKarta = await app.models.karta.findOne({ where: { sample: true, name: "Sample Karta" } });
+      if (sampleKarta) query["kartaDetailId"] = { neq: sampleKarta.id };
+
       const nodes = await app.models.KartaNode.find({ where: query });
       if (nodes && nodes.length > 0) {
         console.log(`==========>>>>> ${nodes.length} NODES FOUND FOR RESETTING THE ACHIEVED VALUE & DUE DATE`);

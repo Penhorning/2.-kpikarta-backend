@@ -305,7 +305,8 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
           $match: query
         },
         SEARCH_MATCH,
-        USER_LOOKUP(findBy, type),
+        // USER_LOOKUP(findBy, type),
+        ALL_USER_LOOKUP,
         UNWIND_USER,
         SORT,
         FACET(page, limit)
