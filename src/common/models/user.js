@@ -882,6 +882,11 @@ module.exports = function(User) {
         if (err) return err;
       });
 
+      // Resetting contributor's id
+      User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
+        if (err) return err;
+      });
+
       // 3. Reassigning the inventories of the deleted user to it's creator
       User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
         if (err) return err;
@@ -935,7 +940,7 @@ module.exports = function(User) {
         }
       });
 
-      // 2. Reassigning the kartas of the deleted user to it's creator
+      // 2. Reassigning the karta of the deleted user to it's creator
       User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
         if (err) return err;
       });
@@ -961,7 +966,7 @@ module.exports = function(User) {
       });
 
       // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      User.app.models.subscription.find({ where: { companyId: user.companyId }}, (err, subscriptions) => {
+      User.app.models.subscription.find({ where: { "companyId": user.companyId }}, (err, subscriptions) => {
         if (subscriptions.length > 0) {
           for (let i = 0; i < subscriptions.length; i++) {
             let subscription = subscriptions[i];
@@ -978,7 +983,7 @@ module.exports = function(User) {
       });
 
       // 8. Find and delete all members of company admin
-      User.find({ where: { companyId: user.companyId }}, (err, members) => {
+      User.find({ where: { "companyId": user.companyId }}, (err, members) => {
         if (err) return err;
         else {
           if (members.length > 0) {
@@ -987,9 +992,16 @@ module.exports = function(User) {
               member.active = false;
               member.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
               member.save();
+
+              User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
             }
           }
         }
+      });
+
+      // 9. Delete user's company
+      User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
+        if (err) return err;
       });
     }
   }
@@ -997,7 +1009,7 @@ module.exports = function(User) {
   // Delete user/member from admin panel
   User.deleteUser = (userId, next) => {
     // Find User
-    User.findOne({ where: { "_id": userId }, include: "license" }, (err, user) => {
+    User.findOne({ where: { "_id": userId }, include: ["license", "company"] }, (err, user) => {
       if (err) next(err);
       else if (!user) {
         let error = new Error("User not found!");
