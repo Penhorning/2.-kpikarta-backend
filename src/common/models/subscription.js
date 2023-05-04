@@ -165,6 +165,14 @@ module.exports = function (Subscription) {
 
           // Confirm a payment from the Card
           const paymentIntent = await create_payment_intent(customer.id, card.id, 50);
+          
+          // Consoles for Live Check Below --------------------
+          console.log(paymentIntent, 'paymentIntent');
+          console.log('Card Payment Success -->>');
+          console.log(paymentIntent.status, 'Payment Intent Status -->>');
+          console.log(paymentIntent.statusCode, 'Payment Intent Status Code -->>');
+          // Consoles for Live Check Above --------------------
+
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
