@@ -165,6 +165,14 @@ module.exports = function (Subscription) {
 
           // Confirm a payment from the Card
           const paymentIntent = await create_payment_intent(customer.id, card.id, 50);
+          
+          // Consoles for Live Check Below --------------------
+          console.log(paymentIntent, 'paymentIntent');
+          console.log('Card Payment Success -->>');
+          console.log(paymentIntent.status, 'Payment Intent Status -->>');
+          console.log(paymentIntent.statusCode, 'Payment Intent Status Code -->>');
+          // Consoles for Live Check Above --------------------
+
           if(paymentIntent.statusCode == 402 || paymentIntent.statusCode == 404) {
             let error = new Error(paymentIntent.raw.message || "Payment Intent error..!!");
             error.status = 404;
@@ -493,12 +501,15 @@ module.exports = function (Subscription) {
 
   Subscription.getSubscribedUsers = async (companyId) => {
     try {
+      // Find Card Holder
       const cardHolder = await Subscription.findOne({ where: { companyId , cardHolder: true }});
       if (cardHolder) {
+        // Find All members of Company
         const findUsers = await Subscription.find({ where: { companyId }, include: ["license", {relation: "user", scope: { where: { is_deleted: false }}}] });
         let userObj = {
           interval: "",
           trialEnds: "",
+          trialStarts: "",
         };
         let tracker = {
           Creator: {
@@ -550,7 +561,8 @@ module.exports = function (Subscription) {
         } else {
           for ( let i = 0; i < findUsers.length; i++) {
             let currentUser = findUsers[i];
-            userObj.trialEnds = moment(Number(currentUser.trialEnds) * 1000).format("DD/MM/yyyy");
+            userObj.trialEnds = moment(Number(currentUser.trialEnds) * 1000).format("MM/DD/yyyy");
+            userObj.trialStarts = moment(currentUser.createdAt).format("MM/DD/yyyy");
             let licenseName = currentUser.license().name;
             let interval = currentUser.currentPlan;
             let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
