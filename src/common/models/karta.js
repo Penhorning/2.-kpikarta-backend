@@ -744,7 +744,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
       }
 
       // Find all versions which was created before the requested time
-      const versions = await Karta.app.models.karta_version.find({ where: query });
+      const versions = await Karta.app.models.karta_version.find({ where: query, order: "createdAt ASC" });
       if (versions.length > 0) {
         // Getting lastest versions from that
         const latestVersion = versions[versions.length - 1];
@@ -775,7 +775,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
                   if (currentOldOptions.hasOwnProperty(key)) {
                     // Third check, to compare the type of values
                     if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
-                      currentOldOptions[key] === lastHistoryObject.old_options[key] ? flagCheck = true : flagCheck = false;
+                      (currentOldOptions[key] === lastHistoryObject.old_options[key] && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
                     } else if (typeof lastHistoryObject.old_options[key] === 'object') {
                       Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
                     } else {

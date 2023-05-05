@@ -80,7 +80,12 @@ exports.resetAchievedValueCron = (app) => {
           } else if (node.target[0].frequency === "yearly") {
             new_due_date = moment().add(1, 'years');
           }
-          await app.models.KartaNode.update({ "_id": node.id }, { "achieved_value": 0, "due_date": new_due_date });
+
+          // Reset percentage
+          node.target[0].percentage = 0;
+          
+          const updateQuery = { "achieved_value": 0, "target.0.percentage": 0, "due_date": new_due_date._d };
+          await app.models.KartaNode.update({ "_id": node.id }, { $set: updateQuery });
 
           console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET`);
           
