@@ -10,6 +10,7 @@ const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
 const { cancel_user_subscription, delete_customer_by_id } = require("../../helper/stripe");
+const { update_subscription } = require("../../helper/chargebee");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -260,6 +261,36 @@ module.exports = function(User) {
       return { success: true, msg: error };
     }
   }
+  // Update subscription
+  const updateSubscription = async (companyId, license, userId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
+    const subscriptionData = {
+      subscription_id: subscription.subscriptionId,
+      license_count: totalPaidUsers
+    }
+    if (subscription && subscription.frequency === "year" && license.name === "Creator") {
+      subscriptionData.plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+      subscriptionData.addOnIndex = 2;
+    }
+    else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
+      subscriptionData.plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+      subscriptionData.addOnIndex = 2;
+    }
+    else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
+      subscriptionData.plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      subscriptionData.addOnIndex = 1;
+    }
+    else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
+      subscriptionData.plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      subscriptionData.addOnIndex = 1;
+    }
+    const subscriptionResponse = await update_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      const { status } = subscriptionResponse.data.subscription;
+      await User.update({ "_id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
+    }
+  }
 
 
 
@@ -299,7 +330,7 @@ module.exports = function(User) {
     email = email.toLowerCase();
     
     // Create user
-    User.create({ fullName, email, "emailVerified": true, "paymentVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -315,15 +346,17 @@ module.exports = function(User) {
             const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
             const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
             const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            const companyDetails = await User.app.models.company.findOne({ where: { "id": creator.companyId }});
+
             let userDetails = {
               ...user.__data,
-              companyName: creator.companyName,
+              companyName: companyDetails.name,
               license: licenseDetails.name,
               role: roleDetails.name,
               department: departmentDetails.name,
             }
             let ret = await sales_user_details(userDetails);
-            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, err => {
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, async (err) => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
@@ -342,6 +375,8 @@ module.exports = function(User) {
                 sendEmail(User.app, data, async () => {
                   await user.updateAttributes({ password });
                 });
+                // Assign license and update subscription in chargebee
+                if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id);
               }
             });
           });
@@ -352,7 +387,6 @@ module.exports = function(User) {
 
   // Send credentials
   User.sendCredentials = (userId, next) => {
-
     const password = generatePassword();
     
     // Update new password
@@ -486,6 +520,56 @@ module.exports = function(User) {
           next(err, result.length);
         });
       });
+    });
+  }
+
+  // Get user count stats
+  User.countStats = (userId, next) => {
+    User.findById(userId, async (err, user) => {
+      if (err) return next(err);
+      else {
+        userId = User.getDataSource().ObjectID(userId);
+        let query = { "companyId": user.companyId };
+        if (user.departmentId) query.departmentId = user.departmentId;
+
+        const spectatorLicense = await User.app.models.license.findOne({ where: { name: "Spectator" }});
+        const championLicense = await User.app.models.license.findOne({ where: { name: "Champion" }});
+        const creatorLicense = await User.app.models.license.findOne({ where: { name: "Creator" }});
+
+        query.licenseId = spectatorLicense.id;
+        User.count(query, (err, result) => {
+          if (err) {
+            console.log('> error while Spectator users', err);
+            let error = err;
+            error.status = 500;
+            return next(error);
+          }
+          query.licenseId = championLicense.id;
+          User.count(query, (err2, result2) => {
+            if (err2) {
+              console.log('> error while fetching Champion users', err);
+              let error = err2;
+              error.status = 500;
+              return next(error);
+            }
+            query.licenseId = creatorLicense.id;
+            User.count(query, (err3, result3) => {
+              if (err3) {
+                console.log('> error while fetching Creator users', err);
+                let error = err3;
+                error.status = 500;
+                return next(error);
+              }
+              let data = [
+                { license: "Creator", count: result3 || 0 },
+                { license:"Champion", count: result2 || 0 },
+                { license: "Spectator", count: result || 0 }
+              ]
+              next(null, data);
+            });
+          });
+        });
+      }
     });
   }
 
@@ -642,17 +726,6 @@ module.exports = function(User) {
       next(error);
     }
   };
-
-  User.verifyPaymentMethod = function(next) {
-    this.app.currentUser.updateAttributes({ "paymentVerified": true}, (error)=>{
-      if(error) {
-        let error = new Error("Invalid Code");
-        error.status = 400;
-        next(error);
-      }
-      next(error, this.app.currentUser);
-    });
-  };
   
   // Send email code
   User.sendEmailCode = function(next) {
@@ -746,12 +819,6 @@ module.exports = function(User) {
       });
     }
   };
-  // Assign plan
-  User.selectPlan = function(plan, next) {
-    this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
-      next(err, this.app.currentUser);
-    });
-  };
   // Check 2FA config
   User.check2FAConfig = function(next) {
     let data = {
@@ -788,7 +855,7 @@ module.exports = function(User) {
         next(error);
       }
       else if (user.creatorId) {
-        User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
+        User.updateAll({ "_id": userId }, { "active" : false }, async (err) => {
           // Creating Email Object for Block User
           const emailObj = {
             subject: `Your account is blocked`,
@@ -799,6 +866,8 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
+          await updateSubscription(user.companyId, licenseDetails, userId);
         });
       } else {
         User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
@@ -826,7 +895,7 @@ module.exports = function(User) {
       }
       // Unblocking a member of a company
       else if (user.creatorId) {
-        User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+        User.updateAll({ "_id": userId }, { "active" : true }, async (err) => {
           const emailObj = {
             subject: `Your account is unblocked`,
             template: "block-unblock.ejs",
@@ -836,6 +905,8 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
+          await updateSubscription(user.companyId, licenseDetails, userId);
         });
       } 
       // Unblocking the whole company with members
@@ -1333,7 +1404,7 @@ module.exports = function(User) {
     else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
-        User.app.models.user.findOne({ where: { id: req.body.userId }, include: ["department", "role", "license"]}, ( err, changedUser ) => {
+        User.findOne({ where: { "id": req.body.userId }, include: ["department", "role", "license"]}, ( err, changedUser ) => {
           if (err) next(err);
           else {
             changedUser = JSON.parse(JSON.stringify(changedUser));
@@ -1344,6 +1415,19 @@ module.exports = function(User) {
           sales_update_user( changedUser, req.body );
         });
         next();
+      });
+
+      // Change license and update subscription in chargebee
+      User.app.models.license.findOne({ where: { "id": req.body.licenseId } }, async (err, newLicense) => {
+        if (!err) {
+          const oldLicense = await User.app.models.license.findOne({ where: { "id": req.body.oldLicense } });
+          if (oldLicense.name !== newLicense.name) {
+            // Change new license count
+            if (newLicense.name !== "Spectator") await updateSubscription(userInstance.companyId, newLicense, req.body.userId);
+            // Change old license count
+            if (oldLicense.name !== "Spectator") await updateSubscription(userInstance.companyId, oldLicense, req.body.userId);
+          }
+        } 
       });
     }
     // Remove old profile picture, if user upload any new picture
