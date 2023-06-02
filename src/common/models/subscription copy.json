@@ -1,0 +1,511 @@
+{
+  "name": "subscription",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true,
+    "mongodb": {
+      "collection": "subscription",
+      "allowExtendedOperators": true
+    }
+  },
+  "mixins": {
+    "TimeStamp": {
+      "required": true,
+      "validateUpsert": true,
+      "silenceWarnings": true
+    }
+  },
+  "properties": {
+    "userId": {
+      "type": "string",
+      "required": true
+    },
+    "companyId": {
+      "type": "string"
+    },
+    "customerId": {
+      "type": "string",
+      "required": true
+    },
+    "cardId": {
+      "type": "string",
+      "required": true
+    },
+    "tokenId": {
+      "type": "string",
+      "required": true
+    },
+    "subscriptionId": {
+      "type": "string"
+    },
+    "trialActive": {
+      "type": "boolean",
+      "default": false
+    },
+    "trialEnds": {
+      "type": "number"
+    },
+    "status": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentSubscriptionDate": {
+      "type": "string"
+    },
+    "nextSubscriptionDate": {
+      "type": "string"
+    },
+    "cronCheck": {
+      "type": "boolean",
+      "default": false
+    },
+    "cardHolder": {
+      "type": "boolean",
+      "default": false
+    },
+    "currentPlan": {
+      "type": "string"
+    },
+    "licenseId": {
+      "type": "string"
+    },
+    "testClock": {
+      "type": "string"
+    }
+  },
+  "validations": [],
+  "relations": {
+    "user": {
+      "type": "belongsTo",
+      "model": "user",
+      "foreignKey": "userId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "license": {
+      "type": "belongsTo",
+      "model": "license",
+      "foreignKey": "licenseId",
+      "options": {
+        "nestRemoting": true
+      }
+    },
+    "company": {
+      "type": "belongsTo",
+      "model": "company",
+      "foreignKey": "companyId",
+      "options": {
+        "nestRemoting": true
+      }
+    }
+  },
+  "acls": [],
+  "methods": {
+    "getPlans": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plans",
+        "verb": "get"
+      }
+    },
+    "assignPlan": {
+      "accepts": [
+        {
+          "arg": "companyId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/assign-plan",
+        "verb": "post"
+      }
+    },
+    "createPrice": {
+      "accepts": [
+        {
+          "arg": "nickname",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "amount",
+          "type": "number",
+          "required": true
+        },
+        {
+          "arg": "interval",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        },
+        {
+          "arg": "licenseType",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/create-price",
+        "verb": "post"
+      }
+    },
+    "getCards": {
+      "accepts": [
+        {
+          "arg": "companyId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-cards",
+        "verb": "post"
+      }
+    },
+    "blockSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/block-subscription",
+        "verb": "post"
+      }
+    },
+    "unblockSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/unblock-subscription",
+        "verb": "post"
+      }
+    },
+    "deleteSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "message",
+        "type": "string"
+      },
+      "http": {
+        "path": "/delete-subscription",
+        "verb": "post"
+      }
+    },
+    "getSubscribedUsers": {
+      "accepts": [
+        {
+          "arg": "companyId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-subscription-users",
+        "verb": "post"
+      }
+    },
+    "getOfflineUsers": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-dashboard-users",
+        "verb": "post"
+      }
+    },
+    "getInvoices": {
+      "accepts": [
+        {
+          "arg": "companyId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-invoices",
+        "verb": "post"
+      }
+    },
+    "getInvoicesForAdmin": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string"
+        },
+        {
+          "arg": "previousId",
+          "type": "string"
+        },
+        {
+          "arg": "nextId",
+          "type": "string"
+        },
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "invoices",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices",
+        "verb": "post"
+      }
+    },
+    "getInvoicesForAdminChart": {
+      "accepts": [
+        {
+          "arg": "startDate",
+          "type": "string"
+        },
+        {
+          "arg": "endDate",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-admin-invoices-chart",
+        "verb": "post"
+      }
+    },
+    "getPrices": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-prices",
+        "verb": "get"
+      }
+    },
+    "createSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "data",
+        "type": "string"
+      },
+      "http": {
+        "path": "/create-subscription",
+        "verb": "post"
+      }
+    },
+    "getPricesForAdmin": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-admin-plans",
+        "verb": "get"
+      }
+    },
+    "getPriceByIdForAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plan",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-plan",
+        "verb": "post"
+      }
+    },
+    "updatePlansByAdmin": {
+      "accepts": [
+        {
+          "arg": "priceId",
+          "type": "string"
+        },
+        {
+          "arg": "amount",
+          "type": "string"
+        },
+        {
+          "arg": "name",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "plans",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-admin-plans",
+        "verb": "post"
+      }
+    },
+    "cancelSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "subscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-subscription",
+        "verb": "post"
+      }
+    },
+    "updateSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "licenseName",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "subscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/update-subscription",
+        "verb": "post"
+      }
+    },
+    "getUserCount": {
+      "accepts": [],
+      "returns": {
+        "arg": "count",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-user-count",
+        "verb": "get"
+      }
+    },
+    "cancelTrial": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "trialResponse",
+        "type": "string"
+      },
+      "http": {
+        "path": "/cancel-trial",
+        "verb": "post"
+      }
+    },
+    "startSubscription": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string"
+        },
+        {
+          "arg": "plan",
+          "type": "string"
+        }
+      ],
+      "returns": {
+        "arg": "startSubscription",
+        "type": "string"
+      },
+      "http": {
+        "path": "/start-subscription",
+        "verb": "post"
+      }
+    }
+  }
+}

@@ -46,6 +46,18 @@
       "type": "boolean",
       "default": false
     },
+    "paymentVerified": {
+      "type": "boolean",
+      "default": false
+    },
+    "paymentFailed": {
+      "type": "boolean",
+      "default": false
+    },
+    "trialCancelled": {
+      "type": "boolean",
+      "default": false
+    },
     "street": {
       "type": "string"
     },
@@ -69,10 +81,6 @@
     },
     "sforceId": {
       "type": "string"
-    },
-    "subscriptionStatus": {
-      "type": "string",
-      "default": "none"
     },
     "active": {
       "type": "boolean",
@@ -120,7 +128,7 @@
       "foreignKey": "creatorId"
     },
     "subscription": {
-      "type": "belongsTo",
+      "type": "hasOne",
       "model": "subscription",
       "foreignKey": "subscriptionId"
     },
@@ -225,6 +233,18 @@
       "http": {
         "verb": "post",
         "path": "/verify-email"
+      }
+    },
+    "verifyPaymentMethod": {
+      "accepts": [],
+      "returns": {
+        "arg": "data",
+        "type": "user",
+        "root": true
+      },
+      "http": {
+        "verb": "post",
+        "path": "/verify-payment"
       }
     },
     "sendMobileCode": {
@@ -538,23 +558,6 @@
       },
       "http": {
         "path": "/count",
-        "verb": "post"
-      }
-    },
-    "countStats": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "user",
-        "type": "array"
-      },
-      "http": {
-        "path": "/get-count-stats",
         "verb": "post"
       }
     },
