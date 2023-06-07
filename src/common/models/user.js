@@ -1326,7 +1326,7 @@ module.exports = function(User) {
     } else next();
   });
 
-  // Before user udpate
+  // Before user update
   User.beforeRemote('prototype.patchAttributes', function(context, instance, next) {
     const req = context.req;
     const user = context.instance;
@@ -1427,12 +1427,13 @@ module.exports = function(User) {
     else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
-        User.findOne({ where: { "id": req.body.userId }, include: ["department", "role"]}, ( err, changedUser ) => {
+        User.findOne({ where: { "id": req.body.userId }, include: ["department", "role", "license"]}, ( err, changedUser ) => {
           if (err) next(err);
           else {
             changedUser = JSON.parse(JSON.stringify(changedUser));
             req.body['department'] = changedUser.department ? changedUser.department.name : "-";
             req.body['designation'] = changedUser.role.name;
+            changedUser.license.name ? req.body['licenseType'] = changedUser.license.name : null;
           }
           sales_update_user( changedUser, req.body );
         });
