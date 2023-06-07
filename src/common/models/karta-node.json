@@ -113,6 +113,9 @@
     "last_alert_sent_on": {
       "type": "date"
     },
+    "reset_on": {
+      "type": "date"
+    },
     "sample": {
       "type": "boolean"
     }

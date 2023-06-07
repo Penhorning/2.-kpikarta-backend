@@ -9,8 +9,7 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
-const { cancel_user_subscription, delete_customer_by_id } = require("../../helper/stripe");
-const { update_subscription } = require("../../helper/chargebee");
+const { update_subscription, pause_subscription, resume_subscription, delete_subscription } = require("../../helper/chargebee");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -264,31 +263,83 @@ module.exports = function(User) {
   // Update subscription
   const updateSubscription = async (companyId, license, userId) => {
     const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
-    const totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
+    let totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
+    let replaceItems = false;
+    // Check if total paid users of particular license is 0, then remove that
+    if (totalPaidUsers < 1) {
+      replaceItems = true;
+      // Find all the champion users, if creator license count is 0
+      if (license.name === "Creator") {
+        const championLicense = await User.app.models.license.findOne({ where: { name: "Champion" }});
+        totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": championLicense.id });
+      }
+      // Find all the creator users, if champion license count is 0
+      else {
+        const creatorLicense = await User.app.models.license.findOne({ where: { name: "Creator" }});
+        totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": creatorLicense.id });
+      }
+    }
     const subscriptionData = {
       subscription_id: subscription.subscriptionId,
-      license_count: totalPaidUsers
+      license_count: totalPaidUsers,
+      replaceItems
     }
     if (subscription && subscription.frequency === "year" && license.name === "Creator") {
-      subscriptionData.plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
-      subscriptionData.addOnIndex = 2;
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
     }
     else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
-      subscriptionData.plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
-      subscriptionData.addOnIndex = 2;
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
     }
     else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
-      subscriptionData.plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
-      subscriptionData.addOnIndex = 1;
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
     }
     else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
-      subscriptionData.plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-      subscriptionData.addOnIndex = 1;
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
     }
     const subscriptionResponse = await update_subscription(subscriptionData);
     if (subscriptionResponse.status === 200) {
       const { status } = subscriptionResponse.data.subscription;
       await User.update({ "_id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
+      await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+    }
+  }
+  // Pause subscription
+  const pauseSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    if (subscription.status !== "in_trial") {
+      const subscriptionResponse = await pause_subscription(subscriptionData);
+      if (subscriptionResponse.status === 200) {
+        const { status } = subscriptionResponse.data.subscription;
+        await User.updateAll({ companyId }, { "subscriptionStatus": status });
+        await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+      }
+    }
+  }
+  // Resume subscription
+  const resumeSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    const subscriptionResponse = await resume_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      const { status } = subscriptionResponse.data.subscription;
+      await User.updateAll({ companyId }, { "subscriptionStatus": status });
+      await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+    }
+  }
+  // Delete subscription
+  const deleteSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    const subscriptionResponse = await delete_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      const { status } = subscriptionResponse.data.subscription;
+      await User.updateAll({ companyId }, { "subscriptionStatus": status });
+      await User.app.models.subscription.update({ "id": subscription.id }, { "status": "deleted", "subscriptionDetails": subscriptionResponse.data.subscription });
     }
   }
 
@@ -854,9 +905,10 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
+      // If user has creatorId, then it is a member
       else if (user.creatorId) {
         User.updateAll({ "_id": userId }, { "active" : false }, async (err) => {
-          // Creating Email Object for Block User
+          // Send email for blocked user
           const emailObj = {
             subject: `Your account is blocked`,
             template: "block-unblock.ejs",
@@ -867,11 +919,13 @@ module.exports = function(User) {
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
           const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
-          await updateSubscription(user.companyId, licenseDetails, userId);
+          if (licenseDetails.name !== "Spectator") await updateSubscription(user.companyId, licenseDetails, userId);
         });
-      } else {
-        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
-          // Creating Email Object for Block User
+      }
+      // If user does not have creatorId, then it would be the main company admin
+      else {
+        User.updateAll({ or: [{ "_id": userId }, { "companyId": user.companyId }] }, { "active" : false }, async(err) => {
+          // Send email for blocked user
           const emailObj = {
             subject: `Your account is blocked`,
             template: "block-unblock.ejs",
@@ -881,6 +935,7 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          await pauseSubscription(user.companyId);
         });
       }
     });
@@ -906,44 +961,30 @@ module.exports = function(User) {
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
           const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
-          await updateSubscription(user.companyId, licenseDetails, userId);
+          if (licenseDetails.name !== "Spectator") await updateSubscription(user.companyId, licenseDetails, userId);
         });
       } 
       // Unblocking the whole company with members
       else {
-        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
-          if (err) {
-            let error = new Error("User not found..!!");
-            error.status = 404;
-            next(error);
-          }
-          // Starting the Subscription
-          User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
-            if (err) {
-              let error = new Error("Subscription not found..!!");
-              error.status = 404;
-              next(error);
-            }
-            if(subscription) {
-              User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {});
-            }
-            const emailObj = {
-              subject: `Your account is unblocked`,
-              template: "block-unblock.ejs",
-              email: user.email,
-              user: user,
-              type: "unblocked"
-            };
-            sendEmail(User.app, emailObj, () => {});
-            next(err, true);
-          });
+        User.updateAll({ or: [{ "_id": userId }, { "companyId": user.companyId }] }, { "active" : true }, async (err) => {
+          // Send email for unblocked user
+          const emailObj = {
+            subject: `Your account is unblocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "unblocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
+          next(err, true);
+          await resumeSubscription(user.companyId);
         });
       }
     });
   }
 
   // Migrate data to other user
-  const DataMigration = (user, userId) => {
+  const DataMigration = async (user, userId) => {
     if (user.creatorId) {
       // 1. Delete user from salesforce
       sales_delete_user(user.sforceId);
@@ -978,22 +1019,8 @@ module.exports = function(User) {
         if (err) return err;
       });
 
-      // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      if (user.license().name !== "Spectator") {
-        // If not, then find the user on subscription model
-        User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
-          if (err) return err;
-          else {
-            // Cancel its subscription
-            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
-              cancel_user_subscription(subscription.subcriptionId);
-            }
-            User.app.models.subscription.deleteAll({ userId }, (err, subscriptionDelete) => {
-              if (err) return err;
-            });
-          }
-        })
-      }
+      // 7. Update Subscription after Check weather the user has Spectator licene or not
+      if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
 
       // 8. Find and delete its invited members
       User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
@@ -1002,7 +1029,7 @@ module.exports = function(User) {
 
     } else {
       // 1. Delete users from salesforce
-      User.find({ where: { companyId: user.companyId }}, (err, users) => {
+      User.find({ where: { "companyId": user.companyId }}, (err, users) => {
         if(err) return err;
         else {
           for (let companyUser of users) {
@@ -1037,21 +1064,7 @@ module.exports = function(User) {
       });
 
       // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      User.app.models.subscription.find({ where: { "companyId": user.companyId }}, (err, subscriptions) => {
-        if (subscriptions.length > 0) {
-          for (let i = 0; i < subscriptions.length; i++) {
-            let subscription = subscriptions[i];
-            // Cancel its subscription
-            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
-              cancel_user_subscription(subscription.subcriptionId);
-              if(i == subscriptions.length - 1 && subscription.customerId) delete_customer_by_id(subscription.customerId);
-            }
-            User.app.models.subscription.deleteAll({ userId: subscription.userId }, (err, subscriptionDelete) => {
-              if (err) return err;
-            });
-          }
-        }
-      });
+      await deleteSubscription(user.companyId);
 
       // 8. Find and delete all members of company admin
       User.find({ where: { "companyId": user.companyId }}, (err, members) => {
@@ -1080,7 +1093,7 @@ module.exports = function(User) {
   // Delete user/member from admin panel
   User.deleteUser = (userId, next) => {
     // Find User
-    User.findOne({ where: { "_id": userId }, include: ["license", "company"] }, (err, user) => {
+    User.findOne({ where: { "_id": userId }, include: ["license", "company"] }, async (err, user) => {
       if (err) next(err);
       else if (!user) {
         let error = new Error("User not found!");
@@ -1100,10 +1113,10 @@ module.exports = function(User) {
         user.is_deleted = true;
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
-        user.save();
+        await user.save();
 
         // It migrates the data
-        const errorCheck = DataMigration(user, userId);
+        const errorCheck = await DataMigration(user, userId);
         if (errorCheck) next(errorCheck);
         else next(null, true);
       }
@@ -1328,7 +1341,7 @@ module.exports = function(User) {
 
   // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
-    const user = User.app.currentUser;
+    const currentUser = User.app.currentUser;
     const req = context.req;
 
     if (req.body.type == "social_user") {
@@ -1343,9 +1356,9 @@ module.exports = function(User) {
           next(error);
         } else {
           User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
-            RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+            RoleManager.assignRoles(User.app, [role.id], currentUser.id, () => {
               // Create company
-              User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
+              User.app.models.company.create({ "name": req.body.companyName, "userId": currentUser.id }, {}, (err, company) => {
                 if (err) {
                   console.log('> error while creating company', err);
                   return next(err);
@@ -1357,17 +1370,27 @@ module.exports = function(User) {
                     return next(err);
                   }
                   // Assign roleId, licenseId and companyId
+                  User.update({ "_id": currentUser.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true }, err => {
+                    if (err) {
+                      console.log('> error while updating social user', err);
+                      return next(err);
+                    } 
+                  });
+                  // Preparing salesforce data
+                  currentUser.__data.mobile = userInstance.__data.mobile;
+                  currentUser.__data.emailVerified = true;
                   let userDetails = {
-                    ...user.__data,
+                    ...currentUser.__data,
                     companyName: company.name,
                     license: license.name,
                     role: role.name
                   }
                   let ret = await sales_user_details(userDetails);
                   if (ret && ret.id) {
-                    User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
+                    // Assign salesforceId
+                    User.update({ "_id": currentUser.id },  { "sforceId": ret.id }, err => {
                       if (err) {
-                        console.log('> error while updating social user', err);
+                        console.log('> error while updating salesforce id in social user', err);
                         return next(err);
                       } 
                     });
@@ -1376,18 +1399,18 @@ module.exports = function(User) {
               });
               // Send welcome email to social users
               const password = generatePassword();
-              user.updateAttributes({ password }, {}, (err) => {
+              currentUser.updateAttributes({ password }, {}, (err) => {
                 // Create access token
-                user.accessTokens.create((err, token) => {
+                currentUser.accessTokens.create((err, token) => {
                   userInstance.__data.accessToken = token.id;
                   next();
                 });
-                if (!user.email.includes("facebook.com")) {
+                if (!currentUser.email.includes("facebook.com")) {
                   const data = {
                     subject: `Welcome to | ${User.app.get('name')}`,
                     template: "welcome.ejs",
-                    email: user.email,
-                    user,
+                    email: currentUser.email,
+                    user: currentUser,
                     password,
                     loginUrl: `${process.env.WEB_URL}/login`,
                     appName: User.app.get('name')

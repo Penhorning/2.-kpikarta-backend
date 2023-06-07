@@ -105,19 +105,30 @@
       }
     },
     "getSubscribedUsers": {
+      "accepts": [],
+      "returns": {
+        "arg": "users",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-subscribed-users",
+        "verb": "post"
+      }
+    },
+    "cancel": {
       "accepts": [
         {
-          "arg": "companyId",
+          "arg": "userId",
           "type": "string",
           "required": true
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "users",
         "type": "object"
       },
       "http": {
-        "path": "/get-subscription-users",
+        "path": "/cancel",
         "verb": "post"
       }
     },
@@ -130,7 +141,7 @@
         },
         {
           "arg": "offset",
-          "type": "number"
+          "type": "string"
         }
       ],
       "returns": {
@@ -139,6 +150,23 @@
       },
       "http": {
         "path": "/get-transactions",
+        "verb": "get"
+      }
+    },
+    "getPortal": {
+      "accepts": [
+        {
+          "arg": "res",
+          "type": "object",
+          "http": { "source": "res" }
+       }
+      ],
+      "returns": {
+        "arg": "result",
+        "type": "any"
+      },
+      "http": {
+        "path": "/get-portal",
         "verb": "get"
       }
     }

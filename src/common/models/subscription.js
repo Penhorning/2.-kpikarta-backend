@@ -1,31 +1,10 @@
 "use strict";
 
-const { sendEmail } = require('../../helper/sendEmail');
-const { sales_delete_user } = require("../../helper/salesforce");
 const moment = require('moment');
-const { get_plans, create_customer, create_subscription, get_transactions } = require('../../helper/chargebee');
+const { get_plans, create_customer, create_subscription, get_transactions, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
 
 
 module.exports = function (Subscription) {
-  // Find users who is not deleted
-  const FIND_ONLY_NOT_DELETED_USERS = {
-    $match: { $or: [ { "is_deleted" : { $exists: false } }, { "is_deleted" : false } ] }
-  }
-  // License lookup
-  const LICENSE_LOOKUP = {
-    $lookup: {
-      from: 'license',
-      localField: 'licenseId',
-      foreignField: '_id',
-      as: 'license'
-    },
-  }
-  // Unwind license
-  const UNWIND_LICENSE = {
-    $unwind: {
-      path: "$license"
-    }
-  }
 
 /* =============================CUSTOM HOOKS=========================================================== */
   // Get plans
@@ -96,121 +75,125 @@ module.exports = function (Subscription) {
   }
 
   // Get subscribed users
-  Subscription.getSubscribedUsers = async (companyId) => {
+  Subscription.getSubscribedUsers = async () => {
     try {
-      // Find Card Holder
-      const cardHolder = await Subscription.findOne({ where: { companyId , cardHolder: true }});
-      if (cardHolder) {
-        // Find All members of Company
-        const findUsers = await Subscription.find({ where: { companyId }, include: ["license", {relation: "user", scope: { where: { is_deleted: false }}}] });
-        let userObj = {
-          interval: "",
-          trialEnds: "",
-          trialStarts: "",
-        };
-        let tracker = {
-          Creator: {
-            user: "Creator",
-            quantity: 0,
-            unit_amount: null,
-            total_amount: null,
-            currency: null
-          },
-          Champion: {
-            user: "Champion",
-            quantity: 0,
-            unit_amount: null,
-            total_amount: null,
-            currency: null
-          },
-          Spectator: {
-            user: "Spectators",
-            quantity: 0,
-            unit_amount: 0,
-            total_amount: "Free",
-            currency: "usd"
-          }
-        };
-        if ( cardHolder.status == true && cardHolder.trialActive == false ) {
-          for ( let i = 0; i < findUsers.length; i++) {
-            let currentUser = findUsers[i];
-            let licenseName = currentUser.license().name;
-            let interval = currentUser.currentPlan;
-            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
-            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
-            tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
-            tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
-            tracker[licenseName].total_amount ? (tracker[licenseName].total_amount = Number(tracker[licenseName].total_amount) + Number(priceDataFromStripe.metadata.unit_amount)) : (tracker[licenseName].total_amount = Number(priceDataFromStripe.metadata.unit_amount));
-            tracker[licenseName].currency = "usd";
+      const companyId = Subscription.app.currentUser.companyId;
+      // Find subscription
+      const subscription = await Subscription.findOne({ where: { companyId }});
+      if (subscription) {
+        const creatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Creator" }});
+        const championLicense = await Subscription.app.models.license.findOne({ where: { name: "Champion" }});
+        const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
 
-            userObj.interval ? null : userObj.interval = currentUser.currentPlan;
-          }
+        const creatorMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": creatorLicense.id });
+        const championMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": championLicense.id });
+        const spectatorMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": spectatorLicense.id });
 
-          if (tracker["Champion"].quantity == 0) {
-            let interval = userObj.interval;
-            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: interval == "monthly" ? "month" : "year" } });
-            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
-            tracker["Champion"].quantity = tracker["Champion"].quantity;
-            tracker["Champion"].unit_amount = priceDataFromStripe.metadata.unit_amount;
-            tracker["Champion"].total_amount = 0;
-            tracker["Champion"].currency = "usd";
-          }
-        } else {
-          for ( let i = 0; i < findUsers.length; i++) {
-            let currentUser = findUsers[i];
-            userObj.trialEnds = moment(Number(currentUser.trialEnds) * 1000).format("MM/DD/yyyy");
-            userObj.trialStarts = moment(currentUser.createdAt).format("MM/DD/yyyy");
-            let licenseName = currentUser.license().name;
-            let interval = currentUser.currentPlan;
-            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: licenseName, interval: interval == "monthly" ? "month" : "year" } });
-            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
-            tracker[licenseName].quantity = tracker[licenseName].quantity + 1;
-            tracker[licenseName].unit_amount = priceDataFromStripe.metadata.unit_amount;
-            tracker[licenseName].total_amount = 0;
-            tracker[licenseName].currency = "usd";
-
-            userObj.interval ? null : userObj.interval = currentUser.currentPlan;
-          }
-
-          if (tracker["Champion"].quantity == 0) {
-            let interval = userObj.interval;
-            let priceDetails = await Subscription.app.models.price_mapping.findOne({ where: { licenseType: "Champion", interval: interval == "monthly" ? "month" : "year" } });
-            let priceDataFromStripe = await get_price_by_id(priceDetails.priceId);
-            tracker["Champion"].quantity = tracker["Champion"].quantity;
-            tracker["Champion"].unit_amount = priceDataFromStripe.metadata.unit_amount;
-            tracker["Champion"].total_amount = 0;
-            tracker["Champion"].currency = "usd";
-          }
-
-          userObj.interval = "Trial";
+        const mainPlan = subscription.subscriptionDetails.subscription_items[0];
+        const findSubscriptionItemDetails = (planId, type) => {
+          const subscriptionPriceDetails = subscription.subscriptionDetails.subscription_items.find(item => item.item_price_id === planId);
+          if (subscriptionPriceDetails && subscriptionPriceDetails[type]) return subscriptionPriceDetails[type]/100;
+          else return 0;
         }
 
-        // Finding Spectators List
-        const spectatorLicense = await Subscription.app.models.license.findOne({ where: { name: "Spectator" }});
-        const findSpectators = await Subscription.app.models.user.find({ where: { companyId, licenseId: spectatorLicense.id, is_deleted: false }, include: "license" });
-        tracker["Spectator"].quantity = findSpectators.length;
-
+        let userObj = { interval: subscription.frequency };
+        let tracker = {
+          Creator: {
+            license: "Creator",
+            count: creatorMembers,
+            unit_price: mainPlan.unit_price/100,
+            amount: mainPlan.amount/100
+          },
+          Champion: {
+            license: "Champion",
+            count: championMembers
+          },
+          Spectator: {
+            license: "Spectator",
+            count: spectatorMembers,
+            unit_price: 0,
+            amount: 0
+          }
+        }
+        if (subscription.frequency === "year") {
+          tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_YEARLY_ADDON_PLAN_ID, 'amount');
+          tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'unit_price');
+          tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'amount');
+        } else {
+          tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_MONTHLY_ADDON_PLAN_ID, 'amount');
+          tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'unit_price');
+          tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'amount');
+        }
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
         userObj["userDetails"] = userDetails;
-        return { message: "Data found..!!", data: userObj };
+        return userObj;
       } else {
-        let error = new Error("Card holder not found..!!");
+        let error = new Error("Subscription not found!");
         error.status = 404;
         throw error;
       }
     } catch (err) {
       console.log(err);
-      throw err;
+      return err;
+    }
+  }
+
+  // Cancel subscription
+  Subscription.cancel =  async (userId) => {
+    try {
+      const user = await Subscription.app.models.user.findOne({ where: { "_id": userId } });
+      if (user) {
+        const subscription = await Subscription.findOne({ where: { "companyId": user.companyId } });
+        const subscriptionData = { subscription_id: subscription.subscriptionId };
+        const subscriptionResponse = await cancel_subscription(subscriptionData);
+        if (subscriptionResponse.status === 200) {
+          const { status } = subscriptionResponse.data.subscription;
+          await Subscription.app.models.user.updateAll({ "companyId": user.companyId }, { "subscriptionStatus": status });
+          await Subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+          return "Subscription cancelled successfully!";
+        } else {
+          let error = new Error("Error while cancelling the subscription!");
+          error.status = 500;
+          throw error;
+        }
+      } else {
+        let error = new Error("User not found!");
+        error.status = 404;
+        throw error;
+      }
+    } catch(err) {
+      return err;
     }
   }
 
   // Get all transactions
-  Subscription.getTransactions = async (limit=0, offset=0) => {
+  Subscription.getTransactions = async (limit=0, offset="") => {
     try {
       const transactions = await get_transactions({ limit, offset });
       return transactions.data;
     } catch(err) {
       return err;
     }
+  }
+
+  // Get chargebee portal url for custumer
+  Subscription.getPortal = (res, next) => {
+    const user = Subscription.app.currentUser;
+    Subscription.findOne({ where: { "companyId": user.companyId } }, async(err, subscription) => {
+      if (err) next(err);
+      else if (subscription) {
+        const portal = await create_portal_session({ customer_id: subscription.customerId });
+        if (portal.status === 200) res.redirect(portal.data.portal_session.access_url);
+        else {
+          let error = new Error("Error while getting portal details!");
+          error.status = 500;
+          next(error);
+        }
+      } else {
+        let error = new Error("Subscription not found!");
+        error.status = 404;
+        next(error);
+      }
+    });
   }
 };
