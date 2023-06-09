@@ -41,7 +41,6 @@
     "passport-oauth2": "file:lib/passport-oauth2",
     "path": "^0.12.7",
     "serve-favicon": "^2.0.1",
-    "stripe": "^10.14.0",
     "strong-error-handler": "^4.0.0"
   },
   "devDependencies": {
