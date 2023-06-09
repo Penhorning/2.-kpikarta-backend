@@ -121,6 +121,17 @@
         "verb": "post"
       }
     },
+    "getUserCount": {
+      "accepts": [],
+      "returns": {
+        "arg": "count",
+        "type": "object"
+      },
+      "http": {
+        "path": "/get-user-count",
+        "verb": "get"
+      }
+    },
     "getTransactions": {
       "accepts": [
         {

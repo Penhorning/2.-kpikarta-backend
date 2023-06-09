@@ -204,13 +204,28 @@ module.exports = function (Subscription) {
     }
   }
 
-  // Get all transactions
-  Subscription.getTransactions = async (limit=0, offset=0) => {
+  // Get user count for Admin
+  Subscription.getUserCount = async () => {
     try {
-      const transactions = await get_transactions({ limit, offset });
-      return transactions.data;
+      let userCount = {
+        "Free": 0,
+        "Paid": 0
+      };
+
+      // Fetching paid licenses
+      let paidLicense = await Subscription.app.models.license.find({ where: { or: [ {"name": "Creator"} , {"name": "Champion"} ] } });
+      paidLicense = paidLicense.map(item => item.id);
+      userCount["Paid"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: paidLicense } }, { exists: true }], is_deleted: false });      
+
+      // Fetching free licenses
+      let freeLicense = await Subscription.app.models.license.find({ where: { "name": "Spectator" } });
+      freeLicense = freeLicense.map(item => item.id);
+      userCount["Free"] = await Subscription.app.models.user.count({ or: [{ licenseId: { inq: freeLicense } }, { exists: true }], is_deleted: false });      
+
+      return userCount;
     } catch(err) {
-      return err;
+      console.log(err);
+      throw err;
     }
   }
 };
