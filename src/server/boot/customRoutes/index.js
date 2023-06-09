@@ -63,7 +63,7 @@ module.exports = function (app) {
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });
 
-    // Stripe webhook url
+    // Chargebee webhook url
     app.post("/webhook", async (req, res) => {
         const { content, event_type } = req.body;
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
@@ -76,6 +76,7 @@ module.exports = function (app) {
     
             // Update subscription status of all users
             const updateSubscriptionStatus = async () => {
+                if (event_type === "subscription_deleted") status = "deleted"; 
                 let updatedData = { status };
                 if (event_type === "subscription_renewed") updatedData.nextSubscriptionDate = moment(Number(content.subscription.next_billing_at) * 1000);
                 await app.models.subscription.update({ "customerId": customer_id }, updatedData);
@@ -88,6 +89,7 @@ module.exports = function (app) {
                 case "subscription_reactivated":
                 case "subscription_renewed":
                 case "subscription_cancelled":
+                case "subscription_deleted":
                     await updateSubscriptionStatus();
                     res.status(200).json({ error: false, status: 200, message: "Success" });
                     break;
