@@ -68,33 +68,35 @@ module.exports = function (app) {
         const { content, event_type } = req.body;
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
-        const { customerId, status } = content.subscription;
-        const subscription = await app.models.subscription.findOne({ where: { customerId }});
-        const mainUser = await app.models.user.findOne({ where: { id: subscription.userId }});
-        const allUsers = await app.models.user.find({ where: { companyId: mainUser.companyId }});
-
-        // Update subscription status of all users
-        const updateSubscriptionStatus = async () => {
-            let updatedData = { status };
-            if (event_type === "subscription_renewed") updatedData.nextSubscriptionDate = moment(Number(content.subscription.next_billing_at) * 1000);
-            await app.models.subscription.update({ customerId }, updatedData);
-            for (let user of allUsers) {
-                await app.models.user.update({ "id": user.id }, { "subscriptionStatus": status });
+        try {
+            const { customer_id, status } = content.subscription;
+            const subscription = await app.models.subscription.findOne({ where: { "customerId": customer_id }});
+            const mainUser = await app.models.user.findOne({ where: { id: subscription.userId }});
+            const allUsers = await app.models.user.find({ where: { companyId: mainUser.companyId }});
+    
+            // Update subscription status of all users
+            const updateSubscriptionStatus = async () => {
+                let updatedData = { status };
+                if (event_type === "subscription_renewed") updatedData.nextSubscriptionDate = moment(Number(content.subscription.next_billing_at) * 1000);
+                await app.models.subscription.update({ "customerId": customer_id }, updatedData);
+                for (let user of allUsers) {
+                    await app.models.user.update({ "id": user.id }, { "subscriptionStatus": status });
+                }
             }
-        }
-
-        switch(event_type) {
-            case "subscription_reactivated":
-            case "subscription_renewed":
-            case "subscription_cancelled":
-            // case "subscription_paused":
-            // case "subscription_resumed":
-                await updateSubscriptionStatus();
-                res.status(200).json({ error: false, status: 200, message: "Success" });
-                break;
-            default:
-                res.status(200).json({ error: false, status: 200, message: "Success" });
-                break;
+    
+            switch(event_type) {
+                case "subscription_reactivated":
+                case "subscription_renewed":
+                case "subscription_cancelled":
+                    await updateSubscriptionStatus();
+                    res.status(200).json({ error: false, status: 200, message: "Success" });
+                    break;
+                default:
+                    res.status(200).json({ error: false, status: 200, message: "Success" });
+                    break;
+            }
+        } catch(err) {
+            res.status(500).json({ error: false, status: 500, message: "Error" });
         }
     });
 };
