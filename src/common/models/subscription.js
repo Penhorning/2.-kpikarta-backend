@@ -1,7 +1,7 @@
 "use strict";
 
 const moment = require('moment');
-const { get_plans, create_customer, create_subscription, get_transactions, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
+const { get_plans, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
 
 
 module.exports = function (Subscription) {
