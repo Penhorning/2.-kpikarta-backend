@@ -337,8 +337,7 @@ module.exports = function(User) {
     const subscriptionData = { subscription_id: subscription.subscriptionId };
     const subscriptionResponse = await delete_subscription(subscriptionData);
     if (subscriptionResponse.status === 200) {
-      const { status } = subscriptionResponse.data.subscription;
-      await User.updateAll({ companyId }, { "subscriptionStatus": status });
+      await User.updateAll({ companyId }, { "subscriptionStatus": "deleted" });
       await User.app.models.subscription.update({ "id": subscription.id }, { "status": "deleted", "subscriptionDetails": subscriptionResponse.data.subscription });
     }
   }
