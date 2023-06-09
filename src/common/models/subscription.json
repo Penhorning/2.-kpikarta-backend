@@ -143,27 +143,6 @@
         "verb": "get"
       }
     },
-    "getTransactions": {
-      "accepts": [
-        {
-          "arg": "limit",
-          "type": "number",
-          "required": true
-        },
-        {
-          "arg": "offset",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "transactions",
-        "type": "array"
-      },
-      "http": {
-        "path": "/get-transactions",
-        "verb": "get"
-      }
-    },
     "getPortal": {
       "accepts": [
         {
