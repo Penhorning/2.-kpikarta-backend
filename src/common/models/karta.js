@@ -730,7 +730,8 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
       const latestVersion = await Karta.app.models.karta_version.find({ where: { kartaId }, order: "createdAt DESC" });
 
       // Find all the history of the current karta with current version id
-      const wholeKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": latestVersion[0].id }, order: "createdAt DESC" });
+      let wholeKartaHistory = await Karta.app.models.karta_history.find({ where: { kartaId, "versionId": latestVersion[0].id }, order: "createdAt DESC" });
+      wholeKartaHistory = JSON.parse(JSON.stringify(wholeKartaHistory));
 
       // Prepare query according to requested parameters
       let query = { kartaId };
@@ -755,7 +756,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         const lastHistoryObject = JSON.parse(JSON.stringify(requestedKartaHistory[requestedKartaHistory.length - 1]));
 
         // Finding the index of the last object of the requested karta history in the whole karta history
-        const historyIndex = wholeKartaHistory.findIndex(x => {
+        const historyIndex = wholeKartaHistory.findIndex((x, index) => {
           // Find index of the last history object from the latest karta history
           if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
             // Return the index directly if node, phase is created or removed
@@ -777,16 +778,16 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
                     if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
                       (currentOldOptions[key] === lastHistoryObject.old_options[key] && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
                     } else if (typeof lastHistoryObject.old_options[key] === 'object') {
-                      Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length ? flagCheck = true : flagCheck = false; 
+                      (Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false; 
                     } else {
-                      currentOldOptions[key].length == lastHistoryObject.old_options[key].length ? flagCheck = true : flagCheck = false;
+                      (currentOldOptions[key].length == lastHistoryObject.old_options[key].length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
                     }
                   } else return flagCheck = false;
                 });
               } else return flagCheck = false;
 
               if (flagCheck) return x;
-              else return -1;
+              // else return -1;
             }
             // If phase is updated, then return the last updated history index
             else if (x.event === "phase_updated") {
@@ -815,18 +816,19 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
           if (currentHistoryObj.event == "node_created") {
             function updateData(data) {
               if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
-                return true;
+                return data.id;
               } else if (data && data.children && data.children.length > 0) {
                 for (let j = 0; j < data.children.length; j++) {
                   let value = updateData(data.children[j]);
                   if (value) {
-                    let tempChildren = data.children[j].children || [];
-                    if (tempChildren.length > 0) {
-                      tempChildren = tempChildren.filter(item => item !== undefined);
-                    }
-                    delete data.children[j];
-                    if (tempChildren.length > 0) data.children = [...tempChildren, data.children[j]];
-                    else data.children = [data.children[j]];
+                    // let tempChildren = data.children[j].children || [];
+                    data.children = data.children.filter(item => item.id !== value);
+                    // if (tempChildren.length > 0) {
+                    //   tempChildren = tempChildren.filter(item => item !== undefined);
+                    // }
+                    // delete data.children[j];
+                    // if (tempChildren.length > 0) data.children = [...tempChildren, data.children[j]];
+                    // else data.children = [data.children[j]];
                     break;
                   }
                 }
@@ -834,6 +836,9 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             }
             updateData(kartaNode);
           } else if (currentHistoryObj.event == "node_updated") {
+            if(currentHistoryObj.id == "647cef0bd1e1f881e3c1b80f") {
+              console.log(currentHistoryObj);
+            }
             function updateData(data) {
               if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 Object.keys(currentHistoryObj.old_options).map(x => {
