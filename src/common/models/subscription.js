@@ -56,8 +56,8 @@ module.exports = function (Subscription) {
             trialEnd: moment(Number(trial_end) * 1000),
             subscriptionDetails: subscriptionResponse.data.subscription
           };
-          await Subscription.create(data);
-          await Subscription.app.models.user.update({ "id": userId }, { "subscriptionId": id, "subscriptionStatus": status });
+          const subscription = await Subscription.create(data);
+          await Subscription.app.models.user.update({ "id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
           return "Subscription started successfully!";
         } else {
           const err = new Error("Internal Server Error");
@@ -139,7 +139,7 @@ module.exports = function (Subscription) {
   }
 
   // Cancel subscription
-  Subscription.cancel =  async (userId) => {
+  Subscription.cancel = async(userId) => {
     try {
       const user = await Subscription.app.models.user.findOne({ where: { "_id": userId } });
       if (user) {
