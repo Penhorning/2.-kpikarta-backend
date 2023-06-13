@@ -105,7 +105,13 @@
       }
     },
     "getSubscribedUsers": {
-      "accepts": [],
+      "accepts": [
+        {
+          "arg": "companyId",
+          "type": "string",
+          "required": true
+        }
+      ],
       "returns": {
         "arg": "users",
         "type": "object"
