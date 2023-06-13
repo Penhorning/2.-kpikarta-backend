@@ -15,9 +15,14 @@ module.exports = function (Kartanode) {
       },
       pipeline: [
         { 
-          $match: { 
-            $expr: { $eq: ["$_id", "$$karta_id"] }
-          } 
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: ["$_id", "$$karta_id"] },
+                { $eq: ["$is_deleted", false] }
+              ]
+            }
+          }
         },
         {
           $project: {

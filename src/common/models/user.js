@@ -999,6 +999,11 @@ module.exports = function(User) {
         if (err) return err;
       });
 
+      // Remove the email ids from all shared kartas
+      User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err, karta) => {
+        if (err) return err;
+      });
+
       // 3. Reassigning the inventories of the deleted user to it's creator
       User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
         if (err) return err;
@@ -1074,7 +1079,7 @@ module.exports = function(User) {
             for (let member of members) {
               member.is_deleted = true;
               member.active = false;
-              member.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
+              member.email = `${member.email.split('@')[0]}_${Date.now()}_@${member.email.split('@')[1]}`;
               member.save();
 
               User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
