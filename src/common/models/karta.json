@@ -117,8 +117,8 @@
     "share": {
       "accepts": [
         {
-          "arg": "karta",
-          "type": "object",
+          "arg": "kartaId",
+          "type": "string",
           "required": true
         },
         {
