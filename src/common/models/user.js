@@ -427,6 +427,7 @@ module.exports = function(User) {
                 });
                 // Assign license and update subscription in chargebee
                 if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id);
+                else await User.update({ "_id": user.id }, { "subscriptionId": "Spectator", "subscriptionStatus": "active" });
               }
             });
           });
