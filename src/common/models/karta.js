@@ -192,84 +192,167 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
   // Copy Karta Functions Ends----------------
 
   // Share karta to multiple users
-  Karta.share = (karta, emails, accessType, next) => {
+  Karta.share = (kartaId, emails, accessType, next) => {
 
-    let kartaId = "";
-    if (karta.hasOwnProperty("id")) kartaId = karta.id;
-    else kartaId = karta._id ;
+    // let kartaId = "";
+    // if (karta.hasOwnProperty("id")) kartaId = karta.id;
+    // else kartaId = karta._id;
 
-    // Check if any email has already been shared to the karta or not
-    let duplicateFlag = false;
-    let alreadySharedList = karta.sharedTo ? karta.sharedTo.map(x => x.email) : [];
-    let newEmails = emails.filter(email => {
-      if (alreadySharedList.includes(email)) {
-        duplicateFlag = true;
-        return null;
-      } else return email;
-    });
-
-    if (newEmails.length > 0) {
-      // Remove duplicate emails
-      newEmails = [...new Set(newEmails)];
-      // Prepare data for updating in the sharedTo field
-      let data = [];
-      for (let i = 0; i < newEmails.length; i++) {
-        data.push({ email: newEmails[i], accessType });
-      }
-
-      Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
-        if (err) console.log('> error while updating the karta sharedTo property ', err);
-        else {
-          next(null, "Karta shared successfully!");
-          // Find existing users in the system
-          Karta.app.models.user.find({ where: { "email": { inq: newEmails } } }, (err, users) => {
-            if (err) console.log('> error while finding users with emails', err);
+    // Get karta info
+    Karta.findOne({ where: { "_id": kartaId, "is_deleted": false } }, (err, karta) => {
+      if (err) next(err);
+      else if (karta) {
+        // Check if any email has already been shared to the karta or not
+        let duplicateFlag = false;
+        let alreadySharedList = karta.sharedTo ? karta.sharedTo.map(x => x.email) : [];
+        let newEmails = emails.filter(email => {
+          if (alreadySharedList.includes(email)) {
+            duplicateFlag = true;
+            return null;
+          } else return email;
+        });
+        // If new emails found
+        if (newEmails.length > 0) {
+          // Remove duplicate emails
+          newEmails = [...new Set(newEmails)];
+          // Prepare data for updating in the sharedTo field
+          let data = [];
+          for (let i = 0; i < newEmails.length; i++) {
+            data.push({ email: newEmails[i], accessType });
+          }
+    
+          Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+            if (err) console.log('> error while updating the karta sharedTo property ', err);
             else {
-              // Prepare notification collection data
-              let notificationData = [];
-              users.forEach(item => {
-                notificationData.push({
-                  title: `${Karta.app.currentUser.fullName} shared the Karta - ${karta.name} with you.`,
-                  click_type: accessType,
-                  type: "karta_shared",
-                  contentId: kartaId,
-                  userId: item.id
-                });
-              });
-              // Insert data in notification collection
-              Karta.app.models.notification.create(notificationData, err => {
-                if (err) console.log('> error while inserting data in notification collection', err);
-              });
-              // Separate emails that are not existing in the system
-              newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
-              let kartaLink = `${process.env.WEB_URL}/karta/${accessType}/${karta._id}`;
-              // Send email to users
-              newEmails.forEach(email => {
-                const data = {
-                  subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
-                  template: "share-karta.ejs",
-                  email: email,
-
-                  user: Karta.app.currentUser,
-                  kartaLink
+              next(null, "Karta shared successfully!");
+              // Find existing users in the system
+              Karta.app.models.user.find({ where: { "email": { inq: newEmails } } }, (err, users) => {
+                if (err) console.log('> error while finding users with emails', err);
+                else {
+                  // Prepare notification collection data
+                  let notificationData = [];
+                  users.forEach(item => {
+                    notificationData.push({
+                      title: `${Karta.app.currentUser.fullName} shared the Karta - ${karta.name} with you.`,
+                      click_type: accessType,
+                      type: "karta_shared",
+                      contentId: kartaId,
+                      userId: item.id
+                    });
+                  });
+                  // Insert data in notification collection
+                  Karta.app.models.notification.create(notificationData, err => {
+                    if (err) console.log('> error while inserting data in notification collection', err);
+                  });
+                  // Separate emails that are not existing in the system
+                  newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
+                  let kartaLink = `${process.env.WEB_URL}/karta/${accessType}/${karta._id}`;
+                  // Send email to users
+                  newEmails.forEach(email => {
+                    const data = {
+                      subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
+                      template: "share-karta.ejs",
+                      email: email,
+    
+                      user: Karta.app.currentUser,
+                      kartaLink
+                    }
+                    sendEmail(Karta.app, data, () => { });
+                  });
                 }
-                sendEmail(Karta.app, data, () => { });
               });
             }
           });
+        } else {
+          if (duplicateFlag) {
+            let error = new Error("Can't share a karta twice to the same user!");
+            error.status = 400;
+            next(error);
+          } else {
+            let error = new Error("Please send an email array");
+            error.status = 400;
+            next(error);
+          }
         }
-      });
-    } else {
-      if (duplicateFlag) {
-        let error = new Error("Can't share a karta twice to the same user!");
-        error.status = 400;
-        next(error);
       } else {
-        let error = new Error("Please send an email array");
-        error.status = 400;
+        let error = new Error("Karta not found!");
+        error.status = 404;
         next(error);
       }
-    }
+    });
+
+    // // Check if any email has already been shared to the karta or not
+    // let duplicateFlag = false;
+    // let alreadySharedList = karta.sharedTo ? karta.sharedTo.map(x => x.email) : [];
+    // let newEmails = emails.filter(email => {
+    //   if (alreadySharedList.includes(email)) {
+    //     duplicateFlag = true;
+    //     return null;
+    //   } else return email;
+    // });
+
+    // if (newEmails.length > 0) {
+    //   // Remove duplicate emails
+    //   newEmails = [...new Set(newEmails)];
+    //   // Prepare data for updating in the sharedTo field
+    //   let data = [];
+    //   for (let i = 0; i < newEmails.length; i++) {
+    //     data.push({ email: newEmails[i], accessType });
+    //   }
+
+    //   Karta.update({ "_id": kartaId }, { $addToSet: { "sharedTo": { $each: data } } }, (err) => {
+    //     if (err) console.log('> error while updating the karta sharedTo property ', err);
+    //     else {
+    //       next(null, "Karta shared successfully!");
+    //       // Find existing users in the system
+    //       Karta.app.models.user.find({ where: { "email": { inq: newEmails } } }, (err, users) => {
+    //         if (err) console.log('> error while finding users with emails', err);
+    //         else {
+    //           // Prepare notification collection data
+    //           let notificationData = [];
+    //           users.forEach(item => {
+    //             notificationData.push({
+    //               title: `${Karta.app.currentUser.fullName} shared the Karta - ${karta.name} with you.`,
+    //               click_type: accessType,
+    //               type: "karta_shared",
+    //               contentId: kartaId,
+    //               userId: item.id
+    //             });
+    //           });
+    //           // Insert data in notification collection
+    //           Karta.app.models.notification.create(notificationData, err => {
+    //             if (err) console.log('> error while inserting data in notification collection', err);
+    //           });
+    //           // Separate emails that are not existing in the system
+    //           newEmails = newEmails.filter(email => !(users.some(item => item.email === email)));
+    //           let kartaLink = `${process.env.WEB_URL}/karta/${accessType}/${karta._id}`;
+    //           // Send email to users
+    //           newEmails.forEach(email => {
+    //             const data = {
+    //               subject: `${Karta.app.currentUser.fullName} has shared a karta with you`,
+    //               template: "share-karta.ejs",
+    //               email: email,
+
+    //               user: Karta.app.currentUser,
+    //               kartaLink
+    //             }
+    //             sendEmail(Karta.app, data, () => { });
+    //           });
+    //         }
+    //       });
+    //     }
+    //   });
+    // } else {
+    //   if (duplicateFlag) {
+    //     let error = new Error("Can't share a karta twice to the same user!");
+    //     error.status = 400;
+    //     next(error);
+    //   } else {
+    //     let error = new Error("Please send an email array");
+    //     error.status = 400;
+    //     next(error);
+    //   }
+    // }
   }
 
   // Get all kartas
@@ -365,7 +448,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         return next(err);
       }
       Karta.update( { "_id": kartaId } , { $set: { "is_deleted": true } }, (err) => {
-        if(err){
+        if (err) {
           console.log('error while soft deleting karta', err);
           return next(err);
         }
