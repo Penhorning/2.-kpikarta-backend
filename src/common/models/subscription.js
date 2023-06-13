@@ -75,9 +75,8 @@ module.exports = function (Subscription) {
   }
 
   // Get subscribed users
-  Subscription.getSubscribedUsers = async () => {
+  Subscription.getSubscribedUsers = async (companyId) => {
     try {
-      const companyId = Subscription.app.currentUser.companyId;
       // Find subscription
       const subscription = await Subscription.findOne({ where: { companyId }});
       if (subscription) {
@@ -96,7 +95,7 @@ module.exports = function (Subscription) {
           else return 0;
         }
 
-        let userObj = { interval: subscription.frequency };
+        let userObj = { interval: subscription.frequency, trialStart: subscription.trialStart, trialEnd: subscription.trialEnd, status: subscription.status };
         let tracker = {
           Creator: {
             license: "Creator",
