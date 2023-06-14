@@ -580,7 +580,7 @@ module.exports = function(User) {
       if (err) return next(err);
       else {
         userId = User.getDataSource().ObjectID(userId);
-        let query = { "companyId": user.companyId };
+        let query = { "companyId": user.companyId, "is_deleted": false, "active": true };
         if (user.departmentId) query.departmentId = user.departmentId;
 
         const spectatorLicense = await User.app.models.license.findOne({ where: { name: "Spectator" }});
@@ -985,113 +985,117 @@ module.exports = function(User) {
 
   // Migrate data to other user
   const DataMigration = async (user, userId) => {
-    if (user.creatorId) {
-      // 1. Delete user from salesforce
-      sales_delete_user(user.sforceId);
-
-      // 2. Reassigning the kartas of the deleted user to it's creator
-      User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
-        if (err) return err;
-      });
-
-      // Resetting contributor's id
-      User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
-        if (err) return err;
-      });
-
-      // Remove the email ids from all shared kartas
-      User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err, karta) => {
-        if (err) return err;
-      });
-
-      // 3. Reassigning the inventories of the deleted user to it's creator
-      User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
-        if (err) return err;
-      });
-
-      // 4. Reassigning the color settings of the deleted user to it's creator
-      User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
-        if (err) return err;
-      });
-
-      // 5. Reassigning the suggestions of the deleted user to it's creator
-      User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
-        if (err) return err;
-      });
-
-      // 6. Reassigning the karta phase of the deleted user to it's creator
-      User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
-        if (err) return err;
-      });
-
-      // 7. Update Subscription after Check weather the user has Spectator licene or not
-      if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
-
-      // 8. Find and delete its invited members
-      User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
-        if (err) return err;
-      });
-
-    } else {
-      // 1. Delete users from salesforce
-      User.find({ where: { "companyId": user.companyId }}, (err, users) => {
-        if(err) return err;
-        else {
-          for (let companyUser of users) {
-            sales_delete_user(companyUser.sforceId);
-          }
-        }
-      });
-
-      // 2. Reassigning the karta of the deleted user to it's creator
-      User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
-        if (err) return err;
-      });
-
-      // 3. deleting the inventories of the deleted user
-      User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
-        if (err) return err;
-      });
-
-      // 4. Reassigning the color settings of the deleted user to it's creator
-      User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
-        if (err) return err;
-      });
-
-      // 5. Reassigning the suggestions of the deleted user to it's creator
-      User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
-        if (err) return err;
-      });
-
-      // 6. Reassigning the karta phase of the deleted user to it's creator
-      User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
-        if (err) return err;
-      });
-
-      // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      await deleteSubscription(user.companyId);
-
-      // 8. Find and delete all members of company admin
-      User.find({ where: { "companyId": user.companyId }}, (err, members) => {
-        if (err) return err;
-        else {
-          if (members.length > 0) {
-            for (let member of members) {
-              member.is_deleted = true;
-              member.active = false;
-              member.email = `${member.email.split('@')[0]}_${Date.now()}_@${member.email.split('@')[1]}`;
-              member.save();
-
-              User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
+    try {
+      if (user.creatorId) {
+        // 1. Delete user from salesforce
+        sales_delete_user(user.sforceId);
+  
+        // 2. Reassigning the kartas of the deleted user to it's creator
+        User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // Resetting contributor's id
+        User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
+          if (err) throw err;
+        });
+  
+        // Remove the email ids from all shared kartas
+        User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // 3. Reassigning the inventories of the deleted user to it's creator
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
+          if (err) throw err;
+        });
+  
+        // 4. Reassigning the color settings of the deleted user to it's creator
+        User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
+          if (err) throw err;
+        });
+  
+        // 5. Reassigning the suggestions of the deleted user to it's creator
+        User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
+          if (err) throw err;
+        });
+  
+        // 6. Reassigning the karta phase of the deleted user to it's creator
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
+          if (err) throw err;
+        });
+  
+        // 7. Update Subscription after Check weather the user has Spectator licene or not
+        if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
+  
+        // 8. Find and delete its invited members
+        User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
+          if (err) throw err;
+        });
+  
+      } else {
+        // 1. Delete users from salesforce
+        User.find({ where: { "companyId": user.companyId }}, (err, users) => {
+          if(err) throw err;
+          else {
+            for (let companyUser of users) {
+              sales_delete_user(companyUser.sforceId);
             }
           }
-        }
-      });
-
-      // 9. Delete user's company
-      User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
-        if (err) return err;
-      });
+        });
+  
+        // 2. Reassigning the karta of the deleted user to it's creator
+        User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // 3. deleting the inventories of the deleted user
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
+          if (err) throw err;
+        });
+  
+        // 4. Reassigning the color settings of the deleted user to it's creator
+        User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
+          if (err) throw err;
+        });
+  
+        // 5. Reassigning the suggestions of the deleted user to it's creator
+        User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
+          if (err) throw err;
+        });
+  
+        // 6. Reassigning the karta phase of the deleted user to it's creator
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
+          if (err) throw err;
+        });
+  
+        // 7. Delete Subscription after Check weather the user has Spectator licene or not
+        await deleteSubscription(user.companyId);
+  
+        // 8. Find and delete all members of company admin
+        User.find({ where: { "companyId": user.companyId }}, (err, members) => {
+          if (err) throw err;
+          else {
+            if (members.length > 0) {
+              for (let member of members) {
+                member.is_deleted = true;
+                member.active = false;
+                member.email = `${member.email.split('@')[0]}_${Date.now()}_@${member.email.split('@')[1]}`;
+                member.save();
+  
+                User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
+              }
+            }
+          }
+        });
+  
+        // 9. Delete user's company
+        User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
+          if (err) throw err;
+        });
+      }
+    } catch (err) {
+      console.log("Error while delete user data ===> ", err);
     }
   }
 
@@ -1119,11 +1123,10 @@ module.exports = function(User) {
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
         await user.save();
+        next(null, true);
 
         // It migrates the data
-        const errorCheck = await DataMigration(user, userId);
-        if (errorCheck) next(errorCheck);
-        else next(null, true);
+        await DataMigration(user, userId);
       }
     });
   }
