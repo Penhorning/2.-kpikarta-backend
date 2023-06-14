@@ -1025,13 +1025,13 @@ module.exports = function(User) {
           if (err) throw err;
         });
   
-        // 7. Update Subscription after Check weather the user has Spectator licene or not
-        if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
-  
-        // 8. Find and delete its invited members
+        // 7. Find and delete its invited members
         User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
           if (err) throw err;
         });
+
+        // 8. Update Subscription after Check weather the user has Spectator licene or not
+        if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
   
       } else {
         // 1. Delete users from salesforce
@@ -1069,10 +1069,7 @@ module.exports = function(User) {
           if (err) throw err;
         });
   
-        // 7. Delete Subscription after Check weather the user has Spectator licene or not
-        await deleteSubscription(user.companyId);
-  
-        // 8. Find and delete all members of company admin
+        // 7. Find and delete all members of company admin
         User.find({ where: { "companyId": user.companyId }}, (err, members) => {
           if (err) throw err;
           else {
@@ -1089,10 +1086,13 @@ module.exports = function(User) {
           }
         });
   
-        // 9. Delete user's company
+        // 8. Delete user's company
         User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
           if (err) throw err;
         });
+
+        // 9. Delete Subscription after Check weather the user has Spectator licene or not
+        await deleteSubscription(user.companyId);
       }
     } catch (err) {
       console.log("Error while delete user data ===> ", err);
