@@ -71,9 +71,7 @@ exports.resetAchievedValueCron = (app) => {
           node = JSON.parse(JSON.stringify(node));
           // Set new due date
           let new_due_date = moment(node.due_date).endOf("day");
-          if (node.target[0].frequency === "weekly") {
-            new_due_date = moment().add(1, 'weeks');
-          } else if (node.target[0].frequency === "monthly") {
+          if (node.target[0].frequency === "monthly") {
             new_due_date = moment().add(1, 'months');
           } else if (node.target[0].frequency === "quarterly") {
             new_due_date = moment().add(3, 'months');

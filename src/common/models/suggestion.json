@@ -2,7 +2,7 @@
   "name": "suggestion",
   "base": "PersistedModel",
   "idInjection": true,
-  "strict": true,
+  "strict": "filter",
   "options": {
     "validateUpsert": true
   },

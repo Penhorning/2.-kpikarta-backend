@@ -2,7 +2,7 @@
   "name": "karta_node",
   "base": "PersistedModel",
   "idInjection": true,
-  "strict": true,
+  "strict": "filter",
   "options": {
     "validateUpsert": true,
     "mongodb": {

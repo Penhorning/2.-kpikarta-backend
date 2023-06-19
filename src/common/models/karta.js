@@ -822,9 +822,6 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         query["createdAt"] = { lte: moment().quarter(duration).endOf('quarter') }
       } else if (type == "month") {
         query["createdAt"] = { lte: moment().month(duration).endOf('month') }
-      } else if (type == "week") {
-        var queryDate = moment().startOf('month').startOf('week').add(duration, 'weeks');
-        query["createdAt"] = { lte: queryDate }
       }
 
       // Find all versions which was created before the requested time
