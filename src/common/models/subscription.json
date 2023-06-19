@@ -2,6 +2,7 @@
   "name": "subscription",
   "base": "PersistedModel",
   "idInjection": true,
+  
   "options": {
     "validateUpsert": true,
     "mongodb": {

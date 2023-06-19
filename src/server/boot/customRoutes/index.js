@@ -29,9 +29,6 @@ module.exports = function (app) {
                     user_data.profilePic = user.profilePic || "";
                     user_data._2faEnabled = user._2faEnabled || false;
                     user_data.mobileVerified = user.mobileVerified || false;
-                    // user_data.paymentVerified = user.paymentVerified || false;
-                    // user_data.paymentFailed = user.paymentFailed || false;
-                    // user_data.trialCancelled = user.trialCancelled || false;
                     user_data.subscriptionStatus = user.subscriptionStatus;
                     if (user._2faEnabled && user.mobileVerified) {
                         let mobileVerificationCode = keygen.number({length: 6});
@@ -44,12 +41,6 @@ module.exports = function (app) {
                           }
                           req.app.models.Twilio.send(twilio_data, function (err, data) {
                             console.log('> sending code to mobile number:', user.mobile.e164Number);
-                            // if (err) {
-                            //     console.log('> error while sending code to mobile number', err);
-                            //     let error = err;
-                            //     error.status = 500;
-                            //     return next(error);
-                            // }
                           });
                         });
                     }
@@ -69,7 +60,7 @@ module.exports = function (app) {
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
         try {
-            const { customer_id, status } = content.subscription;
+            let { customer_id, status } = content.subscription;
             const subscription = await app.models.subscription.findOne({ where: { "customerId": customer_id }});
             const mainUser = await app.models.user.findOne({ where: { id: subscription.userId }});
             const allUsers = await app.models.user.find({ where: { companyId: mainUser.companyId }});
