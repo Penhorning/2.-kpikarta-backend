@@ -2,7 +2,6 @@
   "name": "color_setting",
   "base": "PersistedModel",
   "idInjection": true,
-  "strict": "filter",
   "options": {
     "validateUpsert": true,
     "mongodb": {

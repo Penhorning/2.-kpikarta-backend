@@ -2,7 +2,7 @@
   "name": "user",
   "base": "User",
   "idInjection": true,
-  "strict": "filter",
+  
   "options": {
     "validateUpsert": true
   },

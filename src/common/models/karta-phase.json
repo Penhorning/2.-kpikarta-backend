@@ -2,7 +2,7 @@
   "name": "karta_phase",
   "base": "PersistedModel",
   "idInjection": true,
-  "strict": "filter",
+  
   "options": {
     "validateUpsert": true,
     "mongodb": {

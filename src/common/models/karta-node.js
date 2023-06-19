@@ -779,6 +779,8 @@ module.exports = function (Kartanode) {
               }
               let start = 0, end = 11;
               if (type === "quarterly") {
+                const target = item.target.find(el => el.frequency === type);
+                if (target) item.aggregateTargetValue = target.value;
                 start = moment(moment().startOf('quarter').toDate()).month();        
                 end = moment(moment().endOf('quarter').toDate()).month();
               }      
@@ -798,10 +800,12 @@ module.exports = function (Kartanode) {
                     "event": "node_updated",
                     "old_options.target": { exists: true }
                   }
-                  const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_history_query });
-                  if (targetHistory) {
-                    item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
-                    item.aggregateTargetValue += targetHistory.event_options.updated.target[0].value;
+                  item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
+                  if (!item.aggregateTargetValue) {
+                    const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_history_query });
+                    if (targetHistory) {
+                      item.aggregateTargetValue += targetHistory.event_options.updated.target[0].value;
+                    }
                   }
                 }
               }
@@ -976,7 +980,6 @@ module.exports = function (Kartanode) {
           if (findTarget('monthly')) targetValue = findTarget('monthly').value;
           else if (findTarget('annually')) targetValue = findTarget('annually').value * 12;
           else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 3;
-          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 4;
 
           // target value per day
           targetValue = todayDate * (targetValue / totalDays);
@@ -1001,7 +1004,6 @@ module.exports = function (Kartanode) {
           if (findTarget('annually')) targetValue = findTarget('annually').value;
           else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
           else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
-          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 52;
 
           // target value per day
           targetValue = todayDate * (targetValue / totalDays);
