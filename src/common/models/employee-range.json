@@ -2,6 +2,7 @@
   "name": "employee_range",
   "base": "PersistedModel",
   "idInjection": true,
+  "strict": true,
   "options": {
     "validateUpsert": true
   },

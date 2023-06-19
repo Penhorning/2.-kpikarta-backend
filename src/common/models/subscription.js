@@ -24,7 +24,6 @@ module.exports = function (Subscription) {
       const userId = Subscription.app.currentUser.id;
       const user = await Subscription.app.models.user.findOne({ where: { "_id": userId }, include: 'company' });
       const data = {
-        id: user.company().name,
         first_name: user.fullName,
         email: user.email,
         company: user.company().name
