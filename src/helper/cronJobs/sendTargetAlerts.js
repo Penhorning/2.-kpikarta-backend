@@ -69,18 +69,7 @@ exports.sendTargetAlertsCron = async (app) => {
     }
     // Check target frequency and send alert accordingly
     const checkTargetFrequency = (item) => {
-        if (item.target[0].frequency === 'weekly') {
-            let diff = getDifference(item.start_date, moment());
-            if (diff > 7) {
-                let d = parseInt((diff/7));
-                let n = diff - (7*d);
-                todayDate = n;
-            }
-            else todayDate = diff;
-            const todayTargetValue = todayDate * (item.target[0].value / 7);
-            const percentage = (item.achieved_value/todayTargetValue) * 100;
-            sendAlert({ percentage, thresholdValue, todayTargetValue }, item);
-        } else if (item.target[0].frequency === 'monthly') {
+        if (item.target[0].frequency === 'monthly') {
             const todayTargetValue = todayDate * (item.target[0].value / daysInMonth);
             const percentage = (item.achieved_value/todayTargetValue) * 100;
             sendAlert({ percentage, thresholdValue, todayTargetValue }, item);
@@ -157,9 +146,6 @@ exports.sendTargetAlertsCron = async (app) => {
                     const difference = getDifference(startDate, moment());
                     
                     switch (item["alert_frequency"]) {
-                        case "weekly":
-                            if (difference >= 7) checkTargetFrequency(item);
-                            break;
                         case "monthly":
                             if (difference >= daysInMonth) checkTargetFrequency(item);
                             break;

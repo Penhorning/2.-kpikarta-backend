@@ -23,9 +23,9 @@ exports.get_plans = async () => {
 
 // CREATE CUSTOMER
 exports.create_customer = async (params) => {
-    const { id, first_name, email, company } = params;
+    const { first_name, email, company } = params;
     try {
-        const data = `id=${id}&first_name=${first_name}&email=${email}&company=${company}`;
+        const data = `first_name=${first_name}&email=${email}&company=${company}`;
         const URL = `${SITE_URL}/customers`;
         const response = await axios.post(URL, data, { headers: REQUEST_HEADER });
         return response;
