@@ -1117,6 +1117,7 @@ module.exports = function(User) {
             User.app.models.userIdentity.remove({ userId }, (err, resp) => {
               if (err) next(err);
             });
+            user.username = `${user.username.split('@')[0]}_${Date.now()}_@${user.username.split('@')[1]}`;
           }
         });
         user.is_deleted = true;
