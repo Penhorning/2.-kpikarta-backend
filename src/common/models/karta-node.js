@@ -769,7 +769,16 @@ module.exports = function (Kartanode) {
             for (let item of kpiNodes) {
               item.aggregateAchievedValue = 0;
               item.aggregateTargetValue = 0;
-  
+              
+              // Find yearly or quarterly target
+              let targetFound = false;
+              const target = item.target.find(el => el.frequency === type);
+              if (target) {
+                item.aggregateTargetValue = target.value;
+                targetFound = true;
+              }
+
+              // Preparing achieved history query
               const achieved_history_query = {
                 "kartaId": kartaId,
                 "kartaNodeId": item._id,
@@ -777,19 +786,20 @@ module.exports = function (Kartanode) {
                 "event": "node_updated",
                 "old_options.achieved_value": { exists: true }
               }
+
+              // Set the start and end month number for retrieving the history
               let start = 0, end = 11;
               if (type === "quarterly") {
-                const target = item.target.find(el => el.frequency === type);
-                if (target) item.aggregateTargetValue = target.value;
                 start = moment(moment().startOf('quarter').toDate()).month();        
                 end = moment(moment().endOf('quarter').toDate()).month();
-              }      
+              }    
   
               for (let i=start; i<=end; i++) {
                 achieved_history_query["and"] = [
                   { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
                   { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
                 ]
+                // Find the latest achieved history
                 const achievedHistory = await Kartanode.app.models.karta_history.find({ where: achieved_history_query, order: "createdAt DESC", limit: 1 });
                 if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
                   const target_history_query = {
@@ -801,9 +811,11 @@ module.exports = function (Kartanode) {
                     "old_options.target": { exists: true }
                   }
                   item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
-                  if (!item.aggregateTargetValue) {
+                  // Find the respective target
+                  if (!targetFound) {
                     const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_history_query });
                     if (targetHistory) {
+                      // If target not found directly, then sum all the monthly targets
                       item.aggregateTargetValue += targetHistory.event_options.updated.target[0].value;
                     }
                   }
