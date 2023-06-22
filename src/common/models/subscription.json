@@ -2,6 +2,7 @@
   "name": "subscription",
   "base": "PersistedModel",
   "idInjection": true,
+  
   "options": {
     "validateUpsert": true,
     "mongodb": {
@@ -17,61 +18,42 @@
     }
   },
   "properties": {
-    "userId": {
-      "type": "string",
-      "required": true
-    },
-    "companyId": {
-      "type": "string"
-    },
     "customerId": {
       "type": "string",
       "required": true
     },
-    "cardId": {
-      "type": "string",
-      "required": true
-    },
-    "tokenId": {
+    "planId": {
       "type": "string",
       "required": true
     },
     "subscriptionId": {
-      "type": "string"
+      "type": "string",
+      "required": true
     },
-    "trialActive": {
-      "type": "boolean",
-      "default": false
+    "trialStart": {
+      "type": "date"
     },
-    "trialEnds": {
+    "trialEnd": {
+      "type": "date"
+    },
+    "amount": {
       "type": "number"
     },
     "status": {
-      "type": "boolean",
-      "default": false
+      "type": "string",
+      "required": true
     },
-    "currentSubscriptionDate": {
-      "type": "string"
+    "frequency": {
+      "type": "string",
+      "required": true
     },
     "nextSubscriptionDate": {
-      "type": "string"
+      "type": "date",
+      "required": true
     },
-    "cronCheck": {
-      "type": "boolean",
-      "default": false
-    },
-    "cardHolder": {
-      "type": "boolean",
-      "default": false
-    },
-    "currentPlan": {
-      "type": "string"
-    },
-    "licenseId": {
-      "type": "string"
-    },
-    "testClock": {
-      "type": "string"
+    "subscriptionDetails": {
+      "type": "object",
+      "required": true
     }
   },
   "validations": [],
@@ -80,14 +62,6 @@
       "type": "belongsTo",
       "model": "user",
       "foreignKey": "userId",
-      "options": {
-        "nestRemoting": true
-      }
-    },
-    "license": {
-      "type": "belongsTo",
-      "model": "license",
-      "foreignKey": "licenseId",
       "options": {
         "nestRemoting": true
       }
@@ -103,105 +77,21 @@
   },
   "acls": [],
   "methods": {
-    "saveCard": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "cardNumber",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "expirationDate",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "fullName",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "cvc",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "plan",
-          "type": "string"
-        }
-      ],
+    "getPlans": {
+      "accepts": [],
       "returns": {
-        "arg": "data",
-        "type": "object"
+        "arg": "plans",
+        "type": "array"
       },
       "http": {
-        "path": "/save-card",
-        "verb": "post"
+        "path": "/get-plans",
+        "verb": "get"
       }
     },
-    "createPrice": {
+    "assignPlan": {
       "accepts": [
         {
-          "arg": "nickname",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "amount",
-          "type": "number",
-          "required": true
-        },
-        {
-          "arg": "interval",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        },
-        {
-          "arg": "licenseType",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "object"
-      },
-      "http": {
-        "path": "/create-price",
-        "verb": "post"
-      }
-    },
-    "getCards": {
-      "accepts": [
-        {
-          "arg": "companyId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "object"
-      },
-      "http": {
-        "path": "/get-cards",
-        "verb": "post"
-      }
-    },
-    "blockSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
+          "arg": "planId",
           "type": "string",
           "required": true
         }
@@ -211,41 +101,7 @@
         "type": "string"
       },
       "http": {
-        "path": "/block-subscription",
-        "verb": "post"
-      }
-    },
-    "unblockSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/unblock-subscription",
-        "verb": "post"
-      }
-    },
-    "deleteSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string",
-          "required": true
-        }
-      ],
-      "returns": {
-        "arg": "message",
-        "type": "string"
-      },
-      "http": {
-        "path": "/delete-subscription",
+        "path": "/assign-plan",
         "verb": "post"
       }
     },
@@ -258,15 +114,15 @@
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "users",
         "type": "object"
       },
       "http": {
-        "path": "/get-subscription-users",
+        "path": "/get-subscribed-users",
         "verb": "post"
       }
     },
-    "getOfflineUsers": {
+    "cancel": {
       "accepts": [
         {
           "arg": "userId",
@@ -275,201 +131,11 @@
         }
       ],
       "returns": {
-        "arg": "data",
+        "arg": "users",
         "type": "object"
       },
       "http": {
-        "path": "/get-dashboard-users",
-        "verb": "post"
-      }
-    },
-    "getInvoices": {
-      "accepts": [
-        {
-          "arg": "companyId",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "array"
-      },
-      "http": {
-        "path": "/get-invoices",
-        "verb": "post"
-      }
-    },
-    "getInvoicesForAdmin": {
-      "accepts": [
-        {
-          "arg": "page",
-          "type": "number"
-        },
-        {
-          "arg": "limit",
-          "type": "number"
-        },
-        {
-          "arg": "searchQuery",
-          "type": "string"
-        },
-        {
-          "arg": "previousId",
-          "type": "string"
-        },
-        {
-          "arg": "nextId",
-          "type": "string"
-        },
-        {
-          "arg": "startDate",
-          "type": "string"
-        },
-        {
-          "arg": "endDate",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "invoices",
-        "type": "array"
-      },
-      "http": {
-        "path": "/get-admin-invoices",
-        "verb": "post"
-      }
-    },
-    "getInvoicesForAdminChart": {
-      "accepts": [
-        {
-          "arg": "startDate",
-          "type": "string"
-        },
-        {
-          "arg": "endDate",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "array"
-      },
-      "http": {
-        "path": "/get-admin-invoices-chart",
-        "verb": "post"
-      }
-    },
-    "getPrices": {
-      "accepts": [],
-      "returns": {
-        "arg": "data",
-        "type": "object"
-      },
-      "http": {
-        "path": "/get-prices",
-        "verb": "get"
-      }
-    },
-    "createSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "string"
-      },
-      "http": {
-        "path": "/create-subscription",
-        "verb": "post"
-      }
-    },
-    "getPricesForAdmin": {
-      "accepts": [],
-      "returns": {
-        "arg": "plans",
-        "type": "object"
-      },
-      "http": {
-        "path": "/get-admin-plans",
-        "verb": "get"
-      }
-    },
-    "getPriceByIdForAdmin": {
-      "accepts": [
-        {
-          "arg": "priceId",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "plan",
-        "type": "object"
-      },
-      "http": {
-        "path": "/get-plan",
-        "verb": "post"
-      }
-    },
-    "updatePlansByAdmin": {
-      "accepts": [
-        {
-          "arg": "priceId",
-          "type": "string"
-        },
-        {
-          "arg": "amount",
-          "type": "string"
-        },
-        {
-          "arg": "name",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "plans",
-        "type": "string"
-      },
-      "http": {
-        "path": "/update-admin-plans",
-        "verb": "post"
-      }
-    },
-    "cancelSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "subscription",
-        "type": "string"
-      },
-      "http": {
-        "path": "/cancel-subscription",
-        "verb": "post"
-      }
-    },
-    "updateSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string"
-        },
-        {
-          "arg": "licenseName",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "subscription",
-        "type": "string"
-      },
-      "http": {
-        "path": "/update-subscription",
+        "path": "/cancel",
         "verb": "post"
       }
     },
@@ -484,40 +150,21 @@
         "verb": "get"
       }
     },
-    "cancelTrial": {
+    "getPortal": {
       "accepts": [
         {
-          "arg": "userId",
-          "type": "string"
-        }
+          "arg": "res",
+          "type": "object",
+          "http": { "source": "res" }
+       }
       ],
       "returns": {
-        "arg": "trialResponse",
-        "type": "string"
+        "arg": "result",
+        "type": "any"
       },
       "http": {
-        "path": "/cancel-trial",
-        "verb": "post"
-      }
-    },
-    "startSubscription": {
-      "accepts": [
-        {
-          "arg": "userId",
-          "type": "string"
-        },
-        {
-          "arg": "plan",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "startSubscription",
-        "type": "string"
-      },
-      "http": {
-        "path": "/start-subscription",
-        "verb": "post"
+        "path": "/get-portal",
+        "verb": "get"
       }
     }
   }

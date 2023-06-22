@@ -2,6 +2,7 @@
   "name": "user",
   "base": "User",
   "idInjection": true,
+  
   "options": {
     "validateUpsert": true
   },
@@ -46,18 +47,6 @@
       "type": "boolean",
       "default": false
     },
-    "paymentVerified": {
-      "type": "boolean",
-      "default": false
-    },
-    "paymentFailed": {
-      "type": "boolean",
-      "default": false
-    },
-    "trialCancelled": {
-      "type": "boolean",
-      "default": false
-    },
     "street": {
       "type": "string"
     },
@@ -76,19 +65,23 @@
     "addedBy": {
       "type": "string"
     },
+    "isMaster": {
+      "type": "boolean"
+    },
+    "sforceId": {
+      "type": "string"
+    },
+    "subscriptionStatus": {
+      "type": "string",
+      "default": "none"
+    },
     "active": {
       "type": "boolean",
       "default": true
     },
-    "isMaster": {
-      "type": "boolean"
-    },
     "is_deleted": {
       "type": "boolean",
       "default": false
-    },
-    "sforceId": {
-      "type": "string"
     }
   },
   "validations": [],
@@ -128,7 +121,7 @@
       "foreignKey": "creatorId"
     },
     "subscription": {
-      "type": "hasOne",
+      "type": "belongsTo",
       "model": "subscription",
       "foreignKey": "subscriptionId"
     },
@@ -235,18 +228,6 @@
         "path": "/verify-email"
       }
     },
-    "verifyPaymentMethod": {
-      "accepts": [],
-      "returns": {
-        "arg": "data",
-        "type": "user",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/verify-payment"
-      }
-    },
     "sendMobileCode": {
       "accepts": [
         {
@@ -297,23 +278,6 @@
       "http": {
         "verb": "post",
         "path": "/verify-mobile"
-      }
-    },
-    "selectPlan": {
-      "accepts": [
-        {
-          "arg": "plan",
-          "type": "string"
-        }
-      ],
-      "returns": {
-        "arg": "data",
-        "type": "user",
-        "root": true
-      },
-      "http": {
-        "verb": "post",
-        "path": "/assign-plan"
       }
     },
     "check2FAConfig": {
@@ -575,6 +539,23 @@
       },
       "http": {
         "path": "/count",
+        "verb": "post"
+      }
+    },
+    "countStats": {
+      "accepts": [
+        {
+          "arg": "userId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "user",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-count-stats",
         "verb": "post"
       }
     },

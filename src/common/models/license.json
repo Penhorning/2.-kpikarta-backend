@@ -2,6 +2,7 @@
   "name": "license",
   "base": "PersistedModel",
   "idInjection": true,
+  
   "options": {
     "validateUpsert": true
   },

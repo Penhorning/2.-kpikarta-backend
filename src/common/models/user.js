@@ -9,7 +9,7 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
-const { cancel_user_subscription, delete_customer_by_id } = require("../../helper/stripe");
+const { update_subscription, pause_subscription, resume_subscription, delete_subscription } = require("../../helper/chargebee");
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -260,6 +260,87 @@ module.exports = function(User) {
       return { success: true, msg: error };
     }
   }
+  // Update subscription
+  const updateSubscription = async (companyId, license, userId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    let totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
+    let replaceItems = false;
+    // Check if total paid users of particular license is 0, then remove that
+    if (totalPaidUsers < 1) {
+      replaceItems = true;
+      // Find all the champion users, if creator license count is 0
+      if (license.name === "Creator") {
+        const championLicense = await User.app.models.license.findOne({ where: { name: "Champion" }});
+        totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": championLicense.id });
+      }
+      // Find all the creator users, if champion license count is 0
+      else {
+        const creatorLicense = await User.app.models.license.findOne({ where: { name: "Creator" }});
+        totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": creatorLicense.id });
+      }
+    }
+    const subscriptionData = {
+      subscription_id: subscription.subscriptionId,
+      license_count: totalPaidUsers,
+      replaceItems
+    }
+    if (subscription && subscription.frequency === "year" && license.name === "Creator") {
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+    }
+    else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+    }
+    else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+    }
+    else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
+      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+    }
+    const subscriptionResponse = await update_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      const { status } = subscriptionResponse.data.subscription;
+      await User.update({ "_id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
+      await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+    }
+  }
+  // Pause subscription
+  const pauseSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    if (subscription.status !== "in_trial") {
+      const subscriptionResponse = await pause_subscription(subscriptionData);
+      if (subscriptionResponse.status === 200) {
+        const { status } = subscriptionResponse.data.subscription;
+        await User.updateAll({ companyId }, { "subscriptionStatus": status });
+        await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+      }
+    }
+  }
+  // Resume subscription
+  const resumeSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    const subscriptionResponse = await resume_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      const { status } = subscriptionResponse.data.subscription;
+      await User.updateAll({ companyId }, { "subscriptionStatus": status });
+      await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+    }
+  }
+  // Delete subscription
+  const deleteSubscription = async (companyId) => {
+    const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    const subscriptionData = { subscription_id: subscription.subscriptionId };
+    const subscriptionResponse = await delete_subscription(subscriptionData);
+    if (subscriptionResponse.status === 200) {
+      await User.updateAll({ companyId }, { "subscriptionStatus": "deleted" });
+      await User.app.models.subscription.update({ "id": subscription.id }, { "status": "deleted", "subscriptionDetails": subscriptionResponse.data.subscription });
+    }
+  }
 
 
 
@@ -299,7 +380,7 @@ module.exports = function(User) {
     email = email.toLowerCase();
     
     // Create user
-    User.create({ fullName, email, "emailVerified": true, "paymentVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -315,15 +396,17 @@ module.exports = function(User) {
             const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
             const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
             const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            const companyDetails = await User.app.models.company.findOne({ where: { "id": creator.companyId }});
+
             let userDetails = {
               ...user.__data,
-              companyName: creator.companyName,
+              companyName: companyDetails.name,
               license: licenseDetails.name,
               role: roleDetails.name,
               department: departmentDetails.name,
             }
             let ret = await sales_user_details(userDetails);
-            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, err => {
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, async (err) => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
@@ -342,6 +425,9 @@ module.exports = function(User) {
                 sendEmail(User.app, data, async () => {
                   await user.updateAttributes({ password });
                 });
+                // Assign license and update subscription in chargebee
+                if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id);
+                else await User.update({ "_id": user.id }, { "subscriptionId": "Spectator", "subscriptionStatus": "active" });
               }
             });
           });
@@ -352,7 +438,6 @@ module.exports = function(User) {
 
   // Send credentials
   User.sendCredentials = (userId, next) => {
-
     const password = generatePassword();
     
     // Update new password
@@ -486,6 +571,56 @@ module.exports = function(User) {
           next(err, result.length);
         });
       });
+    });
+  }
+
+  // Get user count stats
+  User.countStats = (userId, next) => {
+    User.findById(userId, async (err, user) => {
+      if (err) return next(err);
+      else {
+        userId = User.getDataSource().ObjectID(userId);
+        let query = { "companyId": user.companyId, "is_deleted": false, "active": true };
+        if (user.departmentId) query.departmentId = user.departmentId;
+
+        const spectatorLicense = await User.app.models.license.findOne({ where: { name: "Spectator" }});
+        const championLicense = await User.app.models.license.findOne({ where: { name: "Champion" }});
+        const creatorLicense = await User.app.models.license.findOne({ where: { name: "Creator" }});
+
+        query.licenseId = spectatorLicense.id;
+        User.count(query, (err, result) => {
+          if (err) {
+            console.log('> error while Spectator users', err);
+            let error = err;
+            error.status = 500;
+            return next(error);
+          }
+          query.licenseId = championLicense.id;
+          User.count(query, (err2, result2) => {
+            if (err2) {
+              console.log('> error while fetching Champion users', err);
+              let error = err2;
+              error.status = 500;
+              return next(error);
+            }
+            query.licenseId = creatorLicense.id;
+            User.count(query, (err3, result3) => {
+              if (err3) {
+                console.log('> error while fetching Creator users', err);
+                let error = err3;
+                error.status = 500;
+                return next(error);
+              }
+              let data = [
+                { license: "Creator", count: result3 || 0 },
+                { license:"Champion", count: result2 || 0 },
+                { license: "Spectator", count: result || 0 }
+              ]
+              next(null, data);
+            });
+          });
+        });
+      }
     });
   }
 
@@ -642,17 +777,6 @@ module.exports = function(User) {
       next(error);
     }
   };
-
-  User.verifyPaymentMethod = function(next) {
-    this.app.currentUser.updateAttributes({ "paymentVerified": true}, (error)=>{
-      if(error) {
-        let error = new Error("Invalid Code");
-        error.status = 400;
-        next(error);
-      }
-      next(error, this.app.currentUser);
-    });
-  };
   
   // Send email code
   User.sendEmailCode = function(next) {
@@ -746,12 +870,6 @@ module.exports = function(User) {
       });
     }
   };
-  // Assign plan
-  User.selectPlan = function(plan, next) {
-    this.app.currentUser.updateAttributes({currentPlan: plan}, (err)=>{
-      next(err, this.app.currentUser);
-    });
-  };
   // Check 2FA config
   User.check2FAConfig = function(next) {
     let data = {
@@ -787,9 +905,10 @@ module.exports = function(User) {
         error.status = 404;
         next(error);
       }
+      // If user has creatorId, then it is a member
       else if (user.creatorId) {
-        User.updateAll({ "_id": userId }, { "active" : false }, (err) => {
-          // Creating Email Object for Block User
+        User.updateAll({ "_id": userId }, { "active" : false }, async (err) => {
+          // Send email for blocked user
           const emailObj = {
             subject: `Your account is blocked`,
             template: "block-unblock.ejs",
@@ -799,10 +918,14 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
+          if (licenseDetails.name !== "Spectator") await updateSubscription(user.companyId, licenseDetails, userId);
         });
-      } else {
-        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : false }, (err) => {
-          // Creating Email Object for Block User
+      }
+      // If user does not have creatorId, then it would be the main company admin
+      else {
+        User.updateAll({ or: [{ "_id": userId }, { "companyId": user.companyId }] }, { "active" : false }, async(err) => {
+          // Send email for blocked user
           const emailObj = {
             subject: `Your account is blocked`,
             template: "block-unblock.ejs",
@@ -812,6 +935,7 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          await pauseSubscription(user.companyId);
         });
       }
     });
@@ -826,7 +950,7 @@ module.exports = function(User) {
       }
       // Unblocking a member of a company
       else if (user.creatorId) {
-        User.updateAll({ "_id": userId }, { "active" : true }, (err) => {
+        User.updateAll({ "_id": userId }, { "active" : true }, async (err) => {
           const emailObj = {
             subject: `Your account is unblocked`,
             template: "block-unblock.ejs",
@@ -836,180 +960,149 @@ module.exports = function(User) {
           };
           sendEmail(User.app, emailObj, () => {});
           next(err, true);
+          const licenseDetails = await User.app.models.license.findOne({ where: { "id": user.licenseId }});
+          if (licenseDetails.name !== "Spectator") await updateSubscription(user.companyId, licenseDetails, userId);
         });
       } 
       // Unblocking the whole company with members
       else {
-        User.updateAll({ or: [{ "_id": userId }, { "creatorId": userId }] }, { "active" : true }, (err) => {
-          if (err) {
-            let error = new Error("User not found..!!");
-            error.status = 404;
-            next(error);
-          }
-          // Starting the Subscription
-          User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
-            if (err) {
-              let error = new Error("Subscription not found..!!");
-              error.status = 404;
-              next(error);
-            }
-            if(subscription) {
-              User.app.models.subscription.update({ "id": subscription.id }, { status: true, trialActive: false }, (err) => {});
-            }
-            const emailObj = {
-              subject: `Your account is unblocked`,
-              template: "block-unblock.ejs",
-              email: user.email,
-              user: user,
-              type: "unblocked"
-            };
-            sendEmail(User.app, emailObj, () => {});
-            next(err, true);
-          });
+        User.updateAll({ or: [{ "_id": userId }, { "companyId": user.companyId }] }, { "active" : true }, async (err) => {
+          // Send email for unblocked user
+          const emailObj = {
+            subject: `Your account is unblocked`,
+            template: "block-unblock.ejs",
+            email: user.email,
+            user: user,
+            type: "unblocked"
+          };
+          sendEmail(User.app, emailObj, () => {});
+          next(err, true);
+          await resumeSubscription(user.companyId);
         });
       }
     });
   }
 
   // Migrate data to other user
-  const DataMigration = (user, userId) => {
-    if (user.creatorId) {
-      // 1. Delete user from salesforce
-      sales_delete_user(user.sforceId);
+  const DataMigration = async (user, userId) => {
+    try {
+      if (user.creatorId) {
+        // 1. Delete user from salesforce
+        sales_delete_user(user.sforceId);
+  
+        // 2. Reassigning the kartas of the deleted user to it's creator
+        User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // Resetting contributor's id
+        User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
+          if (err) throw err;
+        });
+  
+        // Remove the email ids from all shared kartas
+        User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // 3. Reassigning the inventories of the deleted user to it's creator
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
+          if (err) throw err;
+        });
+  
+        // 4. Reassigning the color settings of the deleted user to it's creator
+        User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
+          if (err) throw err;
+        });
+  
+        // 5. Reassigning the suggestions of the deleted user to it's creator
+        User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
+          if (err) throw err;
+        });
+  
+        // 6. Reassigning the karta phase of the deleted user to it's creator
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
+          if (err) throw err;
+        });
+  
+        // 7. Find and delete its invited members
+        User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
+          if (err) throw err;
+        });
 
-      // 2. Reassigning the kartas of the deleted user to it's creator
-      User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
-        if (err) return err;
-      });
-
-      // Resetting contributor's id
-      User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
-        if (err) return err;
-      });
-
-      // 3. Reassigning the inventories of the deleted user to it's creator
-      User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
-        if (err) return err;
-      });
-
-      // 4. Reassigning the color settings of the deleted user to it's creator
-      User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
-        if (err) return err;
-      });
-
-      // 5. Reassigning the suggestions of the deleted user to it's creator
-      User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
-        if (err) return err;
-      });
-
-      // 6. Reassigning the karta phase of the deleted user to it's creator
-      User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
-        if (err) return err;
-      });
-
-      // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      if (user.license().name !== "Spectator") {
-        // If not, then find the user on subscription model
-        User.app.models.subscription.findOne({ where: { userId }}, (err, subscription) => {
-          if (err) return err;
+        // 8. Update Subscription after Check weather the user has Spectator licene or not
+        if (user.license().name !== "Spectator") await updateSubscription(user.companyId, user.license(), userId);
+  
+      } else {
+        // 1. Delete users from salesforce
+        User.find({ where: { "companyId": user.companyId }}, (err, users) => {
+          if(err) throw err;
           else {
-            // Cancel its subscription
-            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
-              cancel_user_subscription(subscription.subcriptionId);
+            for (let companyUser of users) {
+              sales_delete_user(companyUser.sforceId);
             }
-            User.app.models.subscription.deleteAll({ userId }, (err, subscriptionDelete) => {
-              if (err) return err;
-            });
           }
-        })
+        });
+  
+        // 2. Reassigning the karta of the deleted user to it's creator
+        User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
+          if (err) throw err;
+        });
+  
+        // 3. deleting the inventories of the deleted user
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
+          if (err) throw err;
+        });
+  
+        // 4. Reassigning the color settings of the deleted user to it's creator
+        User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
+          if (err) throw err;
+        });
+  
+        // 5. Reassigning the suggestions of the deleted user to it's creator
+        User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
+          if (err) throw err;
+        });
+  
+        // 6. Reassigning the karta phase of the deleted user to it's creator
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
+          if (err) throw err;
+        });
+  
+        // 7. Find and delete all members of company admin
+        User.find({ where: { "companyId": user.companyId }}, (err, members) => {
+          if (err) throw err;
+          else {
+            if (members.length > 0) {
+              for (let member of members) {
+                member.is_deleted = true;
+                member.active = false;
+                member.email = `${member.email.split('@')[0]}_${Date.now()}_@${member.email.split('@')[1]}`;
+                member.save();
+  
+                User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
+              }
+            }
+          }
+        });
+  
+        // 8. Delete user's company
+        User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
+          if (err) throw err;
+        });
+
+        // 9. Delete Subscription after Check weather the user has Spectator licene or not
+        await deleteSubscription(user.companyId);
       }
-
-      // 8. Find and delete its invited members
-      User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
-        if (err) return err;
-      });
-
-    } else {
-      // 1. Delete users from salesforce
-      User.find({ where: { companyId: user.companyId }}, (err, users) => {
-        if(err) return err;
-        else {
-          for (let companyUser of users) {
-            sales_delete_user(companyUser.sforceId);
-          }
-        }
-      });
-
-      // 2. Reassigning the karta of the deleted user to it's creator
-      User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
-        if (err) return err;
-      });
-
-      // 3. deleting the inventories of the deleted user
-      User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
-        if (err) return err;
-      });
-
-      // 4. Reassigning the color settings of the deleted user to it's creator
-      User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
-        if (err) return err;
-      });
-
-      // 5. Reassigning the suggestions of the deleted user to it's creator
-      User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
-        if (err) return err;
-      });
-
-      // 6. Reassigning the karta phase of the deleted user to it's creator
-      User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
-        if (err) return err;
-      });
-
-      // 7. Delete Subscription after Check weather the user has Spectator licene or not
-      User.app.models.subscription.find({ where: { "companyId": user.companyId }}, (err, subscriptions) => {
-        if (subscriptions.length > 0) {
-          for (let i = 0; i < subscriptions.length; i++) {
-            let subscription = subscriptions[i];
-            // Cancel its subscription
-            if(subscription.subscriptionId && subscription.subscriptionId !== "deactivated" && subscription.status == true ) {
-              cancel_user_subscription(subscription.subcriptionId);
-              if(i == subscriptions.length - 1 && subscription.customerId) delete_customer_by_id(subscription.customerId);
-            }
-            User.app.models.subscription.deleteAll({ userId: subscription.userId }, (err, subscriptionDelete) => {
-              if (err) return err;
-            });
-          }
-        }
-      });
-
-      // 8. Find and delete all members of company admin
-      User.find({ where: { "companyId": user.companyId }}, (err, members) => {
-        if (err) return err;
-        else {
-          if (members.length > 0) {
-            for (let member of members) {
-              member.is_deleted = true;
-              member.active = false;
-              member.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
-              member.save();
-
-              User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
-            }
-          }
-        }
-      });
-
-      // 9. Delete user's company
-      User.app.models.company.updateAll({ id: user.companyId }, { "is_deleted": true, "name": `${user.company().name}_${Date.now()}` }, (err, company) => {
-        if (err) return err;
-      });
+    } catch (err) {
+      console.log("Error while delete user data ===> ", err);
     }
   }
 
   // Delete user/member from admin panel
   User.deleteUser = (userId, next) => {
     // Find User
-    User.findOne({ where: { "_id": userId }, include: ["license", "company"] }, (err, user) => {
+    User.findOne({ where: { "_id": userId }, include: ["license", "company"] }, async (err, user) => {
       if (err) next(err);
       else if (!user) {
         let error = new Error("User not found!");
@@ -1017,24 +1110,24 @@ module.exports = function(User) {
         next(error);
       } else {
         // To check if its a social user
-        User.app.models.userIdentity.findOne({ userId }, (err, resp) => {
+        User.app.models.userIdentity.findOne({ where: { userId } }, (err, resp) => {
           if (err) next(err);
           if (resp) {
             // Delete the user from social table
             User.app.models.userIdentity.remove({ userId }, (err, resp) => {
               if (err) next(err);
             });
+            user.username = `${user.username}_${Date.now()}`;
           }
         });
         user.is_deleted = true;
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
-        user.save();
+        await user.save();
+        next(null, true);
 
         // It migrates the data
-        const errorCheck = DataMigration(user, userId);
-        if (errorCheck) next(errorCheck);
-        else next(null, true);
+        await DataMigration(user, userId);
       }
     });
   }
@@ -1257,7 +1350,7 @@ module.exports = function(User) {
 
   // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
-    const user = User.app.currentUser;
+    const currentUser = User.app.currentUser;
     const req = context.req;
 
     if (req.body.type == "social_user") {
@@ -1272,9 +1365,9 @@ module.exports = function(User) {
           next(error);
         } else {
           User.app.models.Role.findOne({ where:{ "name": "company_admin" } }, (err, role) => {
-            RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+            RoleManager.assignRoles(User.app, [role.id], currentUser.id, () => {
               // Create company
-              User.app.models.company.create({ "name": req.body.companyName, "userId": user.id }, {}, (err, company) => {
+              User.app.models.company.create({ "name": req.body.companyName, "userId": currentUser.id }, {}, (err, company) => {
                 if (err) {
                   console.log('> error while creating company', err);
                   return next(err);
@@ -1286,17 +1379,27 @@ module.exports = function(User) {
                     return next(err);
                   }
                   // Assign roleId, licenseId and companyId
+                  User.update({ "_id": currentUser.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true }, err => {
+                    if (err) {
+                      console.log('> error while updating social user', err);
+                      return next(err);
+                    } 
+                  });
+                  // Preparing salesforce data
+                  currentUser.__data.mobile = userInstance.__data.mobile;
+                  currentUser.__data.emailVerified = true;
                   let userDetails = {
-                    ...user.__data,
+                    ...currentUser.__data,
                     companyName: company.name,
                     license: license.name,
                     role: role.name
                   }
                   let ret = await sales_user_details(userDetails);
                   if (ret && ret.id) {
-                    User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "emailVerified": true, "sforceId": ret.id }, err => {
+                    // Assign salesforceId
+                    User.update({ "_id": currentUser.id },  { "sforceId": ret.id }, err => {
                       if (err) {
-                        console.log('> error while updating social user', err);
+                        console.log('> error while updating salesforce id in social user', err);
                         return next(err);
                       } 
                     });
@@ -1305,18 +1408,18 @@ module.exports = function(User) {
               });
               // Send welcome email to social users
               const password = generatePassword();
-              user.updateAttributes({ password }, {}, (err) => {
+              currentUser.updateAttributes({ password }, {}, (err) => {
                 // Create access token
-                user.accessTokens.create((err, token) => {
+                currentUser.accessTokens.create((err, token) => {
                   userInstance.__data.accessToken = token.id;
                   next();
                 });
-                if (!user.email.includes("facebook.com")) {
+                if (!currentUser.email.includes("facebook.com")) {
                   const data = {
                     subject: `Welcome to | ${User.app.get('name')}`,
                     template: "welcome.ejs",
-                    email: user.email,
-                    user,
+                    email: currentUser.email,
+                    user: currentUser,
                     password,
                     loginUrl: `${process.env.WEB_URL}/login`,
                     appName: User.app.get('name')
@@ -1333,7 +1436,7 @@ module.exports = function(User) {
     else if (req.body.type === "invited_user") {
       let updatedUserId = User.getDataSource().ObjectID(req.body.userId);
       RoleManager.assignRoles(User.app, [req.body.roleId], updatedUserId, () => {
-        User.app.models.user.findOne({ where: { id: req.body.userId }, include: ["department", "role", "license"]}, ( err, changedUser ) => {
+        User.findOne({ where: { "id": req.body.userId }, include: ["department", "role", "license"]}, ( err, changedUser ) => {
           if (err) next(err);
           else {
             changedUser = JSON.parse(JSON.stringify(changedUser));
@@ -1344,6 +1447,19 @@ module.exports = function(User) {
           sales_update_user( changedUser, req.body );
         });
         next();
+      });
+
+      // Change license and update subscription in chargebee
+      User.app.models.license.findOne({ where: { "id": req.body.licenseId } }, async (err, newLicense) => {
+        if (!err) {
+          const oldLicense = await User.app.models.license.findOne({ where: { "id": req.body.oldLicense } });
+          if (oldLicense.name !== newLicense.name) {
+            // Change new license count
+            if (newLicense.name !== "Spectator") await updateSubscription(userInstance.companyId, newLicense, req.body.userId);
+            // Change old license count
+            if (oldLicense.name !== "Spectator") await updateSubscription(userInstance.companyId, oldLicense, req.body.userId);
+          }
+        } 
       });
     }
     // Remove old profile picture, if user upload any new picture

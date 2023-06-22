@@ -3,7 +3,6 @@
 const keygen = require('keygenerator');
 const { sales_update_user } = require('../../../helper/salesforce');
 const moment = require('moment');
-const { sendEmail } = require('../../../helper/sendEmail');
 
 module.exports = function (app) {
     // Success redirect url for social login
@@ -30,9 +29,7 @@ module.exports = function (app) {
                     user_data.profilePic = user.profilePic || "";
                     user_data._2faEnabled = user._2faEnabled || false;
                     user_data.mobileVerified = user.mobileVerified || false;
-                    user_data.paymentVerified = user.paymentVerified || false;
-                    user_data.paymentFailed = user.paymentFailed || false;
-                    user_data.trialCancelled = user.trialCancelled || false;
+                    user_data.subscriptionStatus = user.subscriptionStatus;
                     if (user._2faEnabled && user.mobileVerified) {
                         let mobileVerificationCode = keygen.number({length: 6});
                         req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
@@ -44,18 +41,12 @@ module.exports = function (app) {
                           }
                           req.app.models.Twilio.send(twilio_data, function (err, data) {
                             console.log('> sending code to mobile number:', user.mobile.e164Number);
-                            // if (err) {
-                            //     console.log('> error while sending code to mobile number', err);
-                            //     let error = err;
-                            //     error.status = 500;
-                            //     return next(error);
-                            // }
                           });
                         });
                     }
 
                     sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
-                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}&paymentVerified=${user_data.paymentVerified}&paymentFailed=${user_data.paymentFailed}&trialCancelled=${user_data.trialCancelled}`);
+                    res.redirect(`${process.env.WEB_URL}/login?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}&profilePic=${user_data.profilePic}&companyLogo=${user_data.companyLogo}&companyId=${user_data.companyId}&role=${user_data.role}&license=${user_data.license}&_2faEnabled=${user_data._2faEnabled}&mobileVerified=${user_data.mobileVerified}&subscriptionStatus=${user_data.subscriptionStatus}`);
                 });
             } else {
                 res.redirect(`${process.env.WEB_URL}/sign-up?name=${user_data.name}&email=${user_data.email}&userId=${user_data.userId}&access_token=${user_data.accessToken}`);
@@ -63,49 +54,42 @@ module.exports = function (app) {
         } else res.redirect(`${process.env.WEB_URL}/login?isDeleted=true&isActive=false`);
     });
 
-    // Stripe webhook url
+    // Chargebee webhook url
     app.post("/webhook", async (req, res) => {
-        const { data, type } = req.body; 
+        const { content, event_type } = req.body;
         console.log(`==========>>>>> WEBHOOK (${new Date()})`, req.body);
 
-        const customerId = data.object.customer;
-        const userData = await app.models.Subscription.findOne({ where: { customerId, cardHolder: true }});
-        const userDetails = await app.models.user.findOne({ where: { id: userData.userId }});
-        const allCardSubs = await app.models.subscription.find({ where: { customerId }});
-        const allCardUsers = await app.models.user.find({ where: { companyId: userData.companyId }});
-        switch(type) {
-            case "invoice.created": 
-                const emailObj = {
-                    subject: `KPI Invoice`,
-                    template: "invoice.ejs",
-                    email: userDetails.email,
-                    user: userDetails,
-                    amount: parseFloat(Number(data.object.total) / 100),
-                    date: moment(data.object.created * 1000).format("MMM-DD-yyyy"),
-                };
-                sendEmail(app, emailObj, (err, response) => {
-                    if(err) res.status(500).json({ error: false, status: 500, message: "Error" });
-                    else res.status(200).json({ error: false, status: 200, message: "Success" });
-                });
-                break;
-
-            case "customer.source.expiring": 
-                for(let user of allCardUsers) {
-                    await app.models.user.update({ id: user.id }, { paymentFailed: true });
+        try {
+            let { customer_id, status } = content.subscription;
+            const subscription = await app.models.subscription.findOne({ where: { "customerId": customer_id }});
+            const mainUser = await app.models.user.findOne({ where: { id: subscription.userId }});
+            const allUsers = await app.models.user.find({ where: { companyId: mainUser.companyId }});
+    
+            // Update subscription status of all users
+            const updateSubscriptionStatus = async () => {
+                if (event_type === "subscription_deleted") status = "deleted"; 
+                let updatedData = { status };
+                if (event_type === "subscription_renewed") updatedData.nextSubscriptionDate = moment(Number(content.subscription.next_billing_at) * 1000);
+                await app.models.subscription.update({ "customerId": customer_id }, updatedData);
+                for (let user of allUsers) {
+                    await app.models.user.update({ "id": user.id }, { "subscriptionStatus": status });
                 }
-                res.status(200).json({ error: false, status: 200, message: "Success" });
-                break;
-
-            case "charge.failed":
-                for(let user of allCardUsers) {
-                    await app.models.user.update({ id: user.id }, { paymentFailed: true });
-                }
-                res.status(200).json({ error: false, status: 200, message: "Success" });
-                break;
-
-            default:
-                res.status(200).json({ error: false, status: 200, message: "Success" });
-                break;
+            }
+    
+            switch(event_type) {
+                case "subscription_reactivated":
+                case "subscription_renewed":
+                case "subscription_cancelled":
+                case "subscription_deleted":
+                    await updateSubscriptionStatus();
+                    res.status(200).json({ error: false, status: 200, message: "Success" });
+                    break;
+                default:
+                    res.status(200).json({ error: false, status: 200, message: "Success" });
+                    break;
+            }
+        } catch(err) {
+            res.status(500).json({ error: false, status: 500, message: "Error" });
         }
     });
 };

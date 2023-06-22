@@ -124,13 +124,5 @@
   "karta_catalog": {
     "dataSource": "db",
     "public": true
-  },
-  "price_mapping": {
-    "dataSource": "db",
-    "public": true
-  },
-  "trial_period": {
-    "dataSource": "db",
-    "public": true
   }
 }

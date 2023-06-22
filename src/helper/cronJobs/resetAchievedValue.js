@@ -70,10 +70,8 @@ exports.resetAchievedValueCron = (app) => {
         for (let node of nodes) {
           node = JSON.parse(JSON.stringify(node));
           // Set new due date
-          let new_due_date = moment();
-          if (node.target[0].frequency === "weekly") {
-            new_due_date = moment().add(1, 'weeks');
-          } else if (node.target[0].frequency === "monthly") {
+          let new_due_date = moment(node.due_date).endOf("day");
+          if (node.target[0].frequency === "monthly") {
             new_due_date = moment().add(1, 'months');
           } else if (node.target[0].frequency === "quarterly") {
             new_due_date = moment().add(3, 'months');
@@ -84,7 +82,7 @@ exports.resetAchievedValueCron = (app) => {
           // Reset percentage
           node.target[0].percentage = 0;
           
-          const updateQuery = { "achieved_value": 0, "target.0.percentage": 0, "due_date": new_due_date._d };
+          const updateQuery = { "achieved_value": 0, "target.0.percentage": 0, "due_date": new_due_date._d, "reset_on": new Date() };
           await app.models.KartaNode.update({ "_id": node.id }, { $set: updateQuery });
 
           console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET`);

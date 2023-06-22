@@ -15,9 +15,14 @@ module.exports = function (Kartanode) {
       },
       pipeline: [
         { 
-          $match: { 
-            $expr: { $eq: ["$_id", "$$karta_id"] }
-          } 
+          $match: {
+            $expr: {
+              $and: [
+                { $eq: ["$_id", "$$karta_id"] },
+                { $eq: ["$is_deleted", false] }
+              ]
+            }
+          }
         },
         {
           $project: {
@@ -754,41 +759,78 @@ module.exports = function (Kartanode) {
           }
         },
         KARTA_LOOKUP,
-        UNWIND_KARTA,
-        FACET(1, 1000)
-      ]).toArray(async (err, result) => {
-        if (result) {
-          result[0].data.length > 0 ? result[0].metadata[0].count = result[0].data.length : 0;
-          // Fetch past achieved values
-          for (let item of result[0].data) {
-            item.aggregateAchievedValue = 0;
+        UNWIND_KARTA
+      ]).toArray(async (err, kpiNodes) => {
+        if (err) next(err);
 
-            const karta_history_query = {
-              "kartaId": kartaId,
-              "kartaNodeId": item._id,
-              "is_deleted": false,
-              "event": "node_updated",
-              "old_options.achieved_value": { exists: true }
+        try {
+          if (kpiNodes.length > 0) {
+            // Find target
+            const findTarget = (targetArray, type) => {
+              return targetArray.find(el => el.frequency === type);
             }
-            let start = 0, end = 11;
-            if (type === "quarterly") {
-              start = moment(moment().startOf('quarter').toDate()).month();        
-              end = moment(moment().endOf('quarter').toDate()).month();
-            }      
+            const findAppropirateTarget = (targetArray, targetType) => {
+              let targetValue = 0;
+              switch (targetType) {
+                case "quarterly":
+                  if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value;
+                  else if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value * 3;
+                  else if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value / 4;
+                  break;
+                case "monthly":
+                  if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value;
+                  else if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value / 12;
+                  else if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value / 4;
+                  break;
+                case "yearly":
+                  if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value;
+                  else if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value * 12;
+                  else if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value * 4;
+                  break;
+              }
+              return targetValue;
+            }
+            // Fetch past achieved values
+            for (let item of kpiNodes) {
+              item.aggregateAchievedValue = 0;
+              item.aggregateTargetValue = 0;
+              
+              // Find yearly or quarterly target
+              item.aggregateTargetValue = findAppropirateTarget(item.target, type);
 
-            for (let i=start; i<=end; i++) {
-              karta_history_query["and"] = [
-                { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
-                { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
-              ]
-              const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
-              if (achievedHistory.length > 0) {
-                item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
+              // Preparing achieved history query
+              const achieved_history_query = {
+                "kartaId": kartaId,
+                "kartaNodeId": item._id,
+                "is_deleted": false,
+                "event": "node_updated",
+                "old_options.achieved_value": { exists: true }
+              }
+
+              // Set the start and end month number for retrieving the history
+              let start = 0, end = 11;
+              if (type === "quarterly") {
+                start = moment(moment().startOf('quarter').toDate()).month();        
+                end = moment(moment().endOf('quarter').toDate()).month();
+              }    
+  
+              for (let i=start; i<=end; i++) {
+                achieved_history_query["and"] = [
+                  { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
+                  { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
+                ]
+                // Find the latest achieved history
+                const achievedHistory = await Kartanode.app.models.karta_history.find({ where: achieved_history_query, order: "createdAt DESC", limit: 1 });
+                if (achievedHistory.length > 0) {
+                  item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
+                }
               }
             }
           }
+          next(null, kpiNodes);
+        } catch (err) {
+          next(err);
         }
-        next(err, result);
       });
     });
   }
@@ -954,7 +996,6 @@ module.exports = function (Kartanode) {
           if (findTarget('monthly')) targetValue = findTarget('monthly').value;
           else if (findTarget('annually')) targetValue = findTarget('annually').value * 12;
           else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 3;
-          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 4;
 
           // target value per day
           targetValue = todayDate * (targetValue / totalDays);
@@ -979,7 +1020,6 @@ module.exports = function (Kartanode) {
           if (findTarget('annually')) targetValue = findTarget('annually').value;
           else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
           else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
-          else if (findTarget('weekly')) targetValue = findTarget('weekly').value * 52;
 
           // target value per day
           targetValue = todayDate * (targetValue / totalDays);
