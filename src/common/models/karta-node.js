@@ -765,18 +765,38 @@ module.exports = function (Kartanode) {
 
         try {
           if (kpiNodes.length > 0) {
+            // Find target
+            const findTarget = (targetArray, type) => {
+              return targetArray.find(el => el.frequency === type);
+            }
+            const findAppropirateTarget = (targetArray, targetType) => {
+              let targetValue = 0;
+              switch (targetType) {
+                case "quarterly":
+                  if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value;
+                  else if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value * 3;
+                  else if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value / 4;
+                  break;
+                case "monthly":
+                  if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value;
+                  else if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value / 12;
+                  else if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value / 4;
+                  break;
+                case "yearly":
+                  if (findTarget(targetArray, 'yearly')) targetValue = findTarget(targetArray, 'yearly').value;
+                  else if (findTarget(targetArray, 'monthly')) targetValue = findTarget(targetArray, 'monthly').value * 12;
+                  else if (findTarget(targetArray, 'quarterly')) targetValue = findTarget(targetArray, 'quarterly').value * 4;
+                  break;
+              }
+              return targetValue;
+            }
             // Fetch past achieved values
             for (let item of kpiNodes) {
               item.aggregateAchievedValue = 0;
               item.aggregateTargetValue = 0;
               
               // Find yearly or quarterly target
-              let targetFound = false;
-              const target = item.target.find(el => el.frequency === type);
-              if (target) {
-                item.aggregateTargetValue = target.value;
-                targetFound = true;
-              }
+              item.aggregateTargetValue = findAppropirateTarget(item.target, type);
 
               // Preparing achieved history query
               const achieved_history_query = {
@@ -801,24 +821,8 @@ module.exports = function (Kartanode) {
                 ]
                 // Find the latest achieved history
                 const achievedHistory = await Kartanode.app.models.karta_history.find({ where: achieved_history_query, order: "createdAt DESC", limit: 1 });
-                if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
-                  const target_history_query = {
-                    "kartaId": kartaId,
-                    "kartaNodeId": item._id,
-                    "is_deleted": false,
-                    "randomKey": achievedHistory[0].randomKey,
-                    "event": "node_updated",
-                    "old_options.target": { exists: true }
-                  }
+                if (achievedHistory.length > 0) {
                   item.aggregateAchievedValue += achievedHistory[0].event_options.updated.achieved_value;
-                  // Find the respective target
-                  if (!targetFound) {
-                    const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_history_query });
-                    if (targetHistory) {
-                      // If target not found directly, then sum all the monthly targets
-                      item.aggregateTargetValue += targetHistory.event_options.updated.target[0].value;
-                    }
-                  }
                 }
               }
             }
