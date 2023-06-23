@@ -21,6 +21,18 @@ exports.get_plans = async () => {
     }
 }
 
+// GET CHAMPION PLAN
+exports.get_champion_plan = async (planId) => {
+    try {
+        const URL = `${SITE_URL}/item_prices?id[is]=${planId}`;
+        const response = await axios.get(URL, { headers: REQUEST_HEADER });
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
 // CREATE CUSTOMER
 exports.create_customer = async (params) => {
     const { first_name, email, company } = params;
