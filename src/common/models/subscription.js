@@ -1,7 +1,7 @@
 "use strict";
 
 const moment = require('moment');
-const { get_plans, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
+const { get_plans, get_champion_plan, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
 
 
 module.exports = function (Subscription) {
@@ -121,6 +121,16 @@ module.exports = function (Subscription) {
           tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_MONTHLY_ADDON_PLAN_ID, 'amount');
           tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'unit_price');
           tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'amount');
+        }
+        if (!tracker.Champion.unit_price) {
+          try {
+            let planId = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+            if (subscription.frequency === "year") planId = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+            const plan = await get_champion_plan(planId);
+            if (plan.status === 200) tracker.Champion.unit_price = plan.data.list[0].item_price.price/100;
+          } catch(err) {
+            console.log("Error while getting champion plan details=====> ", err);
+          }
         }
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
         userObj["userDetails"] = userDetails;
