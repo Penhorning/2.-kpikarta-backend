@@ -5,8 +5,8 @@ const { sendEmail } = require('../../helper/sendEmail');
 
 exports.profileStatusCron = (app) => {
     // CronJob runs at every friday
-    // cron.schedule('0 0 * * 5', async () => {
-    cron.schedule('*/5 * * * *', () => {
+    cron.schedule('0 0 * * 5', async () => {
+    // cron.schedule('*/5 * * * *', () => {
         try {
             app.models.User.getDataSource().connector.connect(function (err, db) {
                 const userCollection = db.collection('user');
@@ -21,7 +21,7 @@ exports.profileStatusCron = (app) => {
                         $or: [{ "state" : { $exists: false } }, { "state" : { $eq: "" } }],
                         $or: [{ "postal_code" : { $exists: false } }, { "postal_code" : { $eq: "" } }],
                         $or: [{ "country" : { $exists: false } }, { "country" : { $eq: "" } }],
-                        "subscriptionStatus": "active",
+                        "subscriptionStatus": { $in: ["in_trial", "active"] },
                         "active": true,
                         "is_deleted": false
                     }
