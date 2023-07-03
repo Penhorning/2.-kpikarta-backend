@@ -6,7 +6,7 @@ const { sendEmail } = require('../../helper/sendEmail');
 exports.profileStatusCron = (app) => {
     // CronJob runs at every friday
     cron.schedule('0 0 * * 5', async () => {
-    // cron.schedule('*/4 * * * * *', () => {
+    // cron.schedule('*/5 * * * *', () => {
         try {
             app.models.User.getDataSource().connector.connect(function (err, db) {
                 const userCollection = db.collection('user');
@@ -21,23 +21,26 @@ exports.profileStatusCron = (app) => {
                         $or: [{ "state" : { $exists: false } }, { "state" : { $eq: "" } }],
                         $or: [{ "postal_code" : { $exists: false } }, { "postal_code" : { $eq: "" } }],
                         $or: [{ "country" : { $exists: false } }, { "country" : { $eq: "" } }],
+                        "subscriptionStatus": { $in: ["in_trial", "active"] },
+                        "active": true,
+                        "is_deleted": false
                     }
                   }
                 ]).toArray((err, result) => {
                   if (err) throw err;
                   else {
-                    if(result.length > 0) {
-                      for(let i = 0; i < result.length; i++) {
+                    if (result.length > 0) {
+                      for (let user of result) {
                         const emailObj = {
                           subject: `Profile Status`,
                           template: "profile-reminder.ejs",
-                          email: result[i].email,
-                          user: result[i],
+                          email: user.email,
+                          user,
+                          profileLink: `${process.env.WEB_URL}/my-profile`
                         };
                         sendEmail(app, emailObj, () => {});
                       }
                     }
-                    // console.log("contributorId", result);
                   }
                 });
               });

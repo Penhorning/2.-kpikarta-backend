@@ -2,6 +2,7 @@
 
 const moment = require('moment');
 const { get_plans, get_champion_plan, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
+const { sendEmail } = require('../../helper/sendEmail');
 
 
 module.exports = function (Subscription) {
@@ -57,6 +58,26 @@ module.exports = function (Subscription) {
           };
           const subscription = await Subscription.create(data);
           await Subscription.app.models.user.update({ "id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
+          // Send new user mail to super admin
+          Subscription.app.models.Role.findOne({ where: { name: "admin" } }, (err, role) => {
+            if (err) throw err;
+            else {
+              // Find admin user
+              Subscription.app.models.user.findOne({ where: { "roleId": role.id, "email": { neq: process.env.EXCLUDE_ADMIN_EMAIL } } }, (err, adminUser) => {
+                if (!err) {
+                  const emailObj = {
+                    subject: `A new user has signed up..!!`,
+                    template: "admin-notify.ejs",
+                    email: adminUser.email,
+                    user: user,
+                    admin: adminUser,
+                    company: user.company().name
+                  };
+                  sendEmail(Subscription.app, emailObj, () => {});
+                }
+              }); 
+            }
+          });
           return "Subscription started successfully!";
         } else {
           const err = new Error("Internal Server Error");
