@@ -5,8 +5,8 @@ const { sendEmail } = require('../../helper/sendEmail');
 
 exports.profileStatusCron = (app) => {
     // CronJob runs at every friday
-    // cron.schedule('0 0 * * 5', async () => {
-    cron.schedule('*/5 * * * *', () => {
+    cron.schedule('0 0 * * 5', async () => {
+    // cron.schedule('*/5 * * * *', () => {
         try {
             app.models.User.getDataSource().connector.connect(function (err, db) {
                 const userCollection = db.collection('user');
