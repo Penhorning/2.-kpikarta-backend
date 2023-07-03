@@ -360,12 +360,11 @@ module.exports = function(User) {
           return next(err);
         }
         // Assign role
-        RoleManager.assignRoles(User.app, [role.id], user.id, () => {
+        user.updateAttributes({ "roleId": role.id }, (err, result) => {
           if (err) {
             console.log('> error while assigning role', err);
             return next(err);
-          }
-          next();
+          } else next();
         });
       });
     });
