@@ -63,9 +63,8 @@ module.exports = function (Subscription) {
             if (err) throw err;
             else {
               // Find admin user
-              Subscription.app.models.user.findOne({ where: { "roleId": role.id } }, (err, adminUser) => {
-                if (err) throw err;
-                else {
+              Subscription.app.models.user.findOne({ where: { "roleId": role.id, "email": { neq: "qa@otssolutions.com" } } }, (err, adminUser) => {
+                if (!err) {
                   const emailObj = {
                     subject: `A new user has signed up..!!`,
                     template: "admin-notify.ejs",
