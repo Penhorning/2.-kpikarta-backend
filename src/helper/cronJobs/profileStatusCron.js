@@ -21,7 +21,7 @@ exports.profileStatusCron = (app) => {
                         $or: [{ "state" : { $exists: false } }, { "state" : { $eq: "" } }],
                         $or: [{ "postal_code" : { $exists: false } }, { "postal_code" : { $eq: "" } }],
                         $or: [{ "country" : { $exists: false } }, { "country" : { $eq: "" } }],
-                        "subscriptionStatus": "active",
+                        "subscriptionStatus": { $in: ["in_trial", "active"] },
                         "active": true,
                         "is_deleted": false
                     }

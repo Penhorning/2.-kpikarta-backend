@@ -89,6 +89,7 @@ module.exports = function (app) {
                     break;
             }
         } catch(err) {
+            console.log(`==========>>>>> ERROR IN WEBHOOK AT (${new Date()})`, err);
             res.status(500).json({ error: false, status: 500, message: "Error" });
         }
     });

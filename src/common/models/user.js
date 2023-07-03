@@ -990,42 +990,42 @@ module.exports = function(User) {
         sales_delete_user(user.sforceId);
   
         // 2. Reassigning the kartas of the deleted user to it's creator
-        User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, karta) => {
+        User.app.models.karta.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err) => {
           if (err) throw err;
         });
   
         // Resetting contributor's id
-        User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err, karta_node) => {
+        User.app.models.karta_node.updateAll({ "contributorId": userId }, { $unset : { "contributorId" : 1} }, (err) => {
           if (err) throw err;
         });
   
         // Remove the email ids from all shared kartas
-        User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err, karta) => {
+        User.app.models.karta.updateAll({ "sharedTo.email": user.email }, { $pull : { "sharedTo": { "email": user.email } } }, (err) => {
           if (err) throw err;
         });
   
         // 3. Reassigning the inventories of the deleted user to it's creator
-        User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, inventory) => {
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err) => {
           if (err) throw err;
         });
   
         // 4. Reassigning the color settings of the deleted user to it's creator
-        User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, color) => {
+        User.app.models.color_setting.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err) => {
           if (err) throw err;
         });
   
         // 5. Reassigning the suggestions of the deleted user to it's creator
-        User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, suggestion) => {
+        User.app.models.suggestion.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err) => {
           if (err) throw err;
         });
   
         // 6. Reassigning the karta phase of the deleted user to it's creator
-        User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err, phase) => {
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { "userId": user.creatorId }, (err) => {
           if (err) throw err;
         });
   
         // 7. Find and delete its invited members
-        User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err, user) => {
+        User.updateAll({ "creatorId": userId }, { "creatorId": user.creatorId }, (err) => {
           if (err) throw err;
         });
 
@@ -1043,28 +1043,28 @@ module.exports = function(User) {
           }
         });
   
-        // 2. Reassigning the karta of the deleted user to it's creator
-        User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err, karta) => {
+        // 2. Deleting the karta of the deleted user
+        User.app.models.karta.updateAll({ "userId": userId }, { "is_deleted": true }, (err) => {
           if (err) throw err;
         });
   
-        // 3. deleting the inventories of the deleted user
-        User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, inventory) => {
+        // 3. Deleting the inventories of the deleted user
+        User.app.models.karta_catalog.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err) => {
           if (err) throw err;
         });
   
-        // 4. Reassigning the color settings of the deleted user to it's creator
-        User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, color) => {
+        // 4. Deleting the color settings of the deleted user
+        User.app.models.color_setting.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err) => {
           if (err) throw err;
         });
   
-        // 5. Reassigning the suggestions of the deleted user to it's creator
-        User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, suggestion) => {
+        // 5. Deleting the suggestions of the deleted user
+        User.app.models.suggestion.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err) => {
           if (err) throw err;
         });
   
-        // 6. Reassigning the karta phase of the deleted user to it's creator
-        User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err, phase) => {
+        // 6. Deleting the karta phase of the deleted user
+        User.app.models.karta_phase.updateAll({ "userId": userId }, { $set: { "is_deleted": true }}, (err) => {
           if (err) throw err;
         });
   
@@ -1078,7 +1078,7 @@ module.exports = function(User) {
                 member.active = false;
                 member.email = `${member.email.split('@')[0]}_${Date.now()}_@${member.email.split('@')[1]}`;
                 member.save();
-  
+                // Deleting the roleMapping entry
                 User.app.models.RoleMapping.deleteAll({ "principalId": member.id }, () => {});
               }
             }
@@ -1115,7 +1115,7 @@ module.exports = function(User) {
           await User.app.models.userIdentity.deleteAll({ userId });
           user.username = `${user.username}_${Date.now()}`;
         }
-        
+
         user.is_deleted = true;
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;

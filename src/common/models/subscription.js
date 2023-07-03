@@ -63,7 +63,7 @@ module.exports = function (Subscription) {
             if (err) throw err;
             else {
               // Find admin user
-              Subscription.app.models.user.findOne({ where: { "roleId": role.id, "email": { neq: "qa@otssolutions.com" } } }, (err, adminUser) => {
+              Subscription.app.models.user.findOne({ where: { "roleId": role.id, "email": { neq: process.env.EXCLUDE_ADMIN_EMAIL } } }, (err, adminUser) => {
                 if (!err) {
                   const emailObj = {
                     subject: `A new user has signed up..!!`,
