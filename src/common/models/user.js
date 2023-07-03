@@ -1109,16 +1109,13 @@ module.exports = function(User) {
         next(error);
       } else {
         // To check if its a social user
-        User.app.models.userIdentity.findOne({ where: { userId } }, (err, resp) => {
-          if (err) next(err);
-          if (resp) {
-            // Delete the user from social table
-            User.app.models.userIdentity.remove({ userId }, (err, resp) => {
-              if (err) next(err);
-            });
-            user.username = `${user.username}_${Date.now()}`;
-          }
-        });
+        const socialUser = await User.app.models.userIdentity.findOne({ where: { userId } });
+        // Delete the user from social table
+        if (socialUser) {
+          await User.app.models.userIdentity.deleteAll({ userId });
+          user.username = `${user.username}_${Date.now()}`;
+        }
+        
         user.is_deleted = true;
         user.active = false;
         user.email = `${user.email.split('@')[0]}_${Date.now()}_@${user.email.split('@')[1]}`;
