@@ -472,7 +472,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         userId: kartaDetails.userId ? kartaDetails.userId : null,
         status: kartaDetails.status ? kartaDetails.status : null,
         type: kartaDetails.type ? kartaDetails.type : null
-      }
+      };
       const newKarta = await Karta.create(newObj);
 
       // Phase and Node Mappers
