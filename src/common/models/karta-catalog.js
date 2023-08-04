@@ -64,6 +64,7 @@ module.exports = function(Kartacatalog) {
 
     let query = { "userId": objectUserId, "is_deleted": false };
     if (type === "shared") query = { "sharedTo.userId": userId, "is_deleted": false }
+    
     // Fetch catalog with access type like public or private
     if (accessType) query.type = accessType;
 
