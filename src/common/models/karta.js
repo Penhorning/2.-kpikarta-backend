@@ -488,7 +488,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
          let currentPhase = JSON.parse(JSON.stringify(getPhases[x])); 
          let phaseData = {
            ...currentPhase,
-           kartaId: newKarta.id,
+           kartaId: newKarta.id
          };
          delete phaseData.id;
          phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData["parentId"]] : null;
