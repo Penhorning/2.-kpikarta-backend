@@ -480,7 +480,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
       let phaseDataMapping = {};
       let mapper = {};
       
-      //Creating new Phases for new karta
+      // Creating new Phases for new karta
       const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId, "is_child": false }});
       // const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId }});
       if (getPhases.length > 0) {
