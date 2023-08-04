@@ -472,7 +472,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         userId: kartaDetails.userId ? kartaDetails.userId : null,
         status: kartaDetails.status ? kartaDetails.status : null,
         type: kartaDetails.type ? kartaDetails.type : null
-      }
+      };
       const newKarta = await Karta.create(newObj);
 
       // Phase and Node Mappers
@@ -480,7 +480,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
       let phaseDataMapping = {};
       let mapper = {};
       
-      //Creating new Phases for new karta
+      // Creating new Phases for new karta
       const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId, "is_child": false }});
       // const getPhases = await Karta.app.models.karta_phase.find({ where: { kartaId }});
       if (getPhases.length > 0) {
@@ -488,7 +488,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
          let currentPhase = JSON.parse(JSON.stringify(getPhases[x])); 
          let phaseData = {
            ...currentPhase,
-           kartaId: newKarta.id,
+           kartaId: newKarta.id
          };
          delete phaseData.id;
          phaseData["parentId"] ? phaseData["parentId"] = phaseMapping[phaseData["parentId"]] : null;
@@ -754,56 +754,65 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         const latestVersion = versions[versions.length - 1];
 
         // Finding latest version karta history before the requested time
-        const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": latestVersion.id } });
+        const requestedKartaHistory = await Karta.app.models.karta_history.find({ where: { ...query, "versionId": latestVersion.id }, order: "createdAt ASC" });
         // Getting last history event object from that
         const lastHistoryObject = JSON.parse(JSON.stringify(requestedKartaHistory[requestedKartaHistory.length - 1]));
 
         // Finding the index of the last object of the requested karta history in the whole karta history
         const historyIndex = wholeKartaHistory.findIndex((x, index) => {
           // Find index of the last history object from the latest karta history
-          if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
-            // Return the index directly if node, phase is created or removed
-            if (x.event == "node_created" || x.event == "node_removed" || x.event == "phase_created" || x.event == "phase_removed") {
-              return x;
-            }
-            // If node is updated, then return the last updated history index
-            else if (x.event === "node_updated") {
-              const currentOldOptions = JSON.parse(JSON.stringify(x.old_options));
-              let flagCheck = false;
-
-              // First check, for comparing the length of the keys between both objects
-              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(currentOldOptions).length) {
-
-                // Second check, for comparing the key's names between both objects
-                Object.keys(lastHistoryObject.old_options).forEach(key => {
-                  if (currentOldOptions.hasOwnProperty(key)) {
-                    // Third check, to compare the type of values
-                    if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
-                      (currentOldOptions[key] === lastHistoryObject.old_options[key] && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
-                    } else if (typeof lastHistoryObject.old_options[key] === 'object') {
-                      (Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false; 
-                    } else {
-                      (currentOldOptions[key].length == lastHistoryObject.old_options[key].length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
-                    }
-                  } else return flagCheck = false;
-                });
-              } else return flagCheck = false;
-
-              if (flagCheck) return x;
-              // else return -1;
-            }
-            // If phase is updated, then return the last updated history index
-            else if (x.event === "phase_updated") {
-              let flagCheck = false;
-              if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
-                if (lastHistoryObject.old_options.name === x.old_options.name) flagCheck = true;
-                else return flagCheck = false;
-              } else return flagCheck = false;
-              if (flagCheck) return x;
-              else return -1;
-            }
+          if (x.id === lastHistoryObject.id && x.randomKey === lastHistoryObject.randomKey) {
+            return x;
           }
         });
+
+        // Remove below code if everything works fine
+        // Finding the index of the last object of the requested karta history in the whole karta history
+        // const historyIndex = wholeKartaHistory.findIndex((x, index) => {
+        //   // Find index of the last history object from the latest karta history
+        //   if (x.event === lastHistoryObject.event && x.kartaNodeId.toString() === lastHistoryObject.kartaNodeId.toString()) {
+        //     // Return the index directly if node, phase is created or removed
+        //     if (x.event == "node_created" || x.event == "node_removed" || x.event == "phase_created" || x.event == "phase_removed") {
+        //       return x;
+        //     }
+        //     // If node is updated, then return the last updated history index
+        //     else if (x.event === "node_updated") {
+        //       const currentOldOptions = JSON.parse(JSON.stringify(x.old_options));
+        //       let flagCheck = false;
+
+        //       // First check, for comparing the length of the keys between both objects
+        //       if (Object.keys(lastHistoryObject.old_options).length === Object.keys(currentOldOptions).length) {
+
+        //         // Second check, for comparing the key's names between both objects
+        //         Object.keys(lastHistoryObject.old_options).forEach(key => {
+        //           if (currentOldOptions.hasOwnProperty(key)) {
+        //             // Third check, to compare the type of values
+        //             if (typeof lastHistoryObject.old_options[key] === 'string' || typeof lastHistoryObject.old_options[key] === 'number' || typeof lastHistoryObject.old_options[key] === 'boolean') {
+        //               (currentOldOptions[key] === lastHistoryObject.old_options[key] && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
+        //             } else if (typeof lastHistoryObject.old_options[key] === 'object') {
+        //               (Object.keys(currentOldOptions[key]).length === Object.keys(lastHistoryObject.old_options[key]).length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false; 
+        //             } else {
+        //               (currentOldOptions[key].length == lastHistoryObject.old_options[key].length && x.randomKey === lastHistoryObject.randomKey) ? flagCheck = true : flagCheck = false;
+        //             }
+        //           } else return flagCheck = false;
+        //         });
+        //       } else return flagCheck = false;
+
+        //       if (flagCheck) return x;
+        //       // else return -1;
+        //     }
+        //     // If phase is updated, then return the last updated history index
+        //     else if (x.event === "phase_updated") {
+        //       let flagCheck = false;
+        //       if (Object.keys(lastHistoryObject.old_options).length === Object.keys(x.old_options).length) {
+        //         if (lastHistoryObject.old_options.name === x.old_options.name) flagCheck = true;
+        //         else return flagCheck = false;
+        //       } else return flagCheck = false;
+        //       if (flagCheck) return x;
+        //       else return -1;
+        //     }
+        //   }
+        // });
 
         // Whole Karta History - Requested Karta History = History to Undo from main karta data 
         const filteredHistory = historyIndex > -1 ? wholeKartaHistory.slice(0, historyIndex) : [];
@@ -839,9 +848,6 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
             }
             updateData(kartaNode);
           } else if (currentHistoryObj.event == "node_updated") {
-            if(currentHistoryObj.id == "647cef0bd1e1f881e3c1b80f") {
-              console.log(currentHistoryObj);
-            }
             function updateData(data) {
               if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
                 Object.keys(currentHistoryObj.old_options).map(x => {
@@ -894,6 +900,47 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
           });
           return item;
         });
+
+        // Since the Hitory can get changed by the user.. We will redo the karta from the start till the end of the requested month to get the updated data
+        // Getting karta history for the requested month
+        let newquery = { 
+          kartaId,
+          "versionId": latestVersion.id
+        };
+        if (type == "quarter") {
+          newquery["createdAt"] = { 
+            // gte: moment().quarter(duration).startOf('quarter'),
+            lte: moment().quarter(duration).endOf('quarter') 
+          }
+        } else if (type == "month") {
+          newquery["createdAt"] = { 
+            // gte: moment().month(duration).startOf('month'),
+            lte: moment().month(duration).endOf('month').toDate() 
+          }
+        }
+
+        let lastRequestedKartaHistory = await Karta.app.models.karta_history.find({ where: newquery, order: "createdAt ASC" });
+        lastRequestedKartaHistory = JSON.parse(JSON.stringify(lastRequestedKartaHistory));
+
+        // Performing Redo functionality on main kartaData
+        for (const element of lastRequestedKartaHistory) {
+          let currentHistoryObj = element;
+          // CHECKING FOR NODES
+          if (currentHistoryObj.event == "node_updated") {
+            function updateData(data) {
+              if (data && data.id.toString() === currentHistoryObj.kartaNodeId.toString()) {
+                Object.keys(currentHistoryObj.event_options.updated).forEach(x => {
+                  data[x] = JSON.parse(JSON.stringify(currentHistoryObj.event_options.updated[x]));
+                });
+              } else if (data && data.children && data.children.length > 0) {
+                for (let j = 0; j < data.children.length; j++) {
+                  updateData(data.children[j]);
+                }
+              }
+            }
+            updateData(kartaNode);
+          }
+        }
 
         // Remove null from children arrays
         function nullRemover(data) {
