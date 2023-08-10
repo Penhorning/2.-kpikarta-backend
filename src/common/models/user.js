@@ -736,13 +736,12 @@ module.exports = function(User) {
   function loginWithRole(email, password, next, role) {
     email = email.toLowerCase();
     User.login({ email, password }, 'user', (err, token) => {
-      if (err) return next(err);
-      token.user((_e, user) => {
-        user.roles((e, roles) => {
-          roles = roles.map(r => r.name);
-          if (roles.indexOf(role) > -1) {
+      if (err) next(err);
+      else {
+        User.findOne({ where: { email }, include: 'role' }, (err, user) => {
+          if (role === "admin" && user.role().name === "admin") {
             next(null, token);
-          } else if (role === 'not_admin' && roles[0] !== 'admin') {
+          } else if (role === "not_admin" && user.role().name !== "admin") {
             sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
             next(null, token);
           } else {
@@ -751,7 +750,7 @@ module.exports = function(User) {
             next(error);
           }
         });
-      });
+      }
     });
   };
 

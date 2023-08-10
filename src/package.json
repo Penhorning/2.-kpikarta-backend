@@ -11,7 +11,7 @@
     "posttest": "npm run lint"
   },
   "dependencies": {
-    "axios": "^1.4.0",
+    "axios": "0.26.1",
     "body-parser": "^1.20.0",
     "chargebee": "^2.22.3",
     "compression": "^1.0.3",
