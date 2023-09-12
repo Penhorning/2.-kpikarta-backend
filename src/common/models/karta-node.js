@@ -1331,6 +1331,165 @@ module.exports = function (Kartanode) {
     next();
   });
 
+  // Update or create history for past months
+  Kartanode.beforeRemote('prototype.patchAttributes', (context, instance, next) => {
+    const req = context.req;
+    const achievedValue = +req.body.achieved_value;
+    // Check whether user wants to update for past month or not
+    if (req.body.pastMonth) {
+      // Prepare history query
+      const karta_history_query = {
+        "kartaNodeId": req.params.id,
+        "event": "node_updated",
+        "old_options.achieved_value": { exists: true },
+        "createdAt": {
+          between: [
+            moment().month(req.body.pastMonth).startOf('month').toDate(),
+            moment().month(req.body.pastMonth).endOf('month').toDate()
+          ]
+        }
+      }
+      // Find achieved history
+      Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 }, async (err, achievedHistory) => {
+        if (err) next(err);
+        // If we found the history, then we update that
+        else if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
+          // Update achieved value history in db
+          await Kartanode.app.models.karta_history.update({ "id": achievedHistory[0].id }, { $set: { "event_options.updated.achieved_value": achievedValue } });
+          // Find target to update the percentage in target object
+          const target_query = {
+            "kartaNodeId": req.params.id,
+            "randomKey": achievedHistory[0].randomKey,
+            "event": "node_updated",
+            "old_options.target": { exists: true }
+          }
+          const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query });
+          if (targetHistory && targetHistory.randomKey) {
+            // Set new percentage in target object
+            let oldTarget = [{
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: Math.round((achievedValue / targetHistory.event_options.updated.target[0].value) * 100),
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            }];
+            // Update percentage history in db
+            await Kartanode.app.models.karta_history.update({ "id": targetHistory.id }, { $set: { "event_options.updated.target": oldTarget } });
+            // Update formula as well, if node_type is metrics
+            if (req.body.node_formula && req.body.node_formula.metrics) {
+              const formula_query = {
+                "kartaNodeId": req.params.id,
+                "randomKey": targetHistory.randomKey,
+                "event": "node_updated",
+                "old_options.node_formula": { exists: true }
+              }
+              const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+              await Kartanode.app.models.karta_history.update({ "id": formulaHistory.id }, { $set: { "event_options.updated.node_formula": req.body.node_formula } });
+            }
+          }
+          context.res.status(200).json({});
+          return;
+        }
+        // HISTORY NOT FOUND, CREATE NEW ONE
+        else {
+          // Find current node
+          const currentNode = await Kartanode.findOne({ where: { "_id": req.params.id, "is_deleted": false } });
+          // Find karta detail of updating node
+          const karta = await Kartanode.app.models.karta.findOne({ where: { "_id": currentNode.kartaDetailId } });
+          // Find the latest target of current node is history
+          const target_query = {
+            "kartaNodeId": req.params.id,
+            "event": "node_updated",
+            "old_options.target": { exists: true },
+            "createdAt": {
+              between: [
+                moment(currentNode.createdAt).toDate(),
+                moment().month(req.body.pastMonth).endOf('month').toDate()
+              ]
+            }
+          }
+          let oldTarget = [];
+          let newTarget = [];
+          let oldFormula = {};
+          let oldAchievedValue = 0;
+          const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query, "order": "createdAt DESC", "limit": 1 });
+          if (targetHistory && targetHistory.randomKey) {
+            oldTarget.push({
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: targetHistory.event_options.updated.target[0].percentage,
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            });
+            newTarget.push({
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: Math.round((achievedValue / targetHistory.event_options.updated.target[0].value) * 100),
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            });
+            // Fin achieved value of this target
+            const achieved_value_query = {
+              "kartaNodeId": req.params.id,
+              "randomKey": targetHistory.randomKey,
+              "event": "node_updated",
+              "old_options.achieved_value": { exists: true }
+            }
+            const achievedHistory = await Kartanode.app.models.karta_history.findOne({ where: achieved_value_query });
+            oldAchievedValue = achievedHistory.event_options.updated.achieved_value;
+          }
+          let nodeValues = [
+            { "achieved_value": achievedValue },
+            { "target": newTarget }
+          ]
+          // Find formula, if node_type is metrics
+          if (req.body.node_formula && req.body.node_formula.metrics) {
+            nodeValues.push({
+              "node_formula": req.body.node_formula
+            });
+            const formula_query = {
+              "kartaNodeId": req.params.id,
+              "randomKey": targetHistory.randomKey,
+              "event": "node_updated",
+              "old_options.node_formula": { exists: true }
+            }
+            const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+            oldFormula = formulaHistory.event_options.updated.node_formula;
+          }
+          // Creating history for achieved value, node formula and target value
+          let randomKey = new Date().getTime().toString();
+          for (let value of nodeValues) {
+            let old_options = {};
+            if (value.hasOwnProperty("achieved_value")) {
+              old_options["achieved_value"] = oldAchievedValue;
+            } else if (value.hasOwnProperty("target")) {
+              old_options["target"] = oldTarget;
+            } else if (value.hasOwnProperty("node_formula")) {
+              old_options["node_formula"] = oldFormula;
+            }
+            // Prepare history data
+            let history_data = {
+              event: "node_updated",
+              kartaNodeId: currentNode.id,
+              userId: Kartanode.app.currentUser.id,
+              versionId: karta.versionId,
+              kartaId: karta.id,
+              parentNodeId: currentNode.parentId,
+              historyType: 'main',
+              randomKey,
+              event_options: {
+                created: null,
+                updated: value,
+                removed: null
+              },
+              old_options,
+              createdAt: moment().month(req.body.pastMonth).endOf('month')._d,
+              updatedAt: moment().month(req.body.pastMonth).endOf('month')._d
+            }
+            // Create history of current node
+            await Kartanode.app.models.karta_history.create(history_data);
+          }
+          context.res.status(200).json({});
+          return;
+        }
+      });
+    } else next();
+  });
+
   // Update assigned date when a contributor added in a given node
   Kartanode.afterRemote('prototype.patchAttributes', function(context, instance, next) {
     const req = context.req;
