@@ -89,6 +89,7 @@ exports.resetAchievedValueCron = (app) => {
           node.target[0].percentage = 0;
           
           const updateQuery = { "achieved_value": 0, "target.0.percentage": 0, "due_date": new_due_date._d, "reset_on": new Date() };
+          // Execute reset query
           await app.models.KartaNode.update({ "_id": node.id }, { $set: updateQuery });
 
           console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET at ${new Date()}`);
