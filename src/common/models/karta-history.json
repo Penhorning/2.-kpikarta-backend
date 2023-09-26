@@ -267,6 +267,31 @@
         "path": "/sync-history",
         "verb": "post"
       }
+    },
+    "getNodeHistory": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number"
+        },
+        {
+          "arg": "limit",
+          "type": "number"
+        },
+        {
+          "arg": "nodeId",
+          "type": "string",
+          "required": true
+        }
+      ],
+      "returns": {
+        "arg": "karta_history",
+        "type": "string"
+      },
+      "http": {
+        "path": "/get-node-history",
+        "verb": "post"
+      }
     }
   }
 }
