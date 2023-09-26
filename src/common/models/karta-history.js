@@ -1,7 +1,81 @@
 'use strict';
 
 module.exports = function(Kartahistory) {
+    /* QUERY VARIABLES
+    ----------------*/
+    // Karta lookup
+    const KARTA_LOOKUP = {
+        $lookup: {
+            from: 'karta',
+            let: { karta_id: "$kartaId" },
+            pipeline: [
+                { 
+                    $match: {
+                        $expr: {
+                            $and: [
+                                { $eq: ["$_id", "$$karta_id"] },
+                                { $eq: ["$is_deleted", false] }
+                            ]
+                        }
+                    }
+                },
+                {
+                    $project: {
+                        "name": 1,
+                        "userId": 1,
+                        "versionId": 1
+                    }
+                }
+            ],
+            as: 'karta'
+        }
+    }
+    const UNWIND_KARTA = {
+        $unwind: {
+            path: "$karta"
+        }
+    }
+    // User lookup
+    const USER_LOOKUP = {
+        $lookup: {
+            from: "user",
+            let: { user_id: "$userId" },
+            pipeline: [
+                { 
+                    $match: { 
+                        $expr: { $eq: ["$_id", "$$user_id"] }
+                    } 
+                },
+                {
+                    $project: { "fullName": 1, "email": 1 }
+                }
+            ],
+            as: "user"
+        }
+    }
+    const UNWIND_USER = {
+        $unwind: "$user"
+    }
+    // Facet
+    const FACET = (page, limit) => {
+        return {
+        $facet: {
+            metadata: [{ $count: "total" }, { $addFields: { "page": page } }],
+            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+        }
+        }
+    }
 
+    // Convert string id to bson
+    const convertIdToBSON = (id) => {
+        return Kartanode.getDataSource().ObjectID(id);
+    }
+
+
+
+/* =============================CUSTOM METHODS=========================================================== */
+
+    // Create karta history
     Kartahistory.createKartaHistory = (event, eventValue, oldValue, kartaNodeId, versionId, userId, kartaId, parentNodeId, historyType, randomKey, next) => {
         const event_object = {
             "node_created": "created",
@@ -50,6 +124,7 @@ module.exports = function(Kartahistory) {
 
     }
 
+    // Change karta version
     Kartahistory.versionControlChange = async (versionId, kartaId) => {
         try {
 
@@ -100,6 +175,7 @@ module.exports = function(Kartahistory) {
         }
     }
 
+    // Undo karta upto specific version
     Kartahistory.undoKartaToVersion = async ( versionId, kartaId ) => {
         try {
             let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
@@ -171,6 +247,7 @@ module.exports = function(Kartahistory) {
         }
     }
 
+    // Redo karta upto specific version
     Kartahistory.redoKartaToVersion = async ( versionId, kartaId ) => {
         try {
             const kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
@@ -235,6 +312,7 @@ module.exports = function(Kartahistory) {
         }
     }
 
+    // Sync karta history
     Kartahistory.syncKartaHistory = async (versionId, kartaId) => {
         try {
             await Kartahistory.remove({ kartaId, versionId, undoCheck: true });
@@ -245,7 +323,42 @@ module.exports = function(Kartahistory) {
         }
     }
 
-    // Before Kartahistory create
+    // Get Node history for audit trail
+    Kartahistory.getNodeHistory = async (nodeId) => {
+
+        let query = {
+            "kartaNodeId": convertIdToBSON(nodeId)
+        };
+        
+        Kartahistory.getDataSource().connector.connect((err, db) => {
+            const kartahistoryCollection = db.collection('karta_history');
+            kartahistoryCollection.aggregate([
+              {
+                $match: query
+              },
+              {
+                $match: { "is_deleted": false }
+              },
+              KARTA_LOOKUP,
+              UNWIND_KARTA,
+              USER_LOOKUP,
+              UNWIND_USER,
+              {
+                $sort: SORT
+              },
+              FACET(page, limit)
+            ]).toArray((err, result) => {
+              if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+              next(err, result);
+            });
+        });
+    }
+
+
+
+/* =============================REMOTE METHODS=========================================================== */
+    
+    // Before Karta history create
     Kartahistory.beforeRemote('create', (context, user, next) => {
         context.req.body.randomKey ? context.req.body.randomKey = context.req.body.randomKey.toString() : null;
         next();
