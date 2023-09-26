@@ -1,5 +1,7 @@
 'use strict';
 
+const moment = require('moment-timezone');
+
 module.exports = function(Kartahistory) {
     /* QUERY VARIABLES
     ----------------*/
@@ -68,7 +70,7 @@ module.exports = function(Kartahistory) {
 
     // Convert string id to bson
     const convertIdToBSON = (id) => {
-        return Kartanode.getDataSource().ObjectID(id);
+        return Kartahistory.getDataSource().ObjectID(id);
     }
 
 
@@ -324,34 +326,54 @@ module.exports = function(Kartahistory) {
     }
 
     // Get Node history for audit trail
-    Kartahistory.getNodeHistory = async (nodeId) => {
+    Kartahistory.getNodeHistory = (page, limit, nodeId, next) => {
+        page = parseInt(page, 10) || 1;
+        limit = parseInt(limit, 10) || 100;
 
-        let query = {
-            "kartaNodeId": convertIdToBSON(nodeId)
-        };
-        
-        Kartahistory.getDataSource().connector.connect((err, db) => {
-            const kartahistoryCollection = db.collection('karta_history');
-            kartahistoryCollection.aggregate([
-              {
-                $match: query
-              },
-              {
-                $match: { "is_deleted": false }
-              },
-              KARTA_LOOKUP,
-              UNWIND_KARTA,
-              USER_LOOKUP,
-              UNWIND_USER,
-              {
-                $sort: SORT
-              },
-              FACET(page, limit)
-            ]).toArray((err, result) => {
-              if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
-              next(err, result);
+        // Fetching KartaNode Details
+        Kartahistory.app.models.karta_node.findOne({ where: { "id": nodeId }}, (err, data) => {
+            let kartaNodeDetails = JSON.parse(JSON.stringify(data));
+
+            let query = {
+                "kartaNodeId": convertIdToBSON(nodeId),
+                "event": "node_updated",
+                "old_options.achieved_value": { $exists: true },
+                // "createdAt": {
+                //     between: [
+                //         moment().month(kartaNodeDetails.createdAt).startOf('month').toDate(),
+                //         moment().endOf('month').toDate()
+                //     ]
+                // },
+                "createdAt": {
+                    $gte: moment().month(kartaNodeDetails.createdAt).startOf('month').toDate(),
+                    $lte: moment().endOf('month').toDate()
+                }
+            };
+            
+            Kartahistory.getDataSource().connector.connect((err, db) => {
+                const kartahistoryCollection = db.collection('karta_history');
+                kartahistoryCollection.aggregate([
+                    {
+                        $match: query
+                    },
+                    {
+                        $match: { "is_deleted": false }
+                    },
+                    KARTA_LOOKUP,
+                    UNWIND_KARTA,
+                    USER_LOOKUP,
+                    UNWIND_USER,
+                    {
+                        $sort: { "createdAt": -1 }
+                    },
+                    FACET(page, limit)
+                ]).toArray((err, result) => {
+                    if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+                    next(err, result);
+                });
             });
         });
+
     }
 
 
