@@ -338,14 +338,8 @@ module.exports = function(Kartahistory) {
                 "kartaNodeId": convertIdToBSON(nodeId),
                 "event": "node_updated",
                 "old_options.achieved_value": { $exists: true },
-                // "createdAt": {
-                //     between: [
-                //         moment().month(kartaNodeDetails.createdAt).startOf('month').toDate(),
-                //         moment().endOf('month').toDate()
-                //     ]
-                // },
                 "createdAt": {
-                    $gte: moment().month(kartaNodeDetails.createdAt).startOf('month').toDate(),
+                    $gte: moment().set('month', moment(kartaNodeDetails.createdAt).month()).startOf('month').toDate(),
                     $lte: moment().endOf('month').toDate()
                 }
             };
@@ -373,7 +367,6 @@ module.exports = function(Kartahistory) {
                 });
             });
         });
-
     }
 
 
