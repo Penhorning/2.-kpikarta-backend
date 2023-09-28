@@ -56,7 +56,10 @@ module.exports = function(Kartahistory) {
         }
     }
     const UNWIND_USER = {
-        $unwind: "$user"
+        $unwind: {
+            path: "$user",
+            preserveNullAndEmptyArrays: true
+        }
     }
     // Facet
     const FACET = (page, limit) => {
