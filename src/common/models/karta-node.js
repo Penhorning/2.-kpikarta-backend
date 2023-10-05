@@ -872,6 +872,23 @@ module.exports = function (Kartanode) {
           }
           // Creating history
           for (let param of updatingParameters) createHistory(nodeData.kartaDetailId, nodeData, param, randomKey);
+
+          // Create log for achieved value
+          Kartanode.app.models.karta.findOne({ where: { "_id": nodeData.kartaDetailId } }, {}, (err, karta) => {
+            const log_data = {
+              event: "node_updated",
+              event_options: {
+                achieved_value: node.achieved_value
+              },
+              kartaNodeId: nodeData.id,
+              userId: Kartanode.app.currentUser.id,
+              versionId: karta.versionId,
+              kartaId: nodeData.kartaDetailId,
+              duration: new Date().toLocaleString('default', { month: 'long' })
+            }
+            Kartanode.app.models.karta_log.create(log_data, {}, (err) => {});
+          });
+
           if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
         });
       });
