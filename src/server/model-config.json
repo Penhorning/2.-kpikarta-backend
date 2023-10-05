@@ -109,6 +109,10 @@
     "dataSource": "db",
     "public": true
   },
+  "karta_log": {
+    "dataSource": "db",
+    "public": true
+  },
   "karta_version": {
     "dataSource": "db",
     "public": true

@@ -64,10 +64,10 @@ module.exports = function(Kartahistory) {
     // Facet
     const FACET = (page, limit) => {
         return {
-        $facet: {
-            metadata: [{ $count: "total" }, { $addFields: { "page": page } }],
-            data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
-        }
+            $facet: {
+                metadata: [{ $count: "total" }, { $addFields: { "page": page } }],
+                data: [{ $skip: (limit * page) - limit }, { $limit: limit }]
+            }
         }
     }
 
