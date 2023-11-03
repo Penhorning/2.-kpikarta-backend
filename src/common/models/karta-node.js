@@ -4,6 +4,130 @@ const moment = require('moment-timezone');
 const { sales_update_user } = require('../../helper/salesforce');
 
 module.exports = function (Kartanode) {
+
+  // Calculate each node percentage
+  function calculateKPINodePercentage(kpiNodeData) {
+    // Get number of days
+    const getNumberOfDays = (isBusiness = true, type = 'month', date) => {
+      let startDate = moment().startOf(type).format('YYYY-MM-DD hh:mm');
+      let endDate = moment().endOf(type).format('YYYY-MM-DD hh:mm');
+      // Get days till today
+      if (date && date.type === "start") startDate = moment(date.start).format('YYYY-MM-DD hh:mm');
+      else if (date && date.type === "end") endDate = moment(date.end).format('YYYY-MM-DD hh:mm');
+      else if (date && date.type === "both") {
+        startDate = moment(date.start).format('YYYY-MM-DD hh:mm');
+        endDate = moment(date.end).format('YYYY-MM-DD hh:mm');
+      }
+      let day = moment(startDate);
+      let businessDays = 0;
+      
+      // Get business days
+      if (isBusiness) {
+        while (day.isSameOrBefore(endDate,'day')) {
+          if (day.day()!=0 && day.day()!=6) businessDays++;
+            day.add(1,'d');
+        }
+      }
+      // Get all days
+      else {
+        while (day.isSameOrBefore(endDate,'day')) {
+          businessDays++;
+          day.add(1,'d');
+        }
+      }
+      return businessDays;
+    }
+
+    // Calculate each node percentage
+    const element = kpiNodeData;
+    let targetValue = 0;
+    const dayOfMonth = moment().date();
+    const businessDayOfMonth = getNumberOfDays(true, 'month', { type: "end", end: moment() });
+    const currentYear = moment().year();
+    const dayOfYear = moment().dayOfYear();
+    const businessDayOfYear = getNumberOfDays(true, 'year', { type: "end", end: moment() });
+    const daysInMonth = moment().daysInMonth();
+    const businessDaysInMonth = getNumberOfDays(true, 'month');
+    const daysInYear = moment([currentYear]).isLeapYear() ? 366 : 365;
+    const businessDaysInYear = getNumberOfDays(true, 'year');
+    
+    // Calculate percentage
+    const calculateTargetValue = (targetValue, durationType, f_startDate, f_endDate, daysToCalc) => {
+      const currentMonthNumber = new Date().getMonth();
+      const startMonthNumber = new Date(f_startDate).getMonth();
+      const endMonthNumber = new Date(f_endDate).getMonth();
+
+      const getTargetValue = (isBusiness) => {
+        // Check if today's date greater than fiscal year start date or end date
+        if (moment(f_startDate).date() <= moment().date()) {
+          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(f_startDate), end: moment() });
+          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "start", start: moment(f_startDate) });
+          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+        } else {
+          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(), end: moment(f_endDate) });
+          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "end", end: moment(f_endDate) });
+          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+        }
+      }
+      
+      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = business
+      if (f_startDate && f_endDate && daysToCalc === "business") {
+        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+          return getTargetValue(true);
+        } else return businessDayOfMonth * (targetValue / businessDaysInMonth);
+      }
+      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = all
+      else if (f_startDate && f_endDate && daysToCalc !== "business") {
+        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+          return getTargetValue(false);
+        } else return dayOfMonth * (targetValue / daysInMonth);
+      }
+      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = business
+      else if (!f_startDate && !f_endDate && daysToCalc === "business") {
+        return businessDayOfMonth * (targetValue / businessDaysInMonth);
+      }
+      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = all
+      else return dayOfMonth * (targetValue / daysInMonth);
+    }
+
+    const findTarget = (type) => {
+      return element.target.find((item) => item.frequency === type);
+    }
+
+    // Set target value according to monthly
+    if (element.kpi_calc_period === "monthly") {
+      if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+      else if (findTarget('yearly')) targetValue = findTarget('yearly').value / 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value / 4;
+    }
+    // Set target value according to month to date
+    else if (element.kpi_calc_period === "month-to-date") {
+      // Find target value
+      if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+      else if (findTarget('yearly')) targetValue = findTarget('yearly').value / 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value / 4;
+      // Set target value
+      targetValue = calculateTargetValue(targetValue, 'month', element.fiscal_year_start_date, element.fiscal_year_end_date, element.days_to_calculate); 
+    }
+    // Set target value according to year to date
+    else if (element.kpi_calc_period === "year-to-date") {
+      // Find target value
+      if (findTarget('yearly')) targetValue = findTarget('yearly').value;
+      else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
+      // Set target value
+      targetValue = calculateTargetValue(targetValue, 'year', element.fiscal_year_start_date, element.fiscal_year_end_date, element.days_to_calculate);
+    }
+    // Set percentage
+    if ((element.kpi_calc_period === "monthly" || element.kpi_calc_period === "month-to-date" || element.kpi_calc_period === "year-to-date")) {
+      let achieved_value = element.achieved_value;
+      let current_percentage = (achieved_value / targetValue) * 100;
+      element.percentage = Math.round(current_percentage || 0);
+      element.percentage = element.percentage === Infinity ? 0 : element.percentage;
+    }
+
+    return ((element.percentage * element.weightage) / 100) || 0;
+  }
   /* QUERY VARIABLES
     ----------------*/
   // Karta lookup
@@ -441,7 +565,16 @@ module.exports = function (Kartanode) {
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+        if (result && result[0].data.length > 0) {
+          // Set data count
+          result[0].metadata[0].count = result[0].data.length;
+          // Calculate percentage for each node
+          result[0].data.map(item => {
+            const percentage = calculateKPINodePercentage(item);
+            item.kpiPercentage = percentage;
+            return item;
+          });
+        }
         next(err, result);
       });
     });
@@ -642,7 +775,15 @@ module.exports = function (Kartanode) {
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+        if (result && result[0].data.length > 0) {
+          // Set data count
+          result[0].metadata[0].count = result[0].data.length;
+          // Calculate percentage for each node
+          result[0].data.map(item => {
+            calculateKPINodePercentage(item);
+            return item;
+          });
+        }
         next(err, result);
       });
     });
