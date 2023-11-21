@@ -4,6 +4,130 @@ const moment = require('moment-timezone');
 const { sales_update_user } = require('../../helper/salesforce');
 
 module.exports = function (Kartanode) {
+
+  // Calculate each node percentage
+  function calculateKPINodePercentage(kpiNodeData) {
+    // Get number of days
+    const getNumberOfDays = (isBusiness = true, type = 'month', date) => {
+      let startDate = moment().startOf(type).format('YYYY-MM-DD hh:mm');
+      let endDate = moment().endOf(type).format('YYYY-MM-DD hh:mm');
+      // Get days till today
+      if (date && date.type === "start") startDate = moment(date.start).format('YYYY-MM-DD hh:mm');
+      else if (date && date.type === "end") endDate = moment(date.end).format('YYYY-MM-DD hh:mm');
+      else if (date && date.type === "both") {
+        startDate = moment(date.start).format('YYYY-MM-DD hh:mm');
+        endDate = moment(date.end).format('YYYY-MM-DD hh:mm');
+      }
+      let day = moment(startDate);
+      let businessDays = 0;
+      
+      // Get business days
+      if (isBusiness) {
+        while (day.isSameOrBefore(endDate,'day')) {
+          if (day.day()!=0 && day.day()!=6) businessDays++;
+            day.add(1,'d');
+        }
+      }
+      // Get all days
+      else {
+        while (day.isSameOrBefore(endDate,'day')) {
+          businessDays++;
+          day.add(1,'d');
+        }
+      }
+      return businessDays;
+    }
+
+    // Calculate each node percentage
+    const element = kpiNodeData;
+    let targetValue = 0;
+    const dayOfMonth = moment().date();
+    const businessDayOfMonth = getNumberOfDays(true, 'month', { type: "end", end: moment() });
+    const currentYear = moment().year();
+    const dayOfYear = moment().dayOfYear();
+    const businessDayOfYear = getNumberOfDays(true, 'year', { type: "end", end: moment() });
+    const daysInMonth = moment().daysInMonth();
+    const businessDaysInMonth = getNumberOfDays(true, 'month');
+    const daysInYear = moment([currentYear]).isLeapYear() ? 366 : 365;
+    const businessDaysInYear = getNumberOfDays(true, 'year');
+    
+    // Calculate percentage
+    const calculateTargetValue = (targetValue, durationType, f_startDate, f_endDate, daysToCalc) => {
+      const currentMonthNumber = new Date().getMonth();
+      const startMonthNumber = new Date(f_startDate).getMonth();
+      const endMonthNumber = new Date(f_endDate).getMonth();
+
+      const getTargetValue = (isBusiness) => {
+        // Check if today's date greater than fiscal year start date or end date
+        if (moment(f_startDate).date() <= moment().date()) {
+          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(f_startDate), end: moment() });
+          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "start", start: moment(f_startDate) });
+          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+        } else {
+          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(), end: moment(f_endDate) });
+          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "end", end: moment(f_endDate) });
+          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+        }
+      }
+      
+      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = business
+      if (f_startDate && f_endDate && daysToCalc === "business") {
+        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+          return getTargetValue(true);
+        } else return businessDayOfMonth * (targetValue / businessDaysInMonth);
+      }
+      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = all
+      else if (f_startDate && f_endDate && daysToCalc !== "business") {
+        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+          return getTargetValue(false);
+        } else return dayOfMonth * (targetValue / daysInMonth);
+      }
+      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = business
+      else if (!f_startDate && !f_endDate && daysToCalc === "business") {
+        return businessDayOfMonth * (targetValue / businessDaysInMonth);
+      }
+      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = all
+      else return dayOfMonth * (targetValue / daysInMonth);
+    }
+
+    const findTarget = (type) => {
+      return element.target.find((item) => item.frequency === type);
+    }
+
+    // Set target value according to monthly
+    if (element.kpi_calc_period === "monthly") {
+      if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+      else if (findTarget('yearly')) targetValue = findTarget('yearly').value / 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value / 4;
+    }
+    // Set target value according to month to date
+    else if (element.kpi_calc_period === "month-to-date") {
+      // Find target value
+      if (findTarget('monthly')) targetValue = findTarget('monthly').value;
+      else if (findTarget('yearly')) targetValue = findTarget('yearly').value / 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value / 4;
+      // Set target value
+      targetValue = calculateTargetValue(targetValue, 'month', element.fiscal_year_start_date, element.fiscal_year_end_date, element.days_to_calculate); 
+    }
+    // Set target value according to year to date
+    else if (element.kpi_calc_period === "year-to-date") {
+      // Find target value
+      if (findTarget('yearly')) targetValue = findTarget('yearly').value;
+      else if (findTarget('monthly')) targetValue = findTarget('monthly').value * 12;
+      else if (findTarget('quarterly')) targetValue = findTarget('quarterly').value * 4;
+      // Set target value
+      targetValue = calculateTargetValue(targetValue, 'year', element.fiscal_year_start_date, element.fiscal_year_end_date, element.days_to_calculate);
+    }
+    // Set percentage
+    if ((element.kpi_calc_period === "monthly" || element.kpi_calc_period === "month-to-date" || element.kpi_calc_period === "year-to-date")) {
+      let achieved_value = element.achieved_value;
+      let current_percentage = (achieved_value / targetValue) * 100;
+      element.percentage = Math.round(current_percentage || 0);
+      element.percentage = element.percentage === Infinity ? 0 : element.percentage;
+    }
+
+    return ((element.percentage * element.weightage) / 100) || 0;
+  }
   /* QUERY VARIABLES
     ----------------*/
   // Karta lookup
@@ -441,7 +565,16 @@ module.exports = function (Kartanode) {
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+        if (result && result[0].data.length > 0) {
+          // Set data count
+          result[0].metadata[0].count = result[0].data.length;
+          // Calculate percentage for each node
+          result[0].data.map(item => {
+            const percentage = calculateKPINodePercentage(item);
+            item.kpiPercentage = percentage;
+            return item;
+          });
+        }
         next(err, result);
       });
     });
@@ -642,7 +775,15 @@ module.exports = function (Kartanode) {
         },
         FACET(page, limit)
       ]).toArray((err, result) => {
-        if (result && result[0].data.length > 0) result[0].metadata[0].count = result[0].data.length;
+        if (result && result[0].data.length > 0) {
+          // Set data count
+          result[0].metadata[0].count = result[0].data.length;
+          // Calculate percentage for each node
+          result[0].data.map(item => {
+            calculateKPINodePercentage(item);
+            return item;
+          });
+        }
         next(err, result);
       });
     });
@@ -872,6 +1013,23 @@ module.exports = function (Kartanode) {
           }
           // Creating history
           for (let param of updatingParameters) createHistory(nodeData.kartaDetailId, nodeData, param, randomKey);
+
+          // Create log for achieved value
+          Kartanode.app.models.karta.findOne({ where: { "_id": nodeData.kartaDetailId } }, {}, (err, karta) => {
+            const log_data = {
+              event: "node_updated",
+              event_options: {
+                achieved_value: node.achieved_value
+              },
+              kartaNodeId: nodeData.id,
+              userId: Kartanode.app.currentUser.id,
+              versionId: karta.versionId,
+              kartaId: nodeData.kartaDetailId,
+              duration: new Date().toLocaleString('default', { month: 'long' })
+            }
+            Kartanode.app.models.karta_log.create(log_data, {}, (err) => {});
+          });
+
           if (index === nodes.length-1) next(null, "Kpi nodes updated successfully!");
         });
       });
@@ -1329,6 +1487,165 @@ module.exports = function (Kartanode) {
       if (!ctx.query.where.is_deleted) ctx.query.where.is_deleted = false;
     }
     next();
+  });
+
+  // Update or create history for past months
+  Kartanode.beforeRemote('prototype.patchAttributes', (context, instance, next) => {
+    const req = context.req;
+    const achievedValue = +req.body.achieved_value;
+    // Check whether user wants to update for past month or not
+    if (req.body.pastMonth) {
+      // Prepare history query
+      const karta_history_query = {
+        "kartaNodeId": req.params.id,
+        "event": "node_updated",
+        "old_options.achieved_value": { exists: true },
+        "createdAt": {
+          between: [
+            moment().month(req.body.pastMonth).startOf('month').toDate(),
+            moment().month(req.body.pastMonth).endOf('month').toDate()
+          ]
+        }
+      }
+      // Find achieved history
+      Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 }, async (err, achievedHistory) => {
+        if (err) next(err);
+        // If we found the history, then we update that
+        else if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
+          // Update achieved value history in db
+          await Kartanode.app.models.karta_history.update({ "id": achievedHistory[0].id }, { $set: { "event_options.updated.achieved_value": achievedValue } });
+          // Find target to update the percentage in target object
+          const target_query = {
+            "kartaNodeId": req.params.id,
+            "randomKey": achievedHistory[0].randomKey,
+            "event": "node_updated",
+            "old_options.target": { exists: true }
+          }
+          const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query });
+          if (targetHistory && targetHistory.randomKey) {
+            // Set new percentage in target object
+            let oldTarget = [{
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: Math.round((achievedValue / targetHistory.event_options.updated.target[0].value) * 100),
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            }];
+            // Update percentage history in db
+            await Kartanode.app.models.karta_history.update({ "id": targetHistory.id }, { $set: { "event_options.updated.target": oldTarget } });
+            // Update formula as well, if node_type is metrics
+            if (req.body.node_formula && req.body.node_formula.metrics) {
+              const formula_query = {
+                "kartaNodeId": req.params.id,
+                "randomKey": targetHistory.randomKey,
+                "event": "node_updated",
+                "old_options.node_formula": { exists: true }
+              }
+              const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+              await Kartanode.app.models.karta_history.update({ "id": formulaHistory.id }, { $set: { "event_options.updated.node_formula": req.body.node_formula } });
+            }
+          }
+          context.res.status(200).json({});
+          return;
+        }
+        // HISTORY NOT FOUND, CREATE NEW ONE
+        else {
+          // Find current node
+          const currentNode = await Kartanode.findOne({ where: { "_id": req.params.id, "is_deleted": false } });
+          // Find karta detail of updating node
+          const karta = await Kartanode.app.models.karta.findOne({ where: { "_id": currentNode.kartaDetailId } });
+          // Find the latest target of current node is history
+          const target_query = {
+            "kartaNodeId": req.params.id,
+            "event": "node_updated",
+            "old_options.target": { exists: true },
+            "createdAt": {
+              between: [
+                moment(currentNode.createdAt).toDate(),
+                moment().month(req.body.pastMonth).endOf('month').toDate()
+              ]
+            }
+          }
+          let oldTarget = [];
+          let newTarget = [];
+          let oldFormula = {};
+          let oldAchievedValue = 0;
+          const targetHistory = await Kartanode.app.models.karta_history.findOne({ where: target_query, "order": "createdAt DESC", "limit": 1 });
+          if (targetHistory && targetHistory.randomKey) {
+            oldTarget.push({
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: targetHistory.event_options.updated.target[0].percentage,
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            });
+            newTarget.push({
+              value: targetHistory.event_options.updated.target[0].value,
+              percentage: Math.round((achievedValue / targetHistory.event_options.updated.target[0].value) * 100),
+              frequency: targetHistory.event_options.updated.target[0].frequency
+            });
+            // Fin achieved value of this target
+            const achieved_value_query = {
+              "kartaNodeId": req.params.id,
+              "randomKey": targetHistory.randomKey,
+              "event": "node_updated",
+              "old_options.achieved_value": { exists: true }
+            }
+            const achievedHistory = await Kartanode.app.models.karta_history.findOne({ where: achieved_value_query });
+            oldAchievedValue = achievedHistory.event_options.updated.achieved_value;
+          }
+          let nodeValues = [
+            { "achieved_value": achievedValue },
+            { "target": newTarget }
+          ]
+          // Find formula, if node_type is metrics
+          if (req.body.node_formula && req.body.node_formula.metrics) {
+            nodeValues.push({
+              "node_formula": req.body.node_formula
+            });
+            const formula_query = {
+              "kartaNodeId": req.params.id,
+              "randomKey": targetHistory.randomKey,
+              "event": "node_updated",
+              "old_options.node_formula": { exists: true }
+            }
+            const formulaHistory = await Kartanode.app.models.karta_history.findOne({ where: formula_query });
+            oldFormula = formulaHistory.event_options.updated.node_formula;
+          }
+          // Creating history for achieved value, node formula and target value
+          let randomKey = new Date().getTime().toString();
+          for (let value of nodeValues) {
+            let old_options = {};
+            if (value.hasOwnProperty("achieved_value")) {
+              old_options["achieved_value"] = oldAchievedValue;
+            } else if (value.hasOwnProperty("target")) {
+              old_options["target"] = oldTarget;
+            } else if (value.hasOwnProperty("node_formula")) {
+              old_options["node_formula"] = oldFormula;
+            }
+            // Prepare history data
+            let history_data = {
+              event: "node_updated",
+              kartaNodeId: currentNode.id,
+              userId: Kartanode.app.currentUser.id,
+              versionId: karta.versionId,
+              kartaId: karta.id,
+              parentNodeId: currentNode.parentId,
+              historyType: 'main',
+              randomKey,
+              event_options: {
+                created: null,
+                updated: value,
+                removed: null
+              },
+              old_options,
+              createdAt: moment().month(req.body.pastMonth).endOf('month')._d,
+              updatedAt: moment().month(req.body.pastMonth).endOf('month')._d
+            }
+            // Create history of current node
+            await Kartanode.app.models.karta_history.create(history_data);
+          }
+          context.res.status(200).json({});
+          return;
+        }
+      });
+    } else next();
   });
 
   // Update assigned date when a contributor added in a given node

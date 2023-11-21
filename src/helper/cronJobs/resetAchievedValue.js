@@ -12,7 +12,7 @@ exports.resetAchievedValueCron = (app) => {
     let history_data = {
         event,
         kartaNodeId: node.id,
-        userId: karta.userId || userIdValue,
+        userId: userIdValue,
         versionId: karta.versionId,
         kartaId: kartaId,
         parentNodeId: node.parentId,
@@ -39,8 +39,14 @@ exports.resetAchievedValueCron = (app) => {
     }
     // Create history of current node
     app.models.karta_history.create(history_data, {}, (err, response) => {
-        if (err) console.log(err, 'err');
-        app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+        if (err) {
+          console.log(`==========>>>>> WHILE CREATING THE HISTORY OF NODE(${node.id}), AFTER NODE RESET at (${new Date()}) = Someting went wrong `, err);
+          console.log(err, 'err');
+        }
+        else {
+          console.log(`==========>>>>> NODE(${node.id}) HISTORY CREATED AFTER RESET at ${new Date()}`);
+          app.models.karta.update({ "id": kartaId }, { "historyId": response.id }, () => {});
+        }
     });
     });
   }
@@ -66,7 +72,7 @@ exports.resetAchievedValueCron = (app) => {
 
       const nodes = await app.models.KartaNode.find({ where: query });
       if (nodes && nodes.length > 0) {
-        console.log(`==========>>>>> ${nodes.length} NODES FOUND FOR RESETTING THE ACHIEVED VALUE & DUE DATE`);
+        console.log(`==========>>>>> ${nodes.length} NODES FOUND FOR RESETTING THE ACHIEVED VALUE & DUE DATE at ${new Date()}`);
         for (let node of nodes) {
           node = JSON.parse(JSON.stringify(node));
           // Set new due date
@@ -83,9 +89,10 @@ exports.resetAchievedValueCron = (app) => {
           node.target[0].percentage = 0;
           
           const updateQuery = { "achieved_value": 0, "target.0.percentage": 0, "due_date": new_due_date._d, "reset_on": new Date() };
+          // Execute reset query
           await app.models.KartaNode.update({ "_id": node.id }, { $set: updateQuery });
 
-          console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET`);
+          console.log(`==========>>>>> NODE(${node.id}) ACHIEVED VALUE & DUE DATE RESET at ${new Date()}`);
           
           // Create history
           let randomKey = new Date().getTime().toString();
@@ -99,7 +106,7 @@ exports.resetAchievedValueCron = (app) => {
         }
       }
     } catch (err) {
-      console.log(`==========>>>>> WHILE RESET ACHIEVED VALUE & DUE DATE CRON (${new Date()}) = Someting went wrong `, err);
+      console.log(`==========>>>>> WHILE RESET ACHIEVED VALUE & DUE DATE CRON at (${new Date()}) = Someting went wrong `, err);
       throw err;
     }
   },
