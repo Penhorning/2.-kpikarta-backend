@@ -20,6 +20,15 @@
     "name": {
       "type": "string"
     },
+    "department": {
+      "type": "string"
+    },
+    "industry": {
+      "type": "string"
+    },
+    "otherDepartment": {
+      "type": "string"
+    },
     "version": {
       "type": "string"
     },

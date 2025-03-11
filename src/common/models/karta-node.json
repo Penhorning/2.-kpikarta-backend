@@ -559,8 +559,11 @@
         },
         {
           "arg": "parentId",
-          "type": "string",
-          "required": true
+          "type": "string"
+        },
+        {
+          "arg": "randomKey",
+          "type": "string"
         }
       ],
       "returns": {

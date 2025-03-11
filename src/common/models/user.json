@@ -82,6 +82,10 @@
     "is_deleted": {
       "type": "boolean",
       "default": false
+    },
+    "userType": {
+      "type": "string",
+      "default": "kpi"
     }
   },
   "validations": [],
@@ -201,6 +205,43 @@
     }
   ],
   "methods": {
+    "getAll": {
+      "accepts": [
+        {
+          "arg": "page",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "limit",
+          "type": "number",
+          "required": false
+        },
+        {
+          "arg": "searchQuery",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "start",
+          "type": "string",
+          "required": false
+        },
+        {
+          "arg": "end",
+          "type": "string",
+          "required": false
+        }
+      ],
+      "returns": {
+        "arg": "users",
+        "type": "user"
+      },
+      "http": {
+        "path": "/get-all",
+        "verb": "post"
+      }
+    },
     "sendEmailCode": {
       "returns": {
         "arg": "status",
@@ -493,43 +534,6 @@
       "http": {
         "verb": "post",
         "path": "/get-all-members"
-      }
-    },
-    "getAll": {
-      "accepts": [
-        {
-          "arg": "page",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "limit",
-          "type": "number",
-          "required": false
-        },
-        {
-          "arg": "searchQuery",
-          "type": "string",
-          "required": false
-        },
-        {
-          "arg": "start",
-          "type": "string",
-          "required": false
-        },
-        {
-          "arg": "end",
-          "type": "string",
-          "required": false
-        }
-      ],
-      "returns": {
-        "arg": "users",
-        "type": "user"
-      },
-      "http": {
-        "path": "/get-all",
-        "verb": "post"
       }
     },
     "getCount": {

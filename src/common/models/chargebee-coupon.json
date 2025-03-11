@@ -1,0 +1,33 @@
+{
+  "name": "chargebee-coupon",
+  "base": "PersistedModel",
+  "idInjection": true,
+  "options": {
+    "validateUpsert": true
+  },
+  "properties": {},
+  "validations": [],
+  "relations": {},
+  "acls": [],
+  "methods": {
+    "sayHello": {
+      "accepts": [
+        {
+          "arg": "couponCode",
+          "type": "string",
+          "required": false,
+          "http": { "source": "query" }
+        }
+      ],
+      "returns": {
+        "arg": "response",
+        "type": "object",
+        "root": true
+      },
+      "http": {
+        "path": "/verify-coupon",
+        "verb": "get"
+      }
+    }
+  }
+}

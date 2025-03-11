@@ -53,41 +53,44 @@ module.exports = function (Kartanode) {
     
     // Calculate percentage
     const calculateTargetValue = (targetValue, durationType, f_startDate, f_endDate, daysToCalc) => {
-      const currentMonthNumber = new Date().getMonth();
-      const startMonthNumber = new Date(f_startDate).getMonth();
-      const endMonthNumber = new Date(f_endDate).getMonth();
-
-      const getTargetValue = (isBusiness) => {
-        // Check if today's date greater than fiscal year start date or end date
-        if (moment(f_startDate).date() <= moment().date()) {
-          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(f_startDate), end: moment() });
-          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "start", start: moment(f_startDate) });
-          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
-        } else {
-          let fiscalDayOfMonth = this.getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(), end: moment(f_endDate) });
-          let fiscalDaysInMonth = this.getNumberOfDays(isBusiness, durationType, { type: "end", end: moment(f_endDate) });
-          return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+      if (moment(f_startDate).isAfter(moment())) return 0;
+      else {
+        const currentMonthNumber = new Date().getMonth();
+        const startMonthNumber = new Date(f_startDate).getUTCMonth();
+        const endMonthNumber = new Date(f_endDate).getUTCMonth();
+  
+        const getTargetValue = (isBusiness) => {
+          // Check if today's date greater than fiscal year start date or end date
+          if (moment.utc(f_startDate).date() <= moment().date()) {
+            let fiscalDayOfMonth = getNumberOfDays(isBusiness, durationType, { type: "both", start: moment.utc(f_startDate), end: moment() });
+            let fiscalDaysInMonth = getNumberOfDays(isBusiness, durationType, { type: "start", start: moment.utc(f_startDate) });
+            return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+          } else {
+            let fiscalDayOfMonth = getNumberOfDays(isBusiness, durationType, { type: "both", start: moment(), end: moment.utc(f_endDate) });
+            let fiscalDaysInMonth = getNumberOfDays(isBusiness, durationType, { type: "end", end: moment.utc(f_endDate) });
+            return fiscalDayOfMonth * (targetValue / fiscalDaysInMonth);
+          }
         }
+        
+        // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = business
+        if (f_startDate && f_endDate && daysToCalc === "business") {
+          if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+            return getTargetValue(true);
+          } else return businessDayOfMonth * (targetValue / businessDaysInMonth);
+        }
+        // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = all
+        else if (f_startDate && f_endDate && daysToCalc !== "business") {
+          if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
+            return getTargetValue(false);
+          } else return dayOfMonth * (targetValue / daysInMonth);
+        }
+        // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = business
+        else if (!f_startDate && !f_endDate && daysToCalc === "business") {
+          return businessDayOfMonth * (targetValue / businessDaysInMonth);
+        }
+        // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = all
+        else return dayOfMonth * (targetValue / daysInMonth);
       }
-      
-      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = business
-      if (f_startDate && f_endDate && daysToCalc === "business") {
-        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
-          return getTargetValue(true);
-        } else return businessDayOfMonth * (targetValue / businessDaysInMonth);
-      }
-      // Check if => Fiscal Year start date = date, Fiscal Year end date = date, Days to calculate = all
-      else if (f_startDate && f_endDate && daysToCalc !== "business") {
-        if (currentMonthNumber === startMonthNumber || currentMonthNumber === endMonthNumber) {
-          return getTargetValue(false);
-        } else return dayOfMonth * (targetValue / daysInMonth);
-      }
-      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = business
-      else if (!f_startDate && !f_endDate && daysToCalc === "business") {
-        return businessDayOfMonth * (targetValue / businessDaysInMonth);
-      }
-      // Check if => Fiscal Year start date = null, Fiscal Year end date = null, Days to calculate = all
-      else return dayOfMonth * (targetValue / daysInMonth);
     }
 
     const findTarget = (type) => {
@@ -834,8 +837,8 @@ module.exports = function (Kartanode) {
             }
             for (let i=0; i<=11; i++) {
               karta_history_query["and"] = [
-                { "createdAt": { gte: moment().month(i).startOf('month').toDate() } },
-                { "createdAt": { lte: moment().month(i).endOf('month').toDate() } }
+                { "createdAt": { gte: moment().year(year).month(i).startOf('month').toDate() } },
+                { "createdAt": { lte: moment().year(year).month(i).endOf('month').toDate() } }
               ]
               const achievedHistory = await Kartanode.app.models.karta_history.find({ where: karta_history_query, "order": "createdAt DESC", "limit": 1 });
               if (achievedHistory.length > 0 && achievedHistory[0].randomKey) {
@@ -1108,9 +1111,9 @@ module.exports = function (Kartanode) {
   }
 
   // Soft delete Karta Nodes
-  Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, next) => {
+  Kartanode.deleteNodes = (kartaId, nodeId, phaseId, parentId, randomKey, next) => {
     // Creating a random key for history event
-    const randomKey = new Date().getTime().toString();
+    randomKey = randomKey || new Date().getTime().toString();
     // Finding the node to delete it
     Kartanode.findOne({ where: { "_id": nodeId } }, (err, node) => {
       if (node) {
@@ -1404,6 +1407,53 @@ module.exports = function (Kartanode) {
 
 /* =============================REMOTE HOOKS=========================================================== */
 
+  // Delete all nodes of a karta if we are creating a new goal node
+  Kartanode.beforeRemote('create', function(context, instance, next) {
+    const kartaId = context.req.body.kartaId;
+    const phaseId = context.req.body.phaseId;
+    // Find goal phase details
+    Kartanode.app.models.karta_phase.findOne({ where: { "_id": phaseId, global_name: "Goal", kartaId } }, (err, goalPhase) => {
+      if (err) next(err);
+      else if (goalPhase) {
+        // Deleting all nodes
+        // Kartanode.update({ or: [ { "kartaId": kartaId }, { "kartaDetailId": kartaId } ] }, { $set: { "is_deleted": true } }, (err, result) => {
+        //   if (err) next(err);
+        //   else next();
+        // });
+
+        // Creating a random key for history event
+        const randomKey = new Date().getTime().toString();
+        // Finding the goal node to delete it
+        Kartanode.findOne({ where: { "phaseId": goalPhase.id, kartaId  } }, (err, goalNode) => {
+          if (err) next(err);
+          else if (goalNode) {
+            // Creating history of the goal node which will be deleted
+            createHistory(kartaId, JSON.parse(JSON.stringify(goalNode)), JSON.parse(JSON.stringify(goalNode)), randomKey, "node_removed");
+            // Deleting the node
+            Kartanode.update( { "_id": goalNode.id } , { $set: { "is_deleted": true } }, (err) => {
+              if (err) next(err);
+              else {
+                // Finding the child nodes of the deleted goal node
+                Kartanode.find({ where: { "parentId": goalNode.id, is_deleted: false } }, (err, result) => {
+                  if (err) next(err);
+                  // Deleting the nested child nodes
+                  else if (result.length > 0) deleteChildNodes(result, randomKey);
+                });
+                // reAdjustWeightage(kartaId, parentId, phaseId, randomKey);
+                // return next(null, "Node deleted successfully..!!");
+                next();
+              }
+            });
+          } else next();
+        });
+
+
+
+
+      } else next();
+    });
+  });
+
   // Add node and update weightage of other nodes
   Kartanode.afterRemote('create', async function (context, node, next) {
     const kartaId = node.kartaDetailId;
@@ -1411,7 +1461,7 @@ module.exports = function (Kartanode) {
     const phaseId = node.phaseId;
     const parentId = node.parentId;
     const nextPhaseId = context.req.body.nextPhaseId;
-    const randomKey = new Date().getTime().toString();
+    const randomKey = context.req.body.randomKey || new Date().getTime().toString();
 
     if (kartaId) {
       // Find details of current karta
@@ -1676,6 +1726,43 @@ module.exports = function (Kartanode) {
           });
         }
         next(null, result);
+      });
+    };
+    if (req.body.description) {
+      function toTitleCase(str) {
+        return str.replace(
+          /\w\S*/g,
+          function(txt) {
+            return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase();
+          }
+        );
+      }
+
+      let node_desc = "";
+      let next_line = "\n";
+      for(const desc_keys of Object.keys(req.body.description)) {
+        node_desc += `${toTitleCase(desc_keys)}: ${next_line}`;
+        let currentObj = req.body.description[desc_keys];
+        for(const element of Object.keys(currentObj)) {
+          let currentValue = currentObj[element];
+          if (Array.isArray(currentValue)) {
+            let value = currentValue.length > 0 ? `${currentValue[0]}` : 'N/A';
+            if (currentValue.length > 1) {
+              value += `, +${currentValue.length - 1}`;
+            }
+            node_desc += `${toTitleCase(element)} - ${value} ${next_line}`
+          } else {
+            node_desc += `${toTitleCase(element)} - ${currentValue} ${next_line}`
+          }
+        }
+        node_desc += `${next_line}`;
+      }      
+
+      Kartanode.update({ "id": instance.id }, { "node_description": node_desc }, (err, result) => {
+        if (err) {
+          console.log('> error while updating the node data ', err);
+          next(err);
+        };
       });
     };
     let kartaId = instance.kartaId || instance.kartaDetailId;

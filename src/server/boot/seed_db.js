@@ -105,6 +105,7 @@ module.exports = async function(app) {
   }
 
   // Create global phase
+  // Thi code is written to link old Kartas with new phase Ids
   async function createGlobalPhase(name) {
     try {
       let filter = { where: { name, "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } };

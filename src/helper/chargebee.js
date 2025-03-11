@@ -21,11 +21,41 @@ exports.get_plans = async () => {
     }
 }
 
+exports.get_plans_free = async () => {
+    try {
+        const planIds = ['Creator-Test-Free-USD-Monthly'];
+        console.log("planIds",planIds)
+        const URL = `${SITE_URL}/item_prices?id[in]=[${planIds}]`;
+        const response = await axios.get(URL, { headers: REQUEST_HEADER });
+        const freePlan = response.data;
+        console.log('freePlan',freePlan);
+
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+
 // GET CHAMPION PLAN
 exports.get_champion_plan = async (planId) => {
     try {
+        console.log("planId-->>",planId)
         const URL = `${SITE_URL}/item_prices?id[is]=${planId}`;
         const response = await axios.get(URL, { headers: REQUEST_HEADER });
+        // console.log("response-->>",response.data.list)
+        return response;
+    } catch (err) {
+        console.log(err);
+        return err;
+    }
+}
+exports.get_creator_plan = async (planId) => {
+    try {
+        console.log("get_creator_plan planId-->>",planId)
+        const URL = `${SITE_URL}/item_prices?id[is]=${planId}`;
+        const response = await axios.get(URL, { headers: REQUEST_HEADER });
+        console.log("get_creator_plan response-->>",response.data.list)
         return response;
     } catch (err) {
         console.log(err);
@@ -54,6 +84,7 @@ exports.create_subscription = async (params) => {
         const data = `subscription_items[item_price_id][0]=${plan_id}&subscription_items[quantity][0]=1`;
         const URL = `${SITE_URL}/customers/${customer_id}/subscription_for_items`;
         const response = await axios.post(URL, data, { headers: REQUEST_HEADER });
+        console.log("create_subscription response",response)
         return response;
     } catch (err) {
         console.log(err);
@@ -79,13 +110,17 @@ exports.create_portal_session = async (params) => {
 exports.update_subscription = async (params) => {
     const { subscription_id, addon_plan_id, license_count, replaceItems } = params;
     try {
+        console.log("in update_subscription---")
         let data = `subscription_items[item_price_id][1]=${addon_plan_id}&subscription_items[quantity][1]=${license_count}`;
+        console.log("update_subscription---", data)
         if (license_count < 1) data = `replace_items_list=true`;
         else if (license_count > 0 && replaceItems) {
             data = `subscription_items[item_price_id][1]=${addon_plan_id}&subscription_items[quantity][1]=${license_count}&replace_items_list=true`;
         }
+        console.log('update_subscription data' , data)
         const URL = `${SITE_URL}/subscriptions/${subscription_id}/update_for_items`;
         const response = await axios.post(URL, data, { headers: REQUEST_HEADER });
+        console.log("update_subscription",response)
         return response;
     } catch (err) {
         console.log(err);

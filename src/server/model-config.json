@@ -128,5 +128,13 @@
   "karta_catalog": {
     "dataSource": "db",
     "public": true
+  },
+  "openai": {
+    "dataSource": "db",
+    "public": true
+  },
+  "chargebee-coupon": {
+    "dataSource": "db",
+    "public": true
   }
 }

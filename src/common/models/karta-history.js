@@ -181,27 +181,34 @@ module.exports = function(Kartahistory) {
     }
 
     // Undo karta upto specific version
-    Kartahistory.undoKartaToVersion = async ( versionId, kartaId ) => {
+    Kartahistory.undoKartaToVersion = async (versionId, kartaId) => {
         try {
-            let kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
+            const kartaDetails = await Kartahistory.app.models.karta.findOne({ where: { "id": kartaId }});
             if (kartaDetails.historyId == "none") {
                 return { "message": "nothing", "data": null };
             } else {
-                let lastHistoryData = await Kartahistory.findOne({ where: { id: kartaDetails.historyId }});
-                let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main', randomKey: lastHistoryData.randomKey }});
+                // Last or latest history like node rename, node target change, etc.
+                let lastHistoryData = await Kartahistory.findOne({ where: { "id": kartaDetails.historyId }});
+                // Finding the total history of mentioned versionId from the date of version creation till now
+                let mainHistoryData = await Kartahistory.find({ where: { versionId, kartaId, "historyType": 'main', "randomKey": lastHistoryData.randomKey }});
                 let finalHistoryData = mainHistoryData;
-                let toSetIndex = finalHistoryData.findIndex( x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId) );
+                // Getting the last history index from the total history
+                const toSetIndex = finalHistoryData.findIndex(x => JSON.stringify(x.id) == JSON.stringify(kartaDetails.historyId));
 
-                if ( toSetIndex != -1 ) {
-                    let wholeHistory = await Kartahistory.find({ where: { versionId, kartaId, historyType: 'main' }});
-                    let lastHistoryIndex = wholeHistory.findIndex( x => JSON.stringify(x.id) == JSON.stringify(finalHistoryData[0].id) );
-                    let nextHistoryIndex = lastHistoryIndex - 1;
-                    if ( nextHistoryIndex >= 0 ) {
-                        let lastHistory = {}; 
-                        for ( let i = finalHistoryData.length - 1; i >= 0; i-- ) {
+                if (toSetIndex != -1) {
+                    // Finding the whole history of mentioned versionId from the date of version creation till now 
+                    let wholeHistory = await Kartahistory.find({ where: { versionId, kartaId, "historyType": 'main' }});
+                    // Getting the first history index from the whole history
+                    let firstHistoryIndex = wholeHistory.findIndex(x => JSON.stringify(x.id) == JSON.stringify(finalHistoryData[0].id));
+                    let nextHistoryIndex = firstHistoryIndex - 1;
+                    if (nextHistoryIndex >= 0) {
+                        let lastHistory = {};
+                        // This is reversing loop
+                        for (let i = finalHistoryData.length - 1; i >= 0; i--) {
                             let currentHistory = finalHistoryData[i].__data ? finalHistoryData[i].__data : finalHistoryData[i];
+                            // Checking whether the karta has been copied or created
                             if (currentHistory.is_copied) {
-                                return { "message": "final", "data": null }; 
+                                return { "message": "final", "data": null };
                             } else {
                                 if( currentHistory.event == "node_created" ) {
                                     await Kartahistory.update({ "id": currentHistory.id }, { "undoCheck" : true });
