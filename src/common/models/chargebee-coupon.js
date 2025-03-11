@@ -4,7 +4,7 @@ module.exports = function (Chargebeecoupon) {
     // Configure Chargebee
     chargebee.configure({
         site: 'kpikarta',
-        api_key: 'live_VvgLECrZ2S2Q1tR5Z4FCapuGm8Soxyrz'
+        api_key: process.env.chargebeeApiKey
     });
 
     // Method to verify a coupon code in both normal coupons and coupon sets
