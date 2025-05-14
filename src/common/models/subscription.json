@@ -88,6 +88,17 @@
         "verb": "get"
       }
     },
+    "getPlansFree": {
+      "accepts": [],
+      "returns": {
+        "arg": "plans",
+        "type": "array"
+      },
+      "http": {
+        "path": "/get-plans-free",
+        "verb": "get"
+      }
+    },
     "assignPlan": {
       "accepts": [
         {
@@ -111,6 +122,10 @@
           "arg": "companyId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "userType",
+          "type": "string"
         }
       ],
       "returns": {
@@ -155,8 +170,10 @@
         {
           "arg": "res",
           "type": "object",
-          "http": { "source": "res" }
-       }
+          "http": {
+            "source": "res"
+          }
+        }
       ],
       "returns": {
         "arg": "result",

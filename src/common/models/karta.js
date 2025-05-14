@@ -471,7 +471,9 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
         name: kartaDetails.name ? kartaDetails.selfCopyCount == 0 ? kartaDetails.name + " - Copy" : `${kartaDetails.name} - Copy (${kartaDetails.selfCopyCount + 1})` : null,
         userId: kartaDetails.userId ? kartaDetails.userId : null,
         status: kartaDetails.status ? kartaDetails.status : null,
-        type: kartaDetails.type ? kartaDetails.type : null
+        type: kartaDetails.type ? kartaDetails.type : null,
+        industry: kartaDetails.industry ? kartaDetails.industry : null,
+        department: kartaDetails.department ? kartaDetails.department : null,
       };
       const newKarta = await Karta.create(newObj);
 
@@ -974,7 +976,7 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
           console.log('> error while creating karta version', versionErr);
           return next(err);
         } else {
-          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, selfCopyCount: 0, sharedCopyCount: 0 }, async (kartaErr, kartaResult) => {
+          Karta.update({ "id" : karta.id }, { "versionId" : versionResult.id, "selfCopyCount": 0, "sharedCopyCount": 0 }, async (kartaErr, kartaResult) => {
             if (kartaErr) {
               console.log('> error while updating newly crated karta', kartaErr);
               return next(err);
@@ -1010,23 +1012,24 @@ const createHistory = async (kartaId, node, updatedData, randomKey, event = "nod
                       if (phaseErr3) {
                         console.log('> error while finding goal phase', phaseErr3);
                         return next(err);
-                      } 
+                      }
+                      return next();
                       // Create Karta Goal Node
-                      let data = {
-                        name: "Goal",
-                        phaseId: phaseResult3.id,
-                        kartaId: karta.id
-                      };
-                      Karta.app.models.karta_node.create(data, {} , (kartaNodeErr, kartaNodeResult) => {
-                        if (kartaNodeErr) {
-                          console.log('> error while creating Goal Node', kartaNodeErr);
-                          return next(err);
-                        }
-                        let goalNode = JSON.parse(JSON.stringify(kartaNodeResult));
-                        let randomKey = new Date().getTime();
-                        createHistory(karta.id, goalNode, goalNode, randomKey, "node_created");
-                        return next();
-                      });
+                      // let data = {
+                      //   name: "Goal",
+                      //   phaseId: phaseResult3.id,
+                      //   kartaId: karta.id
+                      // };
+                      // Karta.app.models.karta_node.create(data, {} , (kartaNodeErr, kartaNodeResult) => {
+                      //   if (kartaNodeErr) {
+                      //     console.log('> error while creating Goal Node', kartaNodeErr);
+                      //     return next(err);
+                      //   }
+                      //   let goalNode = JSON.parse(JSON.stringify(kartaNodeResult));
+                      //   let randomKey = new Date().getTime();
+                      //   createHistory(karta.id, goalNode, goalNode, randomKey, "node_created");
+                      //   return next();
+                      // });
                     });
                   });
                 }

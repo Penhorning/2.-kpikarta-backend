@@ -1,7 +1,7 @@
 "use strict";
 
 const moment = require('moment');
-const { get_plans, get_champion_plan, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
+const { get_plans, get_plans_free, get_champion_plan,get_creator_plan, create_customer, create_subscription, cancel_subscription, create_portal_session } = require('../../helper/chargebee');
 const { sendEmail } = require('../../helper/sendEmail');
 
 
@@ -17,13 +17,24 @@ module.exports = function (Subscription) {
       return err;
     }
   }
+  Subscription.getPlansFree = async () => {
+    try {
+      const plans = await get_plans_free();
+      console.log("plans.data.list:",plans.data.list)
+      return plans.data.list;
+    } catch(err) {
+      return err;
+    }
+  }
 
   // Assign plan
   Subscription.assignPlan = async (planId) => {
     try {
       // Find current user details
       const userId = Subscription.app.currentUser.id;
+      console.log("Assign userId",userId)
       const user = await Subscription.app.models.user.findOne({ where: { "_id": userId }, include: 'company' });
+      console.log("user assign",user)
       const data = {
         first_name: user.fullName,
         email: user.email,
@@ -40,8 +51,15 @@ module.exports = function (Subscription) {
         }
         const subscriptionResponse = await create_subscription(subscriptionData);
         if (subscriptionResponse.status === 200) {
-          const { id, trial_start, trial_end, next_billing_at, status, billing_period_unit, subscription_items } = subscriptionResponse.data.subscription;
+          console.log("subscriptionResponse.data.subscription",subscriptionResponse.data.subscription)
+          const { id, trial_start, current_term_start, trial_end, current_term_end, next_billing_at, status, billing_period_unit, subscription_items } = subscriptionResponse.data.subscription;
           // Store subscription details in db
+          console.log("trial_start, current_term_start, trial_end, current_term_end",trial_start, current_term_start, trial_end, current_term_end,)
+          const trialStart = trial_start ? moment(Number(trial_start) * 1000) : 
+          (current_term_start ? moment(Number(current_term_start) * 1000) : null);
+          const trialEnd = trial_end ? moment(Number(trial_end) * 1000) : 
+          (current_term_end ? moment(Number(current_term_end) * 1000) : null);
+
           const data = { 
             userId,
             companyId: user.companyId, 
@@ -52,8 +70,8 @@ module.exports = function (Subscription) {
             status,
             frequency: billing_period_unit,
             nextSubscriptionDate: moment(Number(next_billing_at) * 1000),
-            trialStart: moment(Number(trial_start) * 1000),
-            trialEnd: moment(Number(trial_end) * 1000),
+            trialStart,
+            trialEnd,
             subscriptionDetails: subscriptionResponse.data.subscription
           };
           const subscription = await Subscription.create(data);
@@ -95,7 +113,9 @@ module.exports = function (Subscription) {
   }
 
   // Get subscribed users
-  Subscription.getSubscribedUsers = async (companyId) => {
+  Subscription.getSubscribedUsers = async (companyId, userType) => {
+    console.log("companyId",companyId)
+    console.log("userType", userType);
     try {
       // Find subscription
       const subscription = await Subscription.findOne({ where: { companyId }});
@@ -107,10 +127,15 @@ module.exports = function (Subscription) {
         const creatorMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": creatorLicense.id });
         const championMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": championLicense.id });
         const spectatorMembers = await Subscription.app.models.user.count({ companyId, "active": true, "is_deleted": false, "licenseId": spectatorLicense.id });
-
+        console.log("creatorMembers", creatorMembers);
+        console.log("championMembers", championMembers);
+        console.log("spectatorMembers", spectatorMembers);
         const mainPlan = subscription.subscriptionDetails.subscription_items[0];
-        const findSubscriptionItemDetails = (planId, type) => {
+        console.log("mainPlan", mainPlan);
+        const findSubscriptionItemDetails = (planId, type) => { 
+          console.log("Searching for planId:", planId, "with type:", type);
           const subscriptionPriceDetails = subscription.subscriptionDetails.subscription_items.find(item => item.item_price_id === planId);
+          console.log("subscriptionPriceDetails found:", subscriptionPriceDetails);
           if (subscriptionPriceDetails && subscriptionPriceDetails[type]) return subscriptionPriceDetails[type]/100;
           else return 0;
         }
@@ -134,26 +159,77 @@ module.exports = function (Subscription) {
             amount: 0
           }
         }
+        console.log("ut", userType)
+        console.log("subscription.frequency", subscription.frequency)
         if (subscription.frequency === "year") {
-          tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_YEARLY_ADDON_PLAN_ID, 'amount');
-          tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'unit_price');
-          tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'amount');
+          if(userType === "appsumo"){
+            console.log("here1--->>>")
+            tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_MONTHLY_ADDON_PLAN_ID, 'amount');
+            tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'unit_price');
+            tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'amount');
+            console.log("tracker.Creator.amount",tracker.Creator.amount)
+            console.log("tracker.Champion.unit_price",tracker.Champion.unit_price)
+            console.log("tracker.Champion.amount",tracker.Champion.amount)
+          }
+          else{
+            console.log("here11--->>>")
+            console.log(userType,"ut")
+            tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_YEARLY_ADDON_PLAN_ID, 'amount');
+            tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'unit_price');
+            tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_YEARLY_ADDON_PLAN_ID, 'amount');
+            console.log("tracker.Creator.amount",tracker.Creator.amount)
+            console.log("tracker.Champion.unit_price",tracker.Champion.unit_price)
+            console.log("tracker.Champion.amount",tracker.Champion.amount)
+          }
         } else {
+          console.log("here2--->>>")
           tracker.Creator.amount += findSubscriptionItemDetails(process.env.CREATOR_MONTHLY_ADDON_PLAN_ID, 'amount');
           tracker.Champion.unit_price = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'unit_price');
           tracker.Champion.amount = findSubscriptionItemDetails(process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID, 'amount');
+
+          console.log("tracker.Creator.amount2",tracker.Creator.amount)
+          console.log("tracker.Champion.unit_price2",tracker.Champion.unit_price)
+          console.log("tracker.Champion.amount2",tracker.Champion.amount)
+
         }
         if (!tracker.Champion.unit_price) {
           try {
             let planId = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-            if (subscription.frequency === "year") planId = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+            if (subscription.frequency === "year"){ 
+              planId = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID
+            }
+            if (subscription.frequency === "year" && userType === "appsumo"){ 
+              planId = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID
+            }
             const plan = await get_champion_plan(planId);
             if (plan.status === 200) tracker.Champion.unit_price = plan.data.list[0].item_price.price/100;
           } catch(err) {
             console.log("Error while getting champion plan details=====> ", err);
           }
         }
+        if (!tracker.Creator.amount && userType === 'appsumo') {
+          try {
+            console.log("here4--->>>")
+            let planId = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+            const plan = await get_creator_plan(planId);
+            console.log("here4 plan--->>>", plan.data.list)
+            if (plan.status === 200) tracker.Creator.unit_price = plan.data.list[0].item_price.price/100;
+          } catch(err) {
+            console.log("Error while getting champion plan details=====> ", err);
+          }
+        }
+        if (!tracker.Creator.unit_price && userType === 'appsumo') {
+          console.log("here44--->>>")
+          try {
+            let planId = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+            const plan = await get_creator_plan(planId);
+            if (plan.status === 200) tracker.Creator.unit_price = plan.data.list[0].item_price.price/100;
+          } catch(err) {
+            console.log("Error while getting champion plan details=====> ", err);
+          }
+        }
         let userDetails = Object.keys(tracker).map(x => tracker[x]);
+        // console.log("userDetails-->>",userDetails)
         userObj["userDetails"] = userDetails;
         return userObj;
       } else {

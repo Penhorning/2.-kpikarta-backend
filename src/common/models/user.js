@@ -171,6 +171,21 @@ module.exports = function(User) {
       preserveNullAndEmptyArrays: true
     }
   }
+  const USER_TYPE_LOOKUP = {
+    $lookup: {
+      from: 'user_types',   // The name of the collection containing user types
+      localField: 'userTypeId',  // The field in the `user` collection that references the `user_types` collection
+      foreignField: '_id',    // The field in the `user_types` collection that matches
+      as: 'userTypeDetails'   // Alias for the joined data
+    }
+  };
+  
+  const UNWIND_USER_TYPE = {
+    $unwind: {
+      path: '$userTypeDetails',
+      preserveNullAndEmptyArrays: true  // This ensures that if no match is found, the result won't be excluded
+    }
+  };
   // Department lookup
   const DEPARTMENT_LOOKUP = {
     $lookup: {
@@ -208,7 +223,8 @@ module.exports = function(User) {
       'creatorId': 1,
       'active': 1,
       'updatedAt': 1,
-      'createdAt': 1
+      'createdAt': 1,
+      'userType': 1,
     }
   }
   // Facet
@@ -261,10 +277,12 @@ module.exports = function(User) {
     }
   }
   // Update subscription
-  const updateSubscription = async (companyId, license, userId) => {
+  const updateSubscription = async (companyId, license, userId, userType) => {
     const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
     let totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
     let replaceItems = false;
+
+    console.log("userType----->>>>>",userType)
     // Check if total paid users of particular license is 0, then remove that
     if (totalPaidUsers < 1) {
       replaceItems = true;
@@ -284,22 +302,46 @@ module.exports = function(User) {
       license_count: totalPaidUsers,
       replaceItems
     }
-    if (subscription && subscription.frequency === "year" && license.name === "Creator") {
-      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
-      else subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+
+    if(userType === "appsumo"){
+      console.log("herecheck1--->>>")
+      if (subscription && subscription.frequency === "year" && license.name === "Creator") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      }
+      else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      } 
+      else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      }
+      else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      }
     }
-    else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
-      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
-      else subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+    if(userType !== "appsumo"){
+      console.log("herecheck2--->>>")
+      if (subscription && subscription.frequency === "year" && license.name === "Creator") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+      }
+      else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+      }
+      else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+      }
+      else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
+        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+      }
     }
-    else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
-      if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-      else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
-    }
-    else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
-      if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
-      else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-    }
+
     const subscriptionResponse = await update_subscription(subscriptionData);
     if (subscriptionResponse.status === 200) {
       const { status } = subscriptionResponse.data.subscription;
@@ -372,14 +414,15 @@ module.exports = function(User) {
 
   // Add user via invite member
   User.inviteMember = (data, next) => {
-    let { fullName, email, mobile, roleId, licenseId, departmentId, creatorId } = data;
+    console.log("data---->>>>",data)
+    let { fullName, email, mobile, roleId, licenseId, departmentId, creatorId, userType } = data;
 
     const password = generatePassword();
 
     email = email.toLowerCase();
     
     // Create user
-    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator" }, {}, (err, user) => {
+    User.create({ fullName, email, "emailVerified": true, password, mobile, roleId, licenseId, departmentId, creatorId, addedBy: "creator",userType }, {}, (err, user) => {
       if (err) {
         console.log('> error while creating user', err);
         return next(err);
@@ -392,9 +435,14 @@ module.exports = function(User) {
               return next(err);
             }
 
+            let departmentDetails = {
+              name: ""
+            };
+            if (departmentId) {
+              departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
+            }
             const licenseDetails = await User.app.models.license.findOne({ where: { "id": licenseId }});
             const roleDetails = await User.app.models.Role.findOne({ where: { "id": roleId }});
-            const departmentDetails = await User.app.models.department.findOne({ where: { "id": departmentId }});
             const companyDetails = await User.app.models.company.findOne({ where: { "id": creator.companyId }});
 
             let userDetails = {
@@ -404,6 +452,7 @@ module.exports = function(User) {
               role: roleDetails.name,
               department: departmentDetails.name,
             }
+            console.log("userDetails--->>>",userDetails)
             let ret = await sales_user_details(userDetails);
             User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, async (err) => {
               if (err) {
@@ -425,7 +474,7 @@ module.exports = function(User) {
                   await user.updateAttributes({ password });
                 });
                 // Assign license and update subscription in chargebee
-                if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id);
+                if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id, userType);
                 else await User.update({ "_id": user.id }, { "subscriptionId": "Spectator", "subscriptionStatus": "active" });
               }
             });
@@ -690,6 +739,8 @@ module.exports = function(User) {
           EMPLOYEE_RANGE_LOOKUP,
           UNWIND_EMPLOYEE_RANGE,
           SEARCH_MATCH,
+          USER_TYPE_LOOKUP,  // Add the userType lookup stage
+          UNWIND_USER_TYPE,  // Unwind the userType details
           SORT,
           PROJECT,
           FACET(page, limit)
@@ -1183,7 +1234,7 @@ module.exports = function(User) {
       // Assign role
       RoleManager.assignRoles(User.app, [role.id], user.id, () => {
         // Create company
-        User.app.models.company.create({ "name": removeSpace(req.body.companyName), "userId": user.id }, {}, (err, company) => {
+        User.app.models.company.create({ "name": removeSpace(req.body.companyName),"job_title": req.body.job_title ? req.body.job_title : "", "userId": user.id }, {}, (err, company) => {
           if (err) {
             console.log('> error while creating company', err);
             return next(err);
@@ -1197,7 +1248,7 @@ module.exports = function(User) {
             let userDetails = {
               ...user,
               companyName: company.name,
-              license: license.name,
+              license: license?.name || "",
               role: role.name
             }
             let ret = await sales_user_details(userDetails);
