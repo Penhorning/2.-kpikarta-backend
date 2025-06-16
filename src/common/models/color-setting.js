@@ -14,11 +14,11 @@ module.exports = function(Colorsetting) {
     }
     // Get color settings by user
     Colorsetting.getByUser = (userId, kartaId, next) => {
-        Colorsetting.findOne({ where: { userId, kartaId } }, function (err, userResult) {
-            if (userResult) next(err, userResult);
+        Colorsetting.findOne({ where: { userId, "is_global" : true } }, function (error, userGlobalResult) {
+            if (userGlobalResult) next(error, userGlobalResult);
             else {
-                Colorsetting.findOne({ where: { userId, "is_global" : true } }, function (error, userGlobalResult) {
-                    if (userGlobalResult) next(error, userGlobalResult);
+                Colorsetting.findOne({ where: { userId, kartaId } }, function (error, userResult) {
+                    if (userResult) next(error, userResult);
                     else {
                         Colorsetting.findOne({ where: { "userId" : { "exists" : false }, "kartaId" : { "exists" : false } } }, function (error, globalResult) {
                             next(error, globalResult);
@@ -30,6 +30,7 @@ module.exports = function(Colorsetting) {
     }
     // Toggle global color setting
     Colorsetting.toggleGlobal = (colorId, userId, is_global, next) => {
+        console.log('here')
         Colorsetting.update({ "_id": colorId, userId }, { is_global }, function (err, result) {
             if (err) {
                 let error = err;

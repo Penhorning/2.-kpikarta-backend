@@ -792,7 +792,7 @@ module.exports = function(User) {
         User.findOne({ where: { email }, include: 'role' }, (err, user) => {
           if (role === "admin" && user.role().name === "admin") {
             next(null, token);
-          } else if (role === "not_admin" && user.role().name !== "admin") {
+          } else if (role === "not_admin" && user.role()?.name !== "admin") {
             sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
             next(null, token);
           } else {
@@ -1337,7 +1337,7 @@ module.exports = function(User) {
           let error = new Error("Your account has been deactivated or deleted by the admin, please connect admin at info@kpikarta.com for more details.");
           error.status = 400;
           next(error);
-        } else if ((user.subscriptionStatus !== "active" && user.subscriptionStatus !== "in_trial") && (user.role().name == "user" || user.role().name == "department_admin")) {
+        } else if ((user.subscriptionStatus !== "active" && user.subscriptionStatus !== "in_trial") && (user.role()?.name == "user" || user.role()?.name == "department_admin")) {
           let error = new Error("Your cannot login due to subscription cancellation! Please contact to your admin.");
           error.status = 400;
           next(error);
@@ -1379,6 +1379,7 @@ module.exports = function(User) {
 
   // Before user update
   User.beforeRemote('prototype.patchAttributes', function(context, instance, next) {
+    
     const req = context.req;
     const user = context.instance;
     // Set mobile verified and 2fa enable flag to false, when admin change the number
@@ -1392,6 +1393,7 @@ module.exports = function(User) {
 
   // After user update
   User.afterRemote('prototype.patchAttributes', function(context, userInstance, next) {
+    
     const currentUser = User.app.currentUser;
     const req = context.req;
 

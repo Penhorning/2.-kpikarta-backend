@@ -25,6 +25,10 @@
           "color": "string"
         }
       ],
+      "fontSize": {
+        "type": "number",
+        "default": 10
+      },
       "is_global": {
         "type": "boolean"
       },
