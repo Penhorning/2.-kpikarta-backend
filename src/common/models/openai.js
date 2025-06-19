@@ -73,7 +73,21 @@ module.exports = function(Openai) {
 
     async function returnOpenAIResponse(prompt, threadId) {
         try {
-            prompt = prompt + "Respond ONLY with raw JSON, without \`\`\` or any extra text or extra brackets."
+            prompt += `Respond ONLY with a single JSON object with this structure:
+
+                        {
+                          "type": "GOAL",
+                          "name": "...",
+                          "children": [
+                            {
+                              "type": "CSF",
+                              "name": "...",
+                              "children": [ ... ]
+                            }
+                          ]
+                        }
+
+                        Do NOT return a list of goals. The root must always be an object of type "GOAL". No markdown, no explanation, only pure JSON.`
             await openai.beta.threads.messages.create(threadId, {
                     role: "user",
                     content: prompt
@@ -124,6 +138,7 @@ module.exports = function(Openai) {
             let validFlag = 0;
             while(validFlag < 5) {
                 response = await returnOpenAIResponse(prompt, thread);
+                console.log("RESPONSE FROM OPENAI", response);
                 let validJson = tryFixMalformedJson(response);
                 if (validJson) {
                     result = validJson;
