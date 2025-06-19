@@ -6,7 +6,7 @@ module.exports = function(Openai) {
     // Check JSON validation
     const isValidJSON = async (str) => {
         try {
-          JSON.parse(JSON.stringify(str));
+          JSON.parse(str);
           return true;
         } catch (e) {
           return false;
@@ -44,8 +44,36 @@ module.exports = function(Openai) {
         }
     }
 
+    function tryFixMalformedJson(text) {
+  // Try simple extract from `{` to `}` first
+        const match = text.match(/\{[\s\S]*\}/);
+        if (!match) return null;
+  
+        let candidate = match[0];
+
+        // Try parsing directly first
+        try {
+          return JSON.parse(candidate);
+        } catch (e) {
+          // Start trimming from the end
+          for (let i = 1; i <= 5; i++) {
+            let trimmed = candidate.slice(0, -i);
+            try {
+              return JSON.parse(trimmed);
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+
+        return null;
+    }
+
+
+
     async function returnOpenAIResponse(prompt, threadId) {
         try {
+            prompt = prompt + "Respond ONLY with raw JSON, without \`\`\` or any extra text or extra brackets."
             await openai.beta.threads.messages.create(threadId, {
                     role: "user",
                     content: prompt
@@ -57,8 +85,9 @@ module.exports = function(Openai) {
             );
             if (run.status === 'completed') {
                 const messages = await openai.beta.threads.messages.list(run.thread_id);
-                let finalResult = JSON.parse(messages.data[0].content[0].text.value);
-                return finalResult;
+                const validString = messages.data[0].content[0].text.value;
+                console.log(validString)
+                return validString;
             } else {
                 console.log(run.status);
                 let error = new Error("Oops! something went wrong! Try again.");
@@ -76,12 +105,12 @@ module.exports = function(Openai) {
     Openai.suggestGoalNamesByUser = async (prompt, type, kartaId) => {
         try {
             // Preparing prompt
+            console.log("We are coming here")
             type = type || "";
             prompt = prompt || "I'm working in marketing department in IT industry. Suggest me some GOALs";
-            console.log("prompt ----------------->", prompt);
             let thread = "";
             let kartaDetails = await Openai.app.models.karta.findById(kartaId);
-            JSON.parse(JSON.stringify(kartaDetails));
+            // JSON.parse(JSON.stringify(kartaDetails));
             if (kartaDetails.threadId) {
                 thread = kartaDetails.threadId
             } else {
@@ -95,11 +124,12 @@ module.exports = function(Openai) {
             let validFlag = 0;
             while(validFlag < 5) {
                 response = await returnOpenAIResponse(prompt, thread);
-                let validJson = await isValidJSON(response);
+                let validJson = tryFixMalformedJson(response);
                 if (validJson) {
-                    result = response;
+                    result = validJson;
                     validFlag = 5;
                 } else {
+                    console.log("Invalid JSON response from OpenAI");
                     validFlag += 1;
                 }
             }
@@ -190,7 +220,7 @@ module.exports = function(Openai) {
     // Nodes name suggestions based on phase layer
     Openai.suggestGoalNamesByPhase = async (prompt, kartaId) => {
         try {
-            console.log("prompt ----------------->", prompt);
+            console.log('by phase')
             let thread = "";
             let kartaDetails = await Openai.app.models.karta.findById(kartaId);
             JSON.parse(JSON.stringify(kartaDetails));
