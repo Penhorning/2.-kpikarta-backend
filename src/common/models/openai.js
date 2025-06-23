@@ -73,21 +73,76 @@ module.exports = function(Openai) {
 
     async function returnOpenAIResponse(prompt, threadId) {
         try {
-            prompt += `Respond ONLY with a single JSON object with this structure:
+            // prompt += `Respond ONLY with a single JSON object with this structure:
 
+            //             {
+            //               "type": "GOAL",
+            //               "name": "...",
+            //               "children": [
+            //                 {
+            //                   "type": "CSF",
+            //                   "name": "...",
+            //                   "children": [ ... ]
+            //                 }
+            //               ]
+            //             }
+
+            //             Do NOT return a list of goals. The root must always be an object of type "GOAL". and every node at-least have two child, No markdown, no explanation, only pure JSON.`
+            prompt += `Respond ONLY with a single JSON object following this exact structure and rules:
+
+                        STRUCTURE:
+                                
                         {
                           "type": "GOAL",
                           "name": "...",
-                          "children": [
+                          "children": [ 
                             {
                               "type": "CSF",
                               "name": "...",
-                              "children": [ ... ]
+                              "children": [ // At least TWO Phase objects
+                                {
+                                  "type": "Phase",
+                                  "name": "...",
+                                  "children": [ // At least TWO Segment objects
+                                    {
+                                      "type": "Segment",
+                                      "name": "...",
+                                      "children": [ // At least TWO Approach objects
+                                        {
+                                          "type": "Approach",
+                                          "name": "...",
+                                          "children": [ // At least TWO Action objects
+                                            {
+                                              "type": "Action",
+                                              "name": "...",
+                                              "children": [ // At least TWO KPI objects
+                                                {
+                                                  "type": "KPI",
+                                                  "name": "..."
+                                                }
+                                              ]
+                                            }
+                                          ]
+                                        }
+                                      ]
+                                    }
+                                  ]
+                                }
+                              ]
                             }
                           ]
                         }
-
-                        Do NOT return a list of goals. The root must always be an object of type "GOAL". No markdown, no explanation, only pure JSON.`
+                                
+                        RULES:
+                        1. The root object must always be of type "GOAL".
+                        2. Every node must have a **"children"** array with at least **two valid child objects** (of the correct next type).
+                        3. Every "Action" must have at least two "KPI" children.
+                        4. The structure must be exactly as shown — no missing layers or skipping levels.
+                        5. Do NOT return a list of ideas.
+                        6. Do NOT return markdown or wrap the JSON in \`\`\`.
+                        7. Return ONLY pure, raw JSON that is directly parsable with \`JSON.parse\`.
+                                
+                        Make sure each node has exactly the correct type and minimum two children as per hierarchy.`
             await openai.beta.threads.messages.create(threadId, {
                     role: "user",
                     content: prompt
