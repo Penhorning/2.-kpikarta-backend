@@ -71,78 +71,80 @@ module.exports = function(Openai) {
 
 
 
-    async function returnOpenAIResponse(prompt, threadId) {
+    async function returnOpenAIResponse(prompt, threadId, byPhase=null) {
         try {
-            // prompt += `Respond ONLY with a single JSON object with this structure:
+            if (!byPhase){
+                // prompt += `Respond ONLY with a single JSON object with this structure:
 
-            //             {
-            //               "type": "GOAL",
-            //               "name": "...",
-            //               "children": [
-            //                 {
-            //                   "type": "CSF",
-            //                   "name": "...",
-            //                   "children": [ ... ]
-            //                 }
-            //               ]
-            //             }
+                //             {
+                //               "type": "GOAL",
+                //               "name": "...",
+                //               "children": [
+                //                 {
+                //                   "type": "CSF",
+                //                   "name": "...",
+                //                   "children": [ ... ]
+                //                 }
+                //               ]
+                //             }
 
-            //             Do NOT return a list of goals. The root must always be an object of type "GOAL". and every node at-least have two child, No markdown, no explanation, only pure JSON.`
-            prompt += `Respond ONLY with a single JSON object following this exact structure and rules:
+                //             Do NOT return a list of goals. The root must always be an object of type "GOAL". and every node at-least have two child, No markdown, no explanation, only pure JSON.`
+                 prompt += `Respond ONLY with a single JSON object following this exact structure and rules:
 
-                        STRUCTURE:
-                                
-                        {
-                          "type": "GOAL",
-                          "name": "...",
-                          "children": [ 
-                            {
-                              "type": "CSF",
-                              "name": "...",
-                              "children": [ // At least TWO Phase objects
-                                {
-                                  "type": "Phase",
-                                  "name": "...",
-                                  "children": [ // At least TWO Segment objects
-                                    {
-                                      "type": "Segment",
-                                      "name": "...",
-                                      "children": [ // At least TWO Approach objects
-                                        {
-                                          "type": "Approach",
-                                          "name": "...",
-                                          "children": [ // At least TWO Action objects
-                                            {
-                                              "type": "Action",
-                                              "name": "...",
-                                              "children": [ // At least TWO KPI objects
-                                                {
-                                                  "type": "KPI",
-                                                  "name": "..."
-                                                }
-                                              ]
-                                            }
-                                          ]
-                                        }
-                                      ]
-                                    }
-                                  ]
-                                }
-                              ]
-                            }
-                          ]
-                        }
-                                
-                        RULES:
-                        1. The root object must always be of type "GOAL".
-                        2. Every node must have a **"children"** array with at least **two valid child objects** (of the correct next type).
-                        3. Every "Action" must have at least two "KPI" children.
-                        4. The structure must be exactly as shown — no missing layers or skipping levels.
-                        5. Do NOT return a list of ideas.
-                        6. Do NOT return markdown or wrap the JSON in \`\`\`.
-                        7. Return ONLY pure, raw JSON that is directly parsable with \`JSON.parse\`.
-                                
-                        Make sure each node has exactly the correct type and minimum two children as per hierarchy.`
+                             STRUCTURE:
+
+                             {
+                               "type": "GOAL",
+                               "name": "...",
+                               "children": [ 
+                                 {
+                                   "type": "CSF",
+                                   "name": "...",
+                                   "children": [ // At least TWO Phase objects
+                                     {
+                                       "type": "Phase",
+                                       "name": "...",
+                                       "children": [ // At least TWO Segment objects
+                                         {
+                                           "type": "Segment",
+                                           "name": "...",
+                                           "children": [ // At least TWO Approach objects
+                                             {
+                                               "type": "Approach",
+                                               "name": "...",
+                                               "children": [ // At least TWO Action objects
+                                                 {
+                                                   "type": "Action",
+                                                   "name": "...",
+                                                   "children": [ // At least TWO KPI objects
+                                                     {
+                                                       "type": "KPI",
+                                                       "name": "..."
+                                                     }
+                                                   ]
+                                                 }
+                                               ]
+                                             }
+                                           ]
+                                         }
+                                       ]
+                                     }
+                                   ]
+                                 }
+                               ]
+                             }
+
+                             RULES:
+                             1. The root object must always be of type "GOAL".
+                             2. Every node must have a **"children"** array with at least **two valid child objects** (of the correct next type).
+                             3. Every "Action" must have at least two "KPI" children.
+                             4. The structure must be exactly as shown — no missing layers or skipping levels.
+                             5. Do NOT return a list of ideas.
+                             6. Do NOT return markdown or wrap the JSON in \`\`\`.
+                             7. Return ONLY pure, raw JSON that is directly parsable with \`JSON.parse\`.
+
+                             Make sure each node has exactly the correct type and minimum two children as per hierarchy.`
+            }
             await openai.beta.threads.messages.create(threadId, {
                     role: "user",
                     content: prompt
@@ -155,10 +157,8 @@ module.exports = function(Openai) {
             if (run.status === 'completed') {
                 const messages = await openai.beta.threads.messages.list(run.thread_id);
                 const validString = messages.data[0].content[0].text.value;
-                console.log(validString)
                 return validString;
             } else {
-                console.log(run.status);
                 let error = new Error("Oops! something went wrong! Try again.");
                 error.status = 400;
                 throw error;
@@ -301,9 +301,9 @@ module.exports = function(Openai) {
                 thread = newThread.id;
                 await Openai.app.models.karta.update({ "id": kartaId }, { $set: { threadId: thread }} );
             }
-            let response = await returnOpenAIResponse(prompt, thread);
-            if(Array.isArray(response.data)) {
-                let nodeValues = response.data.map(name => {
+            let response = await returnOpenAIResponse(prompt, thread, true);
+            if(Array.isArray(JSON.parse(response)?.data)) {
+                let nodeValues = JSON.parse(response).data.map(name => {
                     return { name, type: "auto" };
                 });
                 nodeValues.push({ type: "manual" });
