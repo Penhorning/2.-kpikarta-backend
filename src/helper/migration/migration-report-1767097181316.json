@@ -1,0 +1,54 @@
+{
+  "timestamp": "2025-12-30T12:19:41.316Z",
+  "mode": "DRY RUN",
+  "statistics": {
+    "customers": {
+      "total": 1,
+      "migrated": 1,
+      "failed": 0,
+      "skipped": 0
+    },
+    "subscriptions": {
+      "total": 1,
+      "migrated": 0,
+      "failed": 1,
+      "skipped": 1,
+      "withStripePayment": 0,
+      "withoutStripePayment": 0
+    },
+    "addons": {
+      "total": 0,
+      "migrated": 0,
+      "failed": 0
+    },
+    "invoices": {
+      "total": 0,
+      "migrated": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "errors": []
+  },
+  "planMapping": {
+    "cb-creator-plan-Monthly": "425",
+    "cb-creator-plan-Yearly": "424",
+    "Creator-Test-Free-USD-Monthly": "419",
+    "Creator-Test-Free-USD-Yearly": "419",
+    "KPI-Karta-Creator---AppSumo-USD-Yearly": "419",
+    "KPI-Karta-Creator---DealMirror-USD-Yearly": "419",
+    "cb-creator-addon-plan-Monthly": "428",
+    "cb-creator-addon-plan-Yearly": "431",
+    "cb-champion-addon-plan-Monthly": "432",
+    "cb-champion-addon-plan-Yearly": "430",
+    "undefined": "419",
+    "Creator-Test-USD-Monthly": "419",
+    "Creator-Test-USD-Yearly": "419",
+    "Creator-Addon-Test-USD-Monthly": "428",
+    "Creator-Addon-Test-USD-Yearly": "431",
+    "Champion-Addon-Test-USD-Monthly": "432",
+    "Champion-Addon-Test-USD-Yearly": "430"
+  },
+  "configuration": {
+    "unibeeApiUrl": "https://api.unibee.dev"
+  }
+}
