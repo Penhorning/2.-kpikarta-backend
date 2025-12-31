@@ -9,7 +9,19 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
-const { update_subscription, pause_subscription, resume_subscription, delete_subscription } = require("../../helper/chargebee");
+// Use billing provider abstraction layer for UniBee/ChargeBee compatibility
+const { 
+  update_subscription, 
+  pause_subscription, 
+  resume_subscription, 
+  delete_subscription,
+  getPlanIds,
+  isUniBee,
+  BILLING_PROVIDER
+} = require("../../helper/billingProvider");
+
+// Get plan IDs based on billing provider
+const PLAN_IDS = getPlanIds();
 
 module.exports = function(User) {
   /* QUERY VARIABLES
@@ -279,10 +291,11 @@ module.exports = function(User) {
   // Update subscription
   const updateSubscription = async (companyId, license, userId, userType) => {
     const subscription = await User.app.models.subscription.findOne({ where: { companyId } });
+    
     let totalPaidUsers = await User.count({ "active": true, "is_deleted": false, "addedBy": "creator", companyId, "licenseId": license.id });
+    
     let replaceItems = false;
 
-    console.log("userType----->>>>>",userType)
     // Check if total paid users of particular license is 0, then remove that
     if (totalPaidUsers < 1) {
       replaceItems = true;
@@ -304,49 +317,50 @@ module.exports = function(User) {
     }
 
     if(userType === "appsumo"){
-      console.log("herecheck1--->>>")
       if (subscription && subscription.frequency === "year" && license.name === "Creator") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_YEARLY_ADDON_PLAN_ID || process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
       }
       else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_YEARLY_ADDON_PLAN_ID || process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
       } 
       else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
       }
       else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
       }
     }
     if(userType !== "appsumo"){
-      console.log("herecheck2--->>>")
       if (subscription && subscription.frequency === "year" && license.name === "Creator") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_YEARLY_ADDON_PLAN_ID || process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_YEARLY_ADDON_PLAN_ID || process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
       }
       else if (subscription && subscription.frequency === "year" && license.name === "Champion") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_YEARLY_ADDON_PLAN_ID || process.env.CREATOR_YEARLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_YEARLY_ADDON_PLAN_ID || process.env.CHAMPION_YEARLY_ADDON_PLAN_ID;
       }
       else if (subscription && subscription.frequency === "month" && license.name === "Creator") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
       }
       else if (subscription && subscription.frequency === "month" && license.name === "Champion") {
-        if (replaceItems) subscriptionData.addon_plan_id = process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
-        else subscriptionData.addon_plan_id = process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
+        if (replaceItems) subscriptionData.addon_plan_id = PLAN_IDS.CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID;
+        else subscriptionData.addon_plan_id = PLAN_IDS.CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID;
       }
     }
 
     const subscriptionResponse = await update_subscription(subscriptionData);
+    
     if (subscriptionResponse.status === 200) {
       const { status } = subscriptionResponse.data.subscription;
       await User.update({ "_id": userId }, { "subscriptionId": subscription.id, "subscriptionStatus": status });
       await User.app.models.subscription.update({ "id": subscription.id }, { status, "subscriptionDetails": subscriptionResponse.data.subscription });
+    } else {
+      console.error('Failed to update subscription:', subscriptionResponse);
     }
   }
   // Pause subscription
@@ -453,8 +467,16 @@ module.exports = function(User) {
               department: departmentDetails.name,
             }
             console.log("userDetails--->>>",userDetails)
-            let ret = await sales_user_details(userDetails);
-            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret.id }, async (err) => {
+            
+            // Try Salesforce sync but don't block registration if it fails
+            let ret = { id: null };
+            try {
+              ret = await sales_user_details(userDetails);
+            } catch (err) {
+              console.log('[SF] Salesforce sync failed (non-blocking):', err.message);
+            }
+            
+            User.update({ "_id": user.id },  { "companyId": creator.companyId, "sforceId": ret?.id }, async (err) => {
               if (err) {
                 console.log('> error while updating user', err);
                 return next(err);
@@ -474,8 +496,20 @@ module.exports = function(User) {
                   await user.updateAttributes({ password });
                 });
                 // Assign license and update subscription in chargebee
-                if (licenseDetails.name !== "Spectator") await updateSubscription(creator.companyId, licenseDetails, user.id, userType);
-                else await User.update({ "_id": user.id }, { "subscriptionId": "Spectator", "subscriptionStatus": "active" });
+                console.log('=== About to update subscription for invited member ===');
+                console.log('License:', licenseDetails.name);
+                console.log('Creator companyId:', creator.companyId);
+                console.log('Invited user ID:', user.id);
+                console.log('userType:', userType);
+                
+                if (licenseDetails.name !== "Spectator") {
+                  console.log('Calling updateSubscription for non-Spectator license...');
+                  await updateSubscription(creator.companyId, licenseDetails, user.id, userType);
+                }
+                else {
+                  console.log('Spectator license - not calling updateSubscription');
+                  await User.update({ "_id": user.id }, { "subscriptionId": "Spectator", "subscriptionStatus": "active" });
+                }
               }
             });
           });
@@ -793,7 +827,12 @@ module.exports = function(User) {
           if (role === "admin" && user.role().name === "admin") {
             next(null, token);
           } else if (role === "not_admin" && user.role()?.name !== "admin") {
-            sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
+            // Try Salesforce sync but don't block
+            try {
+              sales_update_user(user, { userLastLogin: moment().format('DD/MM/YYYY, HH:mm A') });
+            } catch (sfErr) {
+              console.log('[SF] Salesforce sync failed (non-blocking):', sfErr.message);
+            }
             next(null, token);
           } else {
             let error = new Error("You are not allowed to login here");
@@ -817,7 +856,12 @@ module.exports = function(User) {
     var otpVerified = this.app.currentUser.emailVerificationCode == otp;
     if (otpVerified) {
       this.app.currentUser.updateAttributes({ "emailVerified": true, "emailVerificationCode": ""}, (err)=>{
-        sales_update_user(this.app.currentUser, { "emailVerified": true });
+        // Try Salesforce sync but don't block
+        try {
+          sales_update_user(this.app.currentUser, { "emailVerified": true });
+        } catch (sfErr) {
+          console.log('[SF] Salesforce sync failed (non-blocking):', sfErr.message);
+        }
         next(err, this.app.currentUser);
       });
     } else {
@@ -859,7 +903,12 @@ module.exports = function(User) {
       this.app.currentUser.updateAttributes(query, (err) => {
         if (err) next(err);
         else {
-          sales_update_user( this.app.currentUser, { mobileVerified: true });
+          // Try Salesforce sync but don't block
+          try {
+            sales_update_user( this.app.currentUser, { mobileVerified: true });
+          } catch (sfErr) {
+            console.log('[SF] Salesforce sync failed (non-blocking):', sfErr.message);
+          }
           next(null, true);
         }
       });
@@ -932,7 +981,12 @@ module.exports = function(User) {
   User.toggle2FA = function(type, next) {
     const toggle = () => {
       this.app.currentUser.updateAttributes({ "_2faEnabled": type }, (err)=>{
-        sales_update_user( this.app.currentUser, { _2faEnabled: type });
+        // Try Salesforce sync but don't block
+        try {
+          sales_update_user( this.app.currentUser, { _2faEnabled: type });
+        } catch (sfErr) {
+          console.log('[SF] Salesforce sync failed (non-blocking):', sfErr.message);
+        }
         next(err, type);
       });
     }
@@ -1251,7 +1305,15 @@ module.exports = function(User) {
               license: license?.name || "",
               role: role.name
             }
-            let ret = await sales_user_details(userDetails);
+            
+            // Try Salesforce sync but don't block registration if it fails
+            let ret = { id: null };
+            try {
+              ret = await sales_user_details(userDetails);
+            } catch (err) {
+              console.log('[SF] Salesforce sync failed (non-blocking):', err.message);
+            }
+            
             // Assign roleId, licenseId and companyId
             if (ret && ret.id) {
               User.update({ "_id": user.id },  { "companyId": company.id, "roleId": role.id, "licenseId": license.id, "sforceId": ret.id }, (err) => {
@@ -1489,7 +1551,12 @@ module.exports = function(User) {
             req.body['designation'] = changedUser.role.name;
             changedUser.license.name ? req.body['licenseType'] = changedUser.license.name : null;
           }
-          sales_update_user( changedUser, req.body );
+          // Try Salesforce sync but don't block
+          try {
+            sales_update_user( changedUser, req.body );
+          } catch (sfErr) {
+            console.log('[SF] Salesforce sync failed (non-blocking):', sfErr.message);
+          }
         });
         next();
       });
