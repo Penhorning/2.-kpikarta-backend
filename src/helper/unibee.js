@@ -96,6 +96,47 @@ const apiRequest = async (method, endpoint, data = null, retries = 2) => {
     return makeRequest(1);
 };
 
+/**
+ * Fast API request with shorter timeout (10 seconds) and no retries
+ * Used for operations that should fail fast (like coupon verification)
+ */
+const apiRequestFast = async (method, endpoint, data = null) => {
+    try {
+        const config = {
+            method,
+            url: `${UNIBEE_API_URL}${endpoint}`,
+            headers: REQUEST_HEADER,
+            timeout: 10000 // 10 second timeout for fast operations
+        };
+        
+        if (data) {
+            if (method.toUpperCase() === 'GET') {
+                config.params = data;
+            } else {
+                config.data = data;
+            }
+        }
+        
+        const response = await axios(config);
+        
+        return {
+            status: response.status,
+            data: response.data.data || response.data,
+            code: response.data.code,
+            success: response.data.code === 0
+        };
+    } catch (err) {
+        console.error(`[UniBee API Fast ERROR] ${method} ${endpoint}:`, err.message);
+        return {
+            status: err.response?.status || 500,
+            data: err.response?.data || { message: err.message },
+            code: err.response?.data?.code,
+            success: false,
+            error: err
+        };
+    }
+};
+
 // ==================== PLAN MANAGEMENT ====================
 
 /**
@@ -949,19 +990,42 @@ const verifyMainDiscount = (discount) => {
     };
 };
 
+// Cache for batch templates to avoid repeated API calls
+let batchTemplatesCache = null;
+let batchTemplatesCacheTime = 0;
+const BATCH_TEMPLATES_CACHE_TTL = 5 * 60 * 1000; // 5 minutes cache
+
 /**
  * Verify a batch discount child code (unique codes from a template)
  * These are like ChargeBee's coupon codes from a coupon set
  * Used for AppSumo and similar campaigns with 1000s of unique codes
  * 
- * Optimized: Match by code prefix to find the right template quickly
+ * Optimized: 
+ * - Cache templates for 5 minutes to avoid repeated API calls
+ * - Match by code prefix to find the right template quickly
+ * - Use shorter timeout for faster failure
  */
 const verifyBatchChildCode = async (couponCode) => {
     try {
-        // First, get all batch templates
-        const templatesResponse = await apiRequest('GET', '/merchant/discount/batch/template/list', {});
+        const now = Date.now();
         
-        if (!templatesResponse.success || !templatesResponse.data.templates?.length) {
+        // Use cached templates if available and not expired
+        if (!batchTemplatesCache || (now - batchTemplatesCacheTime) > BATCH_TEMPLATES_CACHE_TTL) {
+            // Fetch templates with shorter timeout (10 seconds)
+            const templatesResponse = await apiRequestFast('GET', '/merchant/discount/batch/template/list', {});
+            
+            if (!templatesResponse.success || !templatesResponse.data.templates?.length) {
+                return null;
+            }
+            
+            // Cache the templates
+            batchTemplatesCache = templatesResponse.data.templates
+                .filter(t => t.status === 2 && (!t.isDeleted || t.isDeleted === 0))
+                .sort((a, b) => (b.codePrefix?.length || 0) - (a.codePrefix?.length || 0));
+            batchTemplatesCacheTime = now;
+        }
+        
+        if (!batchTemplatesCache || batchTemplatesCache.length === 0) {
             return null;
         }
         
@@ -969,13 +1033,8 @@ const verifyBatchChildCode = async (couponCode) => {
         // Batch codes are formatted as: {prefix}{randomChars} e.g., "ASKC79VYWVH83"
         const codeUpper = couponCode.toUpperCase();
         
-        // Sort templates by prefix length (longest first) to match most specific prefix
-        const sortedTemplates = templatesResponse.data.templates
-            .filter(t => t.status === 2 && (!t.isDeleted || t.isDeleted === 0))
-            .sort((a, b) => (b.codePrefix?.length || 0) - (a.codePrefix?.length || 0));
-        
         // Find the template whose prefix matches the beginning of the code
-        const matchingTemplate = sortedTemplates.find(template => 
+        const matchingTemplate = batchTemplatesCache.find(template => 
             template.codePrefix && codeUpper.startsWith(template.codePrefix.toUpperCase())
         );
         
@@ -983,8 +1042,8 @@ const verifyBatchChildCode = async (couponCode) => {
             return null; // No matching template found
         }
         
-        // Search for the specific code in this template's children
-        const childrenResponse = await apiRequest('GET', '/merchant/discount/batch/children/list', {
+        // Search for the specific code in this template's children (with shorter timeout)
+        const childrenResponse = await apiRequestFast('GET', '/merchant/discount/batch/children/list', {
             templateId: matchingTemplate.id,
             code: couponCode,
             page: 0,
@@ -1034,14 +1093,14 @@ const verifyBatchChildCode = async (couponCode) => {
         }
         
         // Check validity dates from template
-        const now = Math.floor(Date.now() / 1000);
-        if (childCode.startTime && now < childCode.startTime) {
+        const nowUnix = Math.floor(Date.now() / 1000);
+        if (childCode.startTime && nowUnix < childCode.startTime) {
             return {
                 status: 400,
                 data: { message: 'Coupon is not yet valid' }
             };
         }
-        if (childCode.endTime && now > childCode.endTime) {
+        if (childCode.endTime && nowUnix > childCode.endTime) {
             return {
                 status: 400,
                 data: { message: 'Coupon has expired' }
