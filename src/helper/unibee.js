@@ -846,111 +846,239 @@ exports.get_invoice = async (invoiceId) => {
 /**
  * Verify/retrieve coupon/discount code
  * Maps to ChargeBee coupon verification
- * Supports both regular discounts and advanced discounts (with quantity limits like AppSumo)
+ * Only supports batch discount child codes (unique codes from a template, like AppSumo)
  */
 exports.verify_coupon = async (couponCode) => {
     try {
-        // UniBee uses /merchant/discount/list - we need to fetch all and filter by code
-        const response = await apiRequest('GET', '/merchant/discount/list', {});
-        
-        if (response.success && response.data.discounts?.length > 0) {
-            // Find the discount with matching code (case-insensitive)
-            const discount = response.data.discounts.find(
-                d => d.code && d.code.toLowerCase() === couponCode.toLowerCase()
-            );
-            
-            if (discount) {
-                // Check if discount is deleted
-                if (discount.isDeleted && discount.isDeleted > 0) {
-                    return {
-                        status: 400,
-                        data: { message: 'Coupon has been deleted' }
-                    };
-                }
-                
-                // Check if discount is active (status 2 = active)
-                if (discount.status !== 2) {
-                    return {
-                        status: 400,
-                        data: { message: 'Coupon is not active or has been archived' }
-                    };
-                }
-                
-                // Check validity dates
-                const now = Math.floor(Date.now() / 1000);
-                if (discount.startTime && now < discount.startTime) {
-                    return {
-                        status: 400,
-                        data: { message: 'Coupon is not yet valid' }
-                    };
-                }
-                if (discount.endTime && now > discount.endTime) {
-                    return {
-                        status: 400,
-                        data: { message: 'Coupon has expired' }
-                    };
-                }
-                
-                // For advanced discounts (like AppSumo), check if quantity is available
-                // advance: true means it has limited uses
-                if (discount.advance === true) {
-                    const remaining = discount.liveQuantity || 0;
-                    if (remaining <= 0) {
-                        return {
-                            status: 400,
-                            data: { 
-                                message: 'Coupon has been fully redeemed (no uses remaining)',
-                                // Match ChargeBee coupon_code status format
-                                couponCodeDetails: {
-                                    code: discount.code,
-                                    status: 'redeemed'
-                                }
-                            }
-                        };
-                    }
-                }
-                
-                // Return success with coupon details
-                // For advanced discounts, include usage info like ChargeBee's coupon_code
-                const couponStatus = discount.advance ? 'not_redeemed' : 'active';
-                
-                return {
-                    status: 200,
-                    data: {
-                        coupon: {
-                            id: discount.id,
-                            code: discount.code,
-                            name: discount.name,
-                            discount_type: discount.discountType === 1 ? 'percentage' : 'fixed_amount',
-                            discount_percentage: discount.discountPercentage,
-                            discount_amount: discount.discountAmount,
-                            status: 'active',
-                            start_time: discount.startTime,
-                            end_time: discount.endTime,
-                            // Advanced discount info (similar to ChargeBee coupon sets)
-                            is_advanced: discount.advance || false,
-                            quantity: discount.quantity || 0,
-                            quantity_used: discount.quantityUsed || 0,
-                            live_quantity: discount.liveQuantity || 0,
-                            _unibee: discount
-                        },
-                        // For compatibility with ChargeBee coupon_code format (AppSumo flow)
-                        couponCodeDetails: discount.advance ? {
-                            code: discount.code,
-                            status: couponStatus,
-                            coupon_set_id: discount.id
-                        } : null
-                    }
-                };
-            }
+        // Only check batch discount child codes (unique codes like AppSumo)
+        const batchResult = await verifyBatchChildCode(couponCode);
+        if (batchResult) {
+            return batchResult;
         }
+        
         return { 
             status: 404, 
-            data: { message: 'Coupon not found' } 
+            data: { message: 'Coupon not found or invalid' } 
         };
     } catch (err) {
         console.error('Error verifying coupon:', err);
         return { status: 500, error: err };
+    }
+};
+
+/**
+ * Verify a main discount code (regular or advanced)
+ */
+const verifyMainDiscount = (discount) => {
+    // Check if discount is deleted
+    if (discount.isDeleted && discount.isDeleted > 0) {
+        return {
+            status: 400,
+            data: { message: 'Coupon has been deleted' }
+        };
+    }
+    
+    // Check if discount is active (status 2 = active)
+    if (discount.status !== 2) {
+        return {
+            status: 400,
+            data: { message: 'Coupon is not active or has been archived' }
+        };
+    }
+    
+    // Check validity dates
+    const now = Math.floor(Date.now() / 1000);
+    if (discount.startTime && now < discount.startTime) {
+        return {
+            status: 400,
+            data: { message: 'Coupon is not yet valid' }
+        };
+    }
+    if (discount.endTime && now > discount.endTime) {
+        return {
+            status: 400,
+            data: { message: 'Coupon has expired' }
+        };
+    }
+    
+    // For advanced discounts, check if quantity is available
+    if (discount.advance === true) {
+        const remaining = discount.liveQuantity || 0;
+        if (remaining <= 0) {
+            return {
+                status: 400,
+                data: { 
+                    message: 'Coupon has been fully redeemed (no uses remaining)',
+                    couponCodeDetails: {
+                        code: discount.code,
+                        status: 'redeemed'
+                    }
+                }
+            };
+        }
+    }
+    
+    // Return success with coupon details
+    const couponStatus = discount.advance ? 'not_redeemed' : 'active';
+    
+    return {
+        status: 200,
+        data: {
+            coupon: {
+                id: discount.id,
+                code: discount.code,
+                name: discount.name,
+                discount_type: discount.discountType === 1 ? 'percentage' : 'fixed_amount',
+                discount_percentage: discount.discountPercentage,
+                discount_amount: discount.discountAmount,
+                status: 'active',
+                start_time: discount.startTime,
+                end_time: discount.endTime,
+                is_advanced: discount.advance || false,
+                quantity: discount.quantity || 0,
+                quantity_used: discount.quantityUsed || 0,
+                live_quantity: discount.liveQuantity || 0,
+                _unibee: discount
+            },
+            couponCodeDetails: discount.advance ? {
+                code: discount.code,
+                status: couponStatus,
+                coupon_set_id: discount.id
+            } : null
+        }
+    };
+};
+
+/**
+ * Verify a batch discount child code (unique codes from a template)
+ * These are like ChargeBee's coupon codes from a coupon set
+ * Used for AppSumo and similar campaigns with 1000s of unique codes
+ * 
+ * Optimized: Match by code prefix to find the right template quickly
+ */
+const verifyBatchChildCode = async (couponCode) => {
+    try {
+        // First, get all batch templates
+        const templatesResponse = await apiRequest('GET', '/merchant/discount/batch/template/list', {});
+        
+        if (!templatesResponse.success || !templatesResponse.data.templates?.length) {
+            return null;
+        }
+        
+        // Find the template that matches this code's prefix
+        // Batch codes are formatted as: {prefix}{randomChars} e.g., "ASKC79VYWVH83"
+        const codeUpper = couponCode.toUpperCase();
+        
+        // Sort templates by prefix length (longest first) to match most specific prefix
+        const sortedTemplates = templatesResponse.data.templates
+            .filter(t => t.status === 2 && (!t.isDeleted || t.isDeleted === 0))
+            .sort((a, b) => (b.codePrefix?.length || 0) - (a.codePrefix?.length || 0));
+        
+        // Find the template whose prefix matches the beginning of the code
+        const matchingTemplate = sortedTemplates.find(template => 
+            template.codePrefix && codeUpper.startsWith(template.codePrefix.toUpperCase())
+        );
+        
+        if (!matchingTemplate) {
+            return null; // No matching template found
+        }
+        
+        // Search for the specific code in this template's children
+        const childrenResponse = await apiRequest('GET', '/merchant/discount/batch/children/list', {
+            templateId: matchingTemplate.id,
+            code: couponCode,
+            page: 0,
+            count: 1
+        });
+        
+        if (!childrenResponse.success || !childrenResponse.data.children?.length) {
+            return null;
+        }
+        
+        const childCode = childrenResponse.data.children.find(
+            c => c.code && c.code.toLowerCase() === couponCode.toLowerCase()
+        );
+        
+        if (!childCode) {
+            return null;
+        }
+        
+        // Check if code is already redeemed
+        if (childCode.isRedeemed) {
+            return {
+                status: 400,
+                data: { 
+                    message: 'This coupon code has already been redeemed',
+                    couponCodeDetails: {
+                        code: childCode.code,
+                        status: 'redeemed'
+                    }
+                }
+            };
+        }
+        
+        // Check if code is deleted
+        if (childCode.isDeleted && childCode.isDeleted > 0) {
+            return {
+                status: 400,
+                data: { message: 'Coupon code has been deleted' }
+            };
+        }
+        
+        // Check if code is active (status 2)
+        if (childCode.status !== 2) {
+            return {
+                status: 400,
+                data: { message: 'Coupon code is not active' }
+            };
+        }
+        
+        // Check validity dates from template
+        const now = Math.floor(Date.now() / 1000);
+        if (childCode.startTime && now < childCode.startTime) {
+            return {
+                status: 400,
+                data: { message: 'Coupon is not yet valid' }
+            };
+        }
+        if (childCode.endTime && now > childCode.endTime) {
+            return {
+                status: 400,
+                data: { message: 'Coupon has expired' }
+            };
+        }
+        
+        // Valid batch child code found
+        return {
+            status: 200,
+            data: {
+                coupon: {
+                    id: childCode.id,
+                    code: childCode.code,
+                    name: childCode.name,
+                    discount_type: childCode.discountType === 1 ? 'percentage' : 'fixed_amount',
+                    discount_percentage: childCode.discountPercentage,
+                    discount_amount: childCode.discountAmount,
+                    status: 'active',
+                    start_time: childCode.startTime,
+                    end_time: childCode.endTime,
+                    // Mark as batch child code
+                    is_batch_child: true,
+                    parent_template_id: matchingTemplate.id,
+                    parent_template_code: childCode.parentTemplateCode || matchingTemplate.codePrefix,
+                    _unibee: childCode
+                },
+                // For compatibility with ChargeBee coupon_code format (AppSumo flow)
+                couponCodeDetails: {
+                    code: childCode.code,
+                    status: 'not_redeemed',
+                    coupon_set_id: matchingTemplate.id
+                }
+            }
+        };
+    } catch (err) {
+        console.error('Error verifying batch child code:', err);
+        return null;
     }
 };
 
