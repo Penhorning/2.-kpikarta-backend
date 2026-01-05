@@ -48,12 +48,11 @@ module.exports = function (Subscription) {
       const userId = Subscription.app.currentUser.id;
       const user = await Subscription.app.models.user.findOne({ where: { "_id": userId }, include: 'company' });
       
-      // For AppSumo users, use the free/spectator plan (like ChargeBee's KPI-Karta-Creator---AppSumo-USD-Yearly)
-      // The coupon was only for verification - the plan itself is already $0
+      // For AppSumo users, use dedicated $0 AppSumo plan (same as ChargeBee's KPI-Karta-Creator---AppSumo-USD-Yearly)
       if (user.userType === 'appsumo') {
         if (isUniBee) {
-          // UniBee Spectator plan (equivalent to ChargeBee's AppSumo plan)
-          planId = process.env.UNIBEE_SPECTATOR_PLAN_ID || '419';
+          // UniBee AppSumo Creator Yearly plan ($0/year)
+          planId = process.env.UNIBEE_APPSUMO_PLAN_ID || '452';
         } else {
           // ChargeBee AppSumo plan
           planId = 'KPI-Karta-Creator---AppSumo-USD-Yearly';

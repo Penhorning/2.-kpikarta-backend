@@ -21,6 +21,17 @@ const axios = require('axios');
 const chargebee = require('chargebee');
 const fs = require('fs');
 const path = require('path');
+const { MongoClient, ObjectId } = require('mongodb');
+
+// MongoDB configuration
+const MONGODB_HOST = process.env.MONGODB_HOST || '127.0.0.1';
+const MONGODB_PORT = process.env.MONGODB_PORT || 27018;
+const MONGODB_DB = process.env.DB || 'kpikarta';
+const MONGODB_URL = process.env.MONGODB_URL || `mongodb://${MONGODB_HOST}:${MONGODB_PORT}/${MONGODB_DB}`;
+
+// MongoDB connection
+let mongoClient = null;
+let db = null;
 
 // Configure ChargeBee
 chargebee.configure({
@@ -40,18 +51,18 @@ const DELAY_BETWEEN_BATCHES = 1000; // ms
 // Based on ChargeBee item_price IDs from API query
 // 
 // ChargeBee ACTIVE PLANS (item_type=plan):
-//   - cb-creator-plan-Monthly       ($9/month)   → UniBee Creator Monthly
-//   - cb-creator-plan-Yearly        ($99/year)   → UniBee Creator Yearly
-//   - Creator-Test-Free-USD-Monthly ($0/month)   → UniBee Spectator Free
-//   - Creator-Test-Free-USD-Yearly  ($0/year)    → UniBee Spectator Free
-//   - KPI-Karta-Creator---AppSumo-USD-Yearly   ($0/year, LTD) → UniBee Spectator Free
-//   - KPI-Karta-Creator---DealMirror-USD-Yearly ($0/year, LTD) → UniBee Spectator Free
+//   - cb-creator-plan-Monthly       ($9/month)   → UniBee Creator Monthly (425)
+//   - cb-creator-plan-Yearly        ($99/year)   → UniBee Creator Yearly (424)
+//   - Creator-Test-Free-USD-Monthly ($0/month)   → UniBee Spectator Free (419)
+//   - Creator-Test-Free-USD-Yearly  ($0/year)    → UniBee Spectator Free (419)
+//   - KPI-Karta-Creator---AppSumo-USD-Yearly   ($0/year, LTD) → UniBee AppSumo Plan (452)
+//   - KPI-Karta-Creator---DealMirror-USD-Yearly ($0/year, LTD) → UniBee DealMirror Plan (453)
 //
 // ChargeBee ACTIVE ADDONS (item_type=addon):
-//   - cb-creator-addon-plan-Monthly  ($9/month)  → UniBee Creator Addon Monthly
-//   - cb-creator-addon-plan-Yearly   ($99/year)  → UniBee Creator Addon Yearly
-//   - cb-champion-addon-plan-Monthly ($6/month)  → UniBee Champion Addon Monthly
-//   - cb-champion-addon-plan-Yearly  ($59/year)  → UniBee Champion Addon Yearly
+//   - cb-creator-addon-plan-Monthly  ($9/month)  → UniBee Creator Addon Monthly (428)
+//   - cb-creator-addon-plan-Yearly   ($99/year)  → UniBee Creator Addon Yearly (431)
+//   - cb-champion-addon-plan-Monthly ($6/month)  → UniBee Champion Addon Monthly (432)
+//   - cb-champion-addon-plan-Yearly  ($59/year)  → UniBee Champion Addon Yearly (430)
 //
 const PLAN_MAPPING = {
     // ========================
@@ -66,9 +77,9 @@ const PLAN_MAPPING = {
     'Creator-Test-Free-USD-Monthly': process.env.UNIBEE_SPECTATOR_PLAN_ID,        // 419
     'Creator-Test-Free-USD-Yearly': process.env.UNIBEE_SPECTATOR_PLAN_ID,         // 419
     
-    // AppSumo & DealMirror Lifetime Deals - Free forever, map to Spectator
-    'KPI-Karta-Creator---AppSumo-USD-Yearly': process.env.UNIBEE_SPECTATOR_PLAN_ID,   // 419
-    'KPI-Karta-Creator---DealMirror-USD-Yearly': process.env.UNIBEE_SPECTATOR_PLAN_ID, // 419
+    // AppSumo & DealMirror Lifetime Deals - Dedicated $0 plans (same as ChargeBee)
+    'KPI-Karta-Creator---AppSumo-USD-Yearly': process.env.UNIBEE_APPSUMO_PLAN_ID || '452',      // 452 (AppSumo $0/year)
+    'KPI-Karta-Creator---DealMirror-USD-Yearly': process.env.UNIBEE_DEALMIRROR_PLAN_ID || '453', // 453 (DealMirror $0/year)
     
     // ========================
     // ADDONS (Type 2)
@@ -124,6 +135,7 @@ let stats = {
     subscriptions: { total: 0, migrated: 0, failed: 0, skipped: 0, withStripePayment: 0, withoutStripePayment: 0 },
     addons: { total: 0, migrated: 0, failed: 0 },  // Track addon migrations
     invoices: { total: 0, migrated: 0, failed: 0, skipped: 0 },
+    database: { usersUpdated: 0, subscriptionsUpdated: 0, failed: 0 },  // Track database updates
     errors: []
 };
 
@@ -173,6 +185,165 @@ const unibeeApi = axios.create({
  * Sleep helper for rate limiting
  */
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Connect to MongoDB
+ */
+async function connectToMongoDB() {
+    if (isDryRun) {
+        log.info('[DRY RUN] Skipping MongoDB connection');
+        return null;
+    }
+    
+    try {
+        log.info(`Connecting to MongoDB at ${MONGODB_URL}...`);
+        mongoClient = new MongoClient(MONGODB_URL);
+        await mongoClient.connect();
+        db = mongoClient.db(MONGODB_DB);
+        log.success('Connected to MongoDB');
+        return db;
+    } catch (err) {
+        log.error(`Failed to connect to MongoDB: ${err.message}`);
+        throw err;
+    }
+}
+
+/**
+ * Disconnect from MongoDB
+ */
+async function disconnectFromMongoDB() {
+    if (mongoClient) {
+        await mongoClient.close();
+        log.info('Disconnected from MongoDB');
+    }
+}
+
+/**
+ * Find user in local database by email
+ */
+async function findLocalUserByEmail(email) {
+    if (!db || isDryRun) return null;
+    
+    try {
+        const user = await db.collection('user').findOne({ email: email.toLowerCase() });
+        return user;
+    } catch (err) {
+        log.error(`Failed to find user by email ${email}: ${err.message}`);
+        return null;
+    }
+}
+
+/**
+ * Update local database with UniBee subscription details
+ * This updates both the subscription record and the user record
+ */
+async function updateLocalDatabase(customerEmail, unibeeUserId, unibeeSubscription, unibeePlanId) {
+    if (isDryRun) {
+        log.verbose(`[DRY RUN] Would update local database for ${customerEmail}`);
+        return { success: true, dryRun: true };
+    }
+    
+    if (!db) {
+        log.warn('MongoDB not connected, skipping local database update');
+        return { success: false, error: 'MongoDB not connected' };
+    }
+    
+    try {
+        // Find the user by email
+        const localUser = await findLocalUserByEmail(customerEmail);
+        if (!localUser) {
+            log.warn(`User not found in local database: ${customerEmail}`);
+            stats.database.failed++;
+            return { success: false, error: 'User not found' };
+        }
+        
+        const userId = localUser._id;
+        const subscriptionId = unibeeSubscription.subscriptionId || unibeeSubscription.id;
+        
+        log.verbose(`Updating local database for user ${customerEmail} (ID: ${userId})`);
+        
+        // Update or create subscription record
+        const subscriptionUpdate = {
+            $set: {
+                customerId: String(unibeeUserId),
+                subscriptionId: String(subscriptionId),
+                planId: String(unibeePlanId),
+                status: unibeeSubscription.status === 2 ? 'active' : 
+                       (unibeeSubscription.status === 1 ? 'pending' : 
+                       (unibeeSubscription.status === 3 ? 'incomplete' : 
+                       (unibeeSubscription.status === 4 ? 'cancelled' : 
+                       (unibeeSubscription.status === 5 ? 'suspended' : 'unknown')))),
+                billingProvider: 'unibee',
+                subscriptionDetails: unibeeSubscription,
+                updatedAt: new Date(),
+                migratedFromChargebee: true,
+                migratedAt: new Date()
+            }
+        };
+        
+        // Find existing subscription for this user
+        const existingSubscription = await db.collection('subscription').findOne({ 
+            userId: userId 
+        });
+        
+        if (existingSubscription) {
+            // Update existing subscription
+            await db.collection('subscription').updateOne(
+                { _id: existingSubscription._id },
+                subscriptionUpdate
+            );
+            log.verbose(`Updated existing subscription record for ${customerEmail}`);
+        } else {
+            // Create new subscription record
+            const newSubscription = {
+                userId: userId,
+                companyId: localUser.companyId,
+                customerId: String(unibeeUserId),
+                subscriptionId: String(subscriptionId),
+                planId: String(unibeePlanId),
+                status: unibeeSubscription.status === 2 ? 'active' : 'pending',
+                frequency: unibeeSubscription.planId ? 'yearly' : 'monthly', // Default, will be overwritten
+                nextSubscriptionDate: unibeeSubscription.currentPeriodEnd ? 
+                    new Date(unibeeSubscription.currentPeriodEnd * 1000) : new Date(),
+                amount: unibeeSubscription.amount || 0,
+                billingProvider: 'unibee',
+                subscriptionDetails: unibeeSubscription,
+                migratedFromChargebee: true,
+                migratedAt: new Date(),
+                createdAt: new Date(),
+                updatedAt: new Date()
+            };
+            
+            const insertResult = await db.collection('subscription').insertOne(newSubscription);
+            
+            // Update user with new subscription ID
+            await db.collection('user').updateOne(
+                { _id: userId },
+                { 
+                    $set: { 
+                        subscriptionId: insertResult.insertedId,
+                        subscriptionStatus: newSubscription.status
+                    }
+                }
+            );
+            log.verbose(`Created new subscription record for ${customerEmail}`);
+        }
+        
+        stats.database.subscriptionsUpdated++;
+        stats.database.usersUpdated++;
+        
+        return { success: true };
+    } catch (err) {
+        log.error(`Failed to update local database for ${customerEmail}: ${err.message}`);
+        stats.database.failed++;
+        stats.errors.push({
+            type: 'database',
+            email: customerEmail,
+            error: err.message
+        });
+        return { success: false, error: err.message };
+    }
+}
 
 /**
  * Activate all plans in UniBee
@@ -603,7 +774,8 @@ async function importSubscriptionToUniBee(subscription, unibeeUserId, customer, 
         log.verbose(`[DRY RUN] Would import subscription: ${subscription.id}`);
         return { 
             subscription: { id: `dry-run-${subscription.id}`, ...subscriptionData },
-            addons: addons  // Return addons for separate processing
+            addons: addons,  // Return addons for separate processing
+            unibeePlanId: unibeePlanId  // Return plan ID for database update
         };
     }
     
@@ -615,7 +787,8 @@ async function importSubscriptionToUniBee(subscription, unibeeUserId, customer, 
         // Return both subscription and addons for further processing
         return {
             subscription: importedSubscription,
-            addons: addons  // Pass addons to be added in a separate step
+            addons: addons,  // Pass addons to be added in a separate step
+            unibeePlanId: unibeePlanId  // Return plan ID for database update
         };
     } catch (err) {
         log.error(`Failed to import subscription ${subscription.id}: ${err.message}`);
@@ -772,6 +945,7 @@ async function migrateCustomer(customer) {
             if (importResult && importResult.subscription) {
                 const unibeeSubscription = importResult.subscription;
                 const addons = importResult.addons || [];
+                const unibeePlanId = importResult.unibeePlanId;
                 
                 stats.subscriptions.migrated++;
                 
@@ -788,6 +962,20 @@ async function migrateCustomer(customer) {
                     } else {
                         log.warn(`Failed to add addons to ${subscriptionId} - subscription imported but addons missing`);
                     }
+                }
+                
+                // Step 3.6: Update local MongoDB database with new UniBee IDs
+                // This is critical for the app to recognize the migrated subscriptions
+                const dbUpdateResult = await updateLocalDatabase(
+                    customer.email,
+                    unibeeUser.id,
+                    unibeeSubscription,
+                    unibeePlanId
+                );
+                if (dbUpdateResult.success) {
+                    log.verbose(`Updated local database for ${customer.email}`);
+                } else if (!dbUpdateResult.dryRun) {
+                    log.warn(`Failed to update local database for ${customer.email}: ${dbUpdateResult.error}`);
                 }
                 
                 // Step 4: Fetch and migrate invoices for this subscription
@@ -879,6 +1067,13 @@ async function runMigration() {
     }
     
     try {
+        // Connect to MongoDB for local database updates (skip in dry run)
+        if (!isDryRun) {
+            await connectToMongoDB();
+        } else {
+            log.info('[DRY RUN] Skipping MongoDB connection and database updates');
+        }
+        
         // Activate all UniBee plans first (required for subscription import)
         if (!isDryRun) {
             await activateUniBePlans();
@@ -903,6 +1098,9 @@ async function runMigration() {
             }
         }
         
+        // Disconnect from MongoDB
+        await disconnectFromMongoDB();
+        
         // Generate report
         const reportPath = generateReport();
         
@@ -914,6 +1112,7 @@ async function runMigration() {
         log.info(`  Addons: ${stats.addons.migrated}/${stats.addons.total} migrated, ${stats.addons.failed} failed`);
         log.info(`  Stripe Payment Info: ${stats.subscriptions.withStripePayment} with payment, ${stats.subscriptions.withoutStripePayment} without`);
         log.info(`  Invoices: ${stats.invoices.migrated}/${stats.invoices.total} migrated, ${stats.invoices.failed} failed`);
+        log.info(`  Database: ${stats.database.subscriptionsUpdated} subscriptions updated, ${stats.database.usersUpdated} users updated, ${stats.database.failed} failed`);
         log.info(`  Errors: ${stats.errors.length}`);
         log.info(`Report saved to: ${reportPath}`);
         log.divider();
@@ -931,6 +1130,8 @@ async function runMigration() {
     } catch (err) {
         log.error(`Migration failed: ${err.message}`);
         console.error(err);
+        // Ensure MongoDB is disconnected on error
+        await disconnectFromMongoDB();
         process.exit(1);
     }
 }
