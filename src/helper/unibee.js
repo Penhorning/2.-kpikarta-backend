@@ -28,6 +28,11 @@ const mapPlanIdToUniBee = (planId) => {
         'cb-creator-plan-Yearly': parseInt(process.env.UNIBEE_CREATOR_YEARLY_PLAN_ID) || 424,
         // Free plan
         'Creator-Test-Free-USD-Monthly': parseInt(process.env.UNIBEE_CREATOR_FREE_PLAN_ID) || 419,
+        // AppSumo & DealMirror Lifetime Deal plans ($0/year)
+        'KPI-Karta-Creator---AppSumo-USD-Yearly': parseInt(process.env.UNIBEE_APPSUMO_PLAN_ID) || 452,
+        'creator-appsumo-yearly': parseInt(process.env.UNIBEE_APPSUMO_PLAN_ID) || 452,
+        'KPI-Karta-Creator---DealMirror-USD-Yearly': parseInt(process.env.UNIBEE_DEALMIRROR_PLAN_ID) || 453,
+        'creator-dealmirror-yearly': parseInt(process.env.UNIBEE_DEALMIRROR_PLAN_ID) || 453,
         // Addon plans
         'creator-monthly-addon': parseInt(process.env.UNIBEE_CREATOR_MONTHLY_ADDON_PLAN_ID) || 428,
         'creator-yearly-addon': parseInt(process.env.UNIBEE_CREATOR_YEARLY_ADDON_PLAN_ID) || 431,
