@@ -1,0 +1,142 @@
+{
+  "timestamp": "2026-01-07T06:24:54.288Z",
+  "mode": "LIVE",
+  "statistics": {
+    "customers": {
+      "total": 415,
+      "migrated": 415,
+      "failed": 0,
+      "skipped": 0
+    },
+    "subscriptions": {
+      "total": 380,
+      "migrated": 240,
+      "failed": 140,
+      "skipped": 128,
+      "withStripePayment": 1,
+      "withoutStripePayment": 251
+    },
+    "addons": {
+      "total": 4,
+      "migrated": 2,
+      "failed": 2
+    },
+    "invoices": {
+      "total": 0,
+      "migrated": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "database": {
+      "usersUpdated": 240,
+      "subscriptionsUpdated": 240,
+      "failed": 0
+    },
+    "errors": [
+      {
+        "type": "addon",
+        "subscriptionId": "sub20260106GAstli3HUii5H6I",
+        "addons": [
+          {
+            "addonPlanId": 428,
+            "quantity": 1
+          }
+        ],
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "AzZtQGV7Sj8Yl37my",
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "addon",
+        "subscriptionId": "sub20260105GcMHXpYdlHevmxK",
+        "addons": [
+          {
+            "addonPlanId": 428,
+            "quantity": 1
+          }
+        ],
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "16BStnV7SKu9R2ncz",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "AzypGoV7SIyTr2lUv",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "Azz68xV78JSc11GUb",
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "Azq7GAV6UwBN2qfv",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "AzZZ93V6TcCjl447",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "16CPv8V4mnACy19FD",
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "AzZZYnV4eve2L8unE",
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "16CGkcV4FvHSd46RI",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "169yCaUzyGUeb8KV7",
+        "error": "timeout of 60000ms exceeded"
+      },
+      {
+        "type": "subscription",
+        "id": "AzZcZCUgaKXJR5Osw",
+        "error": "Request failed with status code 400"
+      },
+      {
+        "type": "subscription",
+        "id": "169kDwTiUh7LS3aal",
+        "error": "Request failed with status code 400"
+      }
+    ]
+  },
+  "planMapping": {
+    "cb-creator-plan-Monthly": "425",
+    "cb-creator-plan-Yearly": "424",
+    "Creator-Test-Free-USD-Monthly": "419",
+    "Creator-Test-Free-USD-Yearly": "419",
+    "KPI-Karta-Creator---AppSumo-USD-Yearly": "452",
+    "KPI-Karta-Creator---DealMirror-USD-Yearly": "453",
+    "cb-creator-addon-plan-Monthly": "428",
+    "cb-creator-addon-plan-Yearly": "431",
+    "cb-champion-addon-plan-Monthly": "432",
+    "cb-champion-addon-plan-Yearly": "430",
+    "undefined": "419",
+    "Creator-Test-USD-Monthly": "419",
+    "Creator-Test-USD-Yearly": "419",
+    "Creator-Addon-Test-USD-Monthly": "428",
+    "Creator-Addon-Test-USD-Yearly": "431",
+    "Champion-Addon-Test-USD-Monthly": "432",
+    "Champion-Addon-Test-USD-Yearly": "430"
+  },
+  "configuration": {
+    "unibeeApiUrl": "https://api.unibee.dev"
+  }
+}
