@@ -105,6 +105,11 @@
           "arg": "planId",
           "type": "string",
           "required": true
+        },
+        {
+          "arg": "couponCode",
+          "type": "string",
+          "required": false
         }
       ],
       "returns": {
@@ -183,6 +188,44 @@
         "path": "/get-portal",
         "verb": "get"
       }
+    },
+    "verifyCoupon": {
+      "accepts": [
+        {
+          "arg": "couponCode",
+          "type": "string",
+          "required": true,
+          "description": "Coupon/discount code to verify"
+        }
+      ],
+      "returns": {
+        "arg": "result",
+        "type": "object"
+      },
+      "http": {
+        "path": "/verify-coupon",
+        "verb": "post"
+      },
+      "description": "Verify if a coupon code is valid"
+    },
+    "applyDiscount": {
+      "accepts": [
+        {
+          "arg": "discountCode",
+          "type": "string",
+          "required": true,
+          "description": "Discount code to apply to subscription"
+        }
+      ],
+      "returns": {
+        "arg": "result",
+        "type": "object"
+      },
+      "http": {
+        "path": "/apply-discount",
+        "verb": "post"
+      },
+      "description": "Apply a discount code to current user's subscription"
     }
   }
 }
