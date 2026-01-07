@@ -1,13 +1,19 @@
 module.exports = function (Chargebeecoupon) {
-    const chargebee = require('chargebee');
+    // Billing provider abstraction layer
+    const { verify_coupon, isUniBee, BILLING_PROVIDER } = require('../../helper/billingProvider');
     
-    // Configure Chargebee
-    chargebee.configure({
-        site: 'kpikarta',
-        api_key: 'live_VvgLECrZ2S2Q1tR5Z4FCapuGm8Soxyrz'
-    });
+    // ChargeBee SDK for legacy support (only load if using ChargeBee)
+    let chargebee;
+    if (!isUniBee) {
+        chargebee = require('chargebee');
+        // Configure Chargebee - Use environment variable instead of hardcoded key
+        chargebee.configure({
+            site: process.env.CHARGEBEE_SITE_NAME || 'kpikarta',
+            api_key: process.env.CHARGEBEE_API_KEY || 'live_VvgLECrZ2S2Q1tR5Z4FCapuGm8Soxyrz'
+        });
+    }
 
-    // Method to verify a coupon code in both normal coupons and coupon sets
+    // Method to verify a coupon code - supports both ChargeBee and UniBee
     Chargebeecoupon.verifyCoupon = function (data, cb) {
         const couponCode = data.couponCode;
 
@@ -19,7 +25,64 @@ module.exports = function (Chargebeecoupon) {
             });
         }
 
-        console.log("Verifying Coupon Code: ", couponCode);
+        console.log(`Verifying Coupon Code: ${couponCode} using ${BILLING_PROVIDER}`);
+
+        // Use UniBee verification if UniBee is the billing provider
+        if (isUniBee) {
+            // Call async function and handle promise
+            Chargebeecoupon.verifyUniBee(couponCode)
+                .then(result => cb(null, result))
+                .catch(err => cb(err));
+            return;
+        }
+
+        // Otherwise, use ChargeBee verification
+        return Chargebeecoupon.verifyChargeBee(couponCode, cb);
+    };
+
+    // UniBee coupon verification (returns Promise, not callback)
+    // Supports both regular discounts and advanced discounts (with quantity limits like AppSumo)
+    Chargebeecoupon.verifyUniBee = async function (couponCode) {
+        const response = await verify_coupon(couponCode.trim());
+        
+        if (response.status === 200 && response.data.coupon) {
+            const coupon = response.data.coupon;
+            
+            // Return response compatible with both regular coupons and AppSumo-style coupon codes
+            return {
+                success: true,
+                message: 'Valid coupon code.',
+                statusCode: 200,
+                data: {
+                    id: coupon.id,
+                    code: coupon.code,
+                    name: coupon.name,
+                    discount_type: coupon.discount_type,
+                    discount_percentage: coupon.discount_percentage,
+                    discount_amount: coupon.discount_amount,
+                    status: coupon.status,
+                    // Advanced discount info (for AppSumo-like limited quantity codes)
+                    is_advanced: coupon.is_advanced,
+                    quantity: coupon.quantity,
+                    quantity_used: coupon.quantity_used,
+                    live_quantity: coupon.live_quantity,
+                    // UniBee specific data
+                    _unibee: coupon._unibee
+                },
+                // For AppSumo flow compatibility - include couponCodeDetails like ChargeBee
+                couponCodeDetails: response.data.couponCodeDetails
+            };
+        } else {
+            const error = new Error(response.data?.message || 'Invalid or expired coupon code.');
+            error.statusCode = response.status || 404;
+            error.success = false;
+            throw error;
+        }
+    };
+
+    // ChargeBee coupon verification (legacy)
+    Chargebeecoupon.verifyChargeBee = function (couponCode, cb) {
+        console.log("Verifying coupon in ChargeBee:", couponCode);
 
         // First, try to verify the coupon in the normal coupon list
         chargebee.coupon.retrieve(couponCode.trim()).request((error, result) => {
@@ -60,7 +123,7 @@ module.exports = function (Chargebeecoupon) {
         });
     };
 
-    // Fallback method to validate coupon codes in coupon sets if it's not found in normal coupons
+    // Fallback method to validate coupon codes in coupon sets if it's not found in normal coupons (ChargeBee only)
     Chargebeecoupon.validateCouponCode = function (couponCode, cb) {
         console.log("Validating coupon code in coupon sets: ", couponCode);
 
@@ -127,7 +190,7 @@ module.exports = function (Chargebeecoupon) {
 
     // Remote Method for verifying a coupon code
     Chargebeecoupon.remoteMethod('verifyCoupon', {
-        description: 'Verify a coupon code (Normal coupon and coupon sets)',
+        description: 'Verify a coupon code (supports both ChargeBee and UniBee)',
         accepts: [{
             arg: 'data',
             type: 'object',
