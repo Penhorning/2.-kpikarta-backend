@@ -44,8 +44,8 @@ const UNIBEE_API_URL = process.env.UNIBEE_API_URL || 'https://api.unibee.dev';
 const UNIBEE_API_KEY = process.env.UNIBEE_API_KEY;
 
 // Migration configuration
-const BATCH_SIZE = 10;
-const DELAY_BETWEEN_BATCHES = 1000; // ms
+const BATCH_SIZE = 20;
+const DELAY_BETWEEN_BATCHES = 50; // ms - reduced for faster processing
 
 // Plan mapping from ChargeBee to UniBee
 // Based on ChargeBee item_price IDs from API query
@@ -144,7 +144,7 @@ const args = process.argv.slice(2);
 const isDryRun = args.includes('--dry-run');
 const isVerbose = args.includes('--verbose');
 
-// Support both --customer-id and --single-customer (with email)
+// Support --customer-id, --single-customer, and --email for single user migration
 let specificCustomerId = null;
 let specificCustomerEmail = null;
 
@@ -153,7 +153,12 @@ if (args.includes('--customer-id')) {
     specificCustomerId = args[args.indexOf('--customer-id') + 1];
 }
 
-// Parse --single-customer=<email>
+// Parse --email <email> (simpler format)
+if (args.includes('--email')) {
+    specificCustomerEmail = args[args.indexOf('--email') + 1];
+}
+
+// Parse --single-customer=<email> (legacy format)
 const singleCustomerArg = args.find(arg => arg.startsWith('--single-customer='));
 if (singleCustomerArg) {
     specificCustomerEmail = singleCustomerArg.split('=')[1];
@@ -178,8 +183,31 @@ const unibeeApi = axios.create({
         'Authorization': `Bearer ${UNIBEE_API_KEY}`,
         'Content-Type': 'application/json'
     },
-    timeout: 30000 // 30 second timeout
+    timeout: 60000 // 60 second timeout (increased from 30s)
 });
+
+/**
+ * Retry wrapper for API calls
+ */
+async function withRetry(fn, maxRetries = 3, delayMs = 1000) {
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            return await fn();
+        } catch (err) {
+            const isRetryable = err.code === 'ECONNRESET' || 
+                               err.code === 'ETIMEDOUT' || 
+                               err.message?.includes('timeout') ||
+                               err.message?.includes('ECONNRESET');
+            
+            if (isRetryable && attempt < maxRetries) {
+                log.warn(`🔄 Retry ${attempt}/${maxRetries}: ${err.message}`);
+                await sleep(delayMs * attempt); // Exponential backoff
+                continue;
+            }
+            throw err;
+        }
+    }
+}
 
 /**
  * Sleep helper for rate limiting
@@ -549,41 +577,60 @@ async function createUniBeeUser(customer) {
         return { id: `dry-run-${customer.id}`, ...userData };
     }
     
+    // Try to find existing user first (with retry for network issues)
+    let existingUser = null;
     try {
-        // Try to find existing user first
-        const searchResponse = await unibeeApi.get('/merchant/user/search', {
-            params: { email: customer.email }
-        });
-        
-        // Check if user exists in the userAccounts array
-        if (searchResponse.data?.data?.userAccounts && searchResponse.data.data.userAccounts.length > 0) {
-            const existingUser = searchResponse.data.data.userAccounts[0];
-            log.verbose(`User already exists: ${customer.email} (status: ${existingUser.status})`);
+        existingUser = await withRetry(async () => {
+            // Use searchKey parameter - 'email' param doesn't filter properly in UniBee
+            const searchResponse = await unibeeApi.get('/merchant/user/search', {
+                params: { searchKey: customer.email }
+            });
             
-            // If user is suspended (status 2), try to update gatewayId to ensure it's set
-            if (existingUser.status === 2) {
-                log.warn(`User ${customer.email} is suspended - updating gateway...`);
-                try {
-                    await unibeeApi.post('/merchant/user/update', {
-                        userId: existingUser.id,
-                        gatewayId: 82  // Stripe gateway
-                    });
-                } catch (updateErr) {
-                    log.verbose(`Could not update suspended user: ${updateErr.message}`);
-                }
+            // UniBee search returns results matching searchKey
+            // We still need to find the EXACT email match from the results
+            const userAccounts = searchResponse.data?.data?.userAccounts || [];
+            if (userAccounts.length > 0) {
+                const exactMatch = userAccounts.find(u => 
+                    u.email && u.email.toLowerCase() === customer.email.toLowerCase()
+                );
+                return exactMatch || null;
             }
-            
-            return existingUser;
-        }
+            return null;
+        });
     } catch (err) {
-        // User doesn't exist, continue to create new one
+        // Search failed after retries, continue to try creating
         log.verbose(`Search failed for ${customer.email}: ${err.message}`);
     }
     
-    // Use the correct endpoint: /merchant/user/new with gatewayId
+    if (existingUser) {
+        log.info(`👤 User already exists: ${customer.email} (UniBee ID: ${existingUser.id})`);
+        
+        // If user is suspended (status 2), try to update gatewayId to ensure it's set
+        if (existingUser.status === 2) {
+            log.warn(`User ${customer.email} is suspended - updating gateway...`);
+            try {
+                await unibeeApi.post('/merchant/user/update', {
+                    userId: existingUser.id,
+                    gatewayId: 82  // Stripe gateway
+                });
+            } catch (updateErr) {
+                log.verbose(`Could not update suspended user: ${updateErr.message}`);
+            }
+        }
+        
+        return existingUser;
+    }
+    
+    // Create new user (with retry for network issues)
     userData.gatewayId = 82; // Stripe gateway
-    const response = await unibeeApi.post('/merchant/user/new', userData);
-    return response.data?.data?.user || response.data?.user;
+    const response = await withRetry(async () => {
+        return await unibeeApi.post('/merchant/user/new', userData);
+    });
+    const newUser = response.data?.data?.user || response.data?.user;
+    if (newUser) {
+        log.info(`✨ New user created: ${customer.email} (UniBee ID: ${newUser.id})`);
+    }
+    return newUser;
 }
 
 /**
@@ -672,6 +719,63 @@ async function importSubscriptionToUniBee(subscription, unibeeUserId, customer, 
         log.warn(`Skipping ${subscription.status} subscription ${subscription.id}`);
         stats.subscriptions.skipped++;
         return null;
+    }
+    
+    // Check if subscription already exists in UniBee (for idempotent re-runs)
+    // Search by external subscription ID (which is the ChargeBee subscription ID)
+    try {
+        const existingSubsResponse = await withRetry(async () => {
+            return await unibeeApi.get('/merchant/subscription/list', {
+                params: { userId: unibeeUserId }
+            });
+        });
+        
+        const existingSubscriptions = existingSubsResponse.data?.data?.subscriptions || [];
+        
+        // Look for subscription with matching external ID or metadata
+        for (const existingSub of existingSubscriptions) {
+            // Check externalSubscriptionId field
+            if (existingSub.externalSubscriptionId === subscription.id) {
+                log.info(`📋 Subscription already exists: ${subscription.id} → UniBee #${existingSub.subscriptionId}`);
+                stats.subscriptions.skipped++;
+                
+                // Return existing subscription for addons and DB update processing
+                return {
+                    subscription: existingSub,
+                    addons: getChargeBeeAddons(subscription),
+                    unibeePlanId: unibeePlanId,
+                    alreadyExists: true
+                };
+            }
+            
+            // Also check metadata for chargebeeSubscriptionId
+            let metadata = {};
+            try {
+                if (existingSub.metadata && typeof existingSub.metadata === 'string') {
+                    metadata = JSON.parse(existingSub.metadata);
+                } else if (existingSub.metadata) {
+                    metadata = existingSub.metadata;
+                }
+            } catch (e) {
+                // Ignore parsing errors
+            }
+            
+            if (metadata.chargebeeSubscriptionId === subscription.id) {
+                log.info(`📋 Subscription already exists (metadata): ${subscription.id} → UniBee #${existingSub.subscriptionId}`);
+                stats.subscriptions.skipped++;
+                
+                return {
+                    subscription: existingSub,
+                    addons: getChargeBeeAddons(subscription),
+                    unibeePlanId: unibeePlanId,
+                    alreadyExists: true
+                };
+            }
+        }
+        
+        log.verbose(`No existing subscription found for ${subscription.id} - will import`);
+    } catch (err) {
+        log.verbose(`Could not check for existing subscriptions: ${err.message} - proceeding with import`);
     }
     
     // Format dates as "YYYY-MM-DD HH:mm:ss" for UniBee
@@ -782,7 +886,37 @@ async function importSubscriptionToUniBee(subscription, unibeeUserId, customer, 
     try {
         // Use the correct UniBee endpoint for active subscription import
         const response = await unibeeApi.post('/merchant/subscription/active_subscription_import', subscriptionData);
-        const importedSubscription = response.data?.data?.subscription || response.data?.subscription || response.data;
+        
+        // Debug: Log the response structure
+        log.verbose(`Import response: ${JSON.stringify(response.data).slice(0, 500)}`);
+        
+        // The response structure is: { code: 0, message: "", data: { subscription: { dayLeft, user, subscription: {...}, plan, ... } } }
+        // The actual subscription details are nested inside data.subscription.subscription
+        const responseData = response.data?.data || response.data;
+        const outerSubscription = responseData?.subscription || responseData;
+        
+        // The actual subscription object with subscriptionId is nested inside
+        const innerSubscription = outerSubscription?.subscription || outerSubscription;
+        
+        // Try multiple possible locations for subscription ID
+        const subId = innerSubscription?.subscriptionId || 
+                      outerSubscription?.subscriptionId ||
+                      responseData?.subscriptionId || 
+                      innerSubscription?.id || 
+                      outerSubscription?.id;
+        
+        // Log the extracted subscription ID and full subscription keys
+        log.verbose(`Extracted subscription ID: ${subId || 'NOT FOUND'}`);
+        log.verbose(`Outer subscription keys: ${Object.keys(outerSubscription || {}).slice(0, 10).join(', ')}`);
+        log.verbose(`Inner subscription keys: ${Object.keys(innerSubscription || {}).slice(0, 10).join(', ')}`);
+        
+        // Use inner subscription as the main object, ensure subscriptionId is set
+        const importedSubscription = innerSubscription;
+        if (subId && importedSubscription && !importedSubscription.subscriptionId) {
+            importedSubscription.subscriptionId = subId;
+        }
+        
+        log.info(`📦 New subscription imported: ${subscription.id} → UniBee #${subId}`);
         
         // Return both subscription and addons for further processing
         return {
@@ -807,13 +941,15 @@ async function importSubscriptionToUniBee(subscription, unibeeUserId, customer, 
 /**
  * Add addons to a UniBee subscription after import
  * UniBee's active_subscription_import doesn't support addons directly,
- * so we need to add them in a separate step via /merchant/subscription/addon/update
+ * so we need to add them via update_preview + update_submit
  * 
  * @param {string} subscriptionId - UniBee subscription ID
+ * @param {number} planId - UniBee plan ID
  * @param {Array} addons - Array of { planId, quantity } objects
+ * @param {boolean} isInTrial - Whether the ChargeBee subscription was in trial
  * @returns {Object|null} - Updated subscription or null on failure
  */
-async function addAddonsToSubscription(subscriptionId, addons) {
+async function addAddonsToSubscription(subscriptionId, planId, addons, isInTrial = false) {
     if (!addons || addons.length === 0) {
         log.verbose(`No addons to add for subscription ${subscriptionId}`);
         return null;
@@ -822,35 +958,71 @@ async function addAddonsToSubscription(subscriptionId, addons) {
     // Track total addons
     stats.addons.total += addons.length;
     
-    log.info(`Adding ${addons.length} addon(s) to subscription ${subscriptionId}`);
+    log.info(`Adding ${addons.length} addon(s) to subscription ${subscriptionId} (trial: ${isInTrial})`);
     
-    // Format addons for UniBee API
-    // The API expects: addonData as JSON string with array of { addonPlanId, quantity }
-    const addonDataArray = addons.map(addon => ({
+    // Format addons for UniBee API - addonParams array
+    const addonParams = addons.map(addon => ({
         addonPlanId: addon.planId,
         quantity: addon.quantity || 1
     }));
     
-    const requestData = {
+    // Use effectImmediate: 2 for trial (apply at next billing), 1 for active (apply now)
+    // effectImmediate: 2 means changes apply at next billing cycle, avoiding proration charges
+    const effectImmediate = isInTrial ? 2 : 1;
+    
+    const updateData = {
         subscriptionId: subscriptionId,
-        addonData: JSON.stringify(addonDataArray),
-        // Don't prorate to avoid charging the customer during migration
-        prorationDate: 0
+        newPlanId: planId,  // Required - keep same plan
+        quantity: 1,
+        addonParams: addonParams,
+        effectImmediate: effectImmediate
     };
     
-    log.verbose(`Addon request data: ${JSON.stringify(requestData)}`);
+    log.verbose(`Addon update data: ${JSON.stringify(updateData)}`);
     
     if (isDryRun) {
-        log.verbose(`[DRY RUN] Would add addons: ${JSON.stringify(addonDataArray)}`);
+        log.verbose(`[DRY RUN] Would add addons with effectImmediate=${effectImmediate}: ${JSON.stringify(addonParams)}`);
         stats.addons.migrated += addons.length;
-        return { addons: addonDataArray };
+        return { addons: addonParams, effectImmediate };
     }
     
     try {
-        const response = await unibeeApi.post('/merchant/subscription/addon/update', requestData);
-        log.info(`Successfully added addons to subscription ${subscriptionId}`);
+        // Step 1: Preview the update to get pricing info
+        const previewResponse = await unibeeApi.post('/merchant/subscription/update_preview', updateData);
+        
+        if (previewResponse.data?.code !== 0) {
+            log.error(`Addon preview failed: ${previewResponse.data?.message || 'Unknown error'}`);
+            throw new Error(previewResponse.data?.message || 'Preview failed');
+        }
+        
+        const previewData = previewResponse.data?.data || previewResponse.data;
+        log.verbose(`Preview response: totalAmount=${previewData.totalAmount}, currency=${previewData.currency}`);
+        
+        // Step 2: Submit the update with confirmed amounts
+        const submitData = {
+            ...updateData,
+            confirmTotalAmount: previewData.totalAmount || previewData.invoice?.totalAmount || 0,
+            confirmCurrency: previewData.currency || previewData.invoice?.currency || 'USD'
+        };
+        
+        const submitResponse = await unibeeApi.post('/merchant/subscription/update_submit', submitData);
+        
+        if (submitResponse.data?.code !== 0) {
+            log.error(`Addon submit failed: ${submitResponse.data?.message || 'Unknown error'}`);
+            throw new Error(submitResponse.data?.message || 'Submit failed');
+        }
+        
+        const result = submitResponse.data?.data || submitResponse.data;
+        const isPending = !!result.subscriptionPendingUpdate;
+        
+        if (isPending) {
+            log.info(`Addons scheduled for subscription ${subscriptionId} (pending update: ${result.subscriptionPendingUpdate?.pendingUpdateId})`);
+        } else {
+            log.info(`Successfully added addons to subscription ${subscriptionId}`);
+        }
+        
         stats.addons.migrated += addons.length;
-        return response.data?.data?.subscription || response.data;
+        return result;
     } catch (err) {
         log.error(`Failed to add addons to subscription ${subscriptionId}: ${err.message}`);
         if (err.response?.data) {
@@ -860,7 +1032,7 @@ async function addAddonsToSubscription(subscriptionId, addons) {
         stats.errors.push({
             type: 'addon',
             subscriptionId: subscriptionId,
-            addons: addonDataArray,
+            addons: addonParams,
             error: err.message
         });
         return null;
@@ -946,17 +1118,25 @@ async function migrateCustomer(customer) {
                 const unibeeSubscription = importResult.subscription;
                 const addons = importResult.addons || [];
                 const unibeePlanId = importResult.unibeePlanId;
+                const alreadyExists = importResult.alreadyExists || false;
                 
-                stats.subscriptions.migrated++;
+                if (alreadyExists) {
+                    log.info(`Subscription already in UniBee, skipping to DB update...`);
+                } else {
+                    stats.subscriptions.migrated++;
+                }
                 
                 // Step 3.5: Add addons to the subscription (if any)
+                // Skip if subscription already existed - addons would already be there
                 // UniBee's active_subscription_import doesn't support addons directly
-                // We need to add them separately via /merchant/subscription/addon/update
-                if (addons.length > 0) {
+                // We need to add them separately via update_preview + update_submit
+                // Use effectImmediate: 2 for trial subs to avoid proration charges
+                if (addons.length > 0 && !alreadyExists) {
                     const subscriptionId = unibeeSubscription.subscriptionId || unibeeSubscription.id;
-                    log.info(`Adding ${addons.length} addon(s) to subscription ${subscriptionId}`);
+                    const isInTrial = subscription.status === 'in_trial';
+                    log.info(`Adding ${addons.length} addon(s) to subscription ${subscriptionId} (trial: ${isInTrial})`);
                     
-                    const addonResult = await addAddonsToSubscription(subscriptionId, addons);
+                    const addonResult = await addAddonsToSubscription(subscriptionId, unibeePlanId, addons, isInTrial);
                     if (addonResult) {
                         log.info(`Successfully added addons to ${subscriptionId}`);
                     } else {
@@ -978,7 +1158,10 @@ async function migrateCustomer(customer) {
                     log.warn(`Failed to update local database for ${customer.email}: ${dbUpdateResult.error}`);
                 }
                 
-                // Step 4: Fetch and migrate invoices for this subscription
+                // Step 4: Invoice migration DISABLED
+                // UniBee's /merchant/payment/import endpoint doesn't exist
+                // Invoices will be generated by UniBee going forward
+                /*
                 const invoices = await fetchChargeBeeInvoices(customer.id);
                 stats.invoices.total += invoices.length;
                 
@@ -997,6 +1180,7 @@ async function migrateCustomer(customer) {
                         }
                     }
                 }
+                */
             } else {
                 stats.subscriptions.failed++;
             }

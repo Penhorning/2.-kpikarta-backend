@@ -1,31 +1,36 @@
 {
-  "timestamp": "2025-12-30T12:19:41.316Z",
+  "timestamp": "2026-01-06T12:12:46.395Z",
   "mode": "DRY RUN",
   "statistics": {
     "customers": {
-      "total": 1,
-      "migrated": 1,
+      "total": 415,
+      "migrated": 415,
       "failed": 0,
       "skipped": 0
     },
     "subscriptions": {
-      "total": 1,
-      "migrated": 0,
-      "failed": 1,
-      "skipped": 1,
-      "withStripePayment": 0,
-      "withoutStripePayment": 0
+      "total": 380,
+      "migrated": 252,
+      "failed": 128,
+      "skipped": 128,
+      "withStripePayment": 1,
+      "withoutStripePayment": 251
     },
     "addons": {
-      "total": 0,
-      "migrated": 0,
+      "total": 7,
+      "migrated": 7,
       "failed": 0
     },
     "invoices": {
-      "total": 0,
-      "migrated": 0,
+      "total": 2027,
+      "migrated": 2027,
       "failed": 0,
       "skipped": 0
+    },
+    "database": {
+      "usersUpdated": 0,
+      "subscriptionsUpdated": 0,
+      "failed": 0
     },
     "errors": []
   },
@@ -34,8 +39,8 @@
     "cb-creator-plan-Yearly": "424",
     "Creator-Test-Free-USD-Monthly": "419",
     "Creator-Test-Free-USD-Yearly": "419",
-    "KPI-Karta-Creator---AppSumo-USD-Yearly": "419",
-    "KPI-Karta-Creator---DealMirror-USD-Yearly": "419",
+    "KPI-Karta-Creator---AppSumo-USD-Yearly": "452",
+    "KPI-Karta-Creator---DealMirror-USD-Yearly": "453",
     "cb-creator-addon-plan-Monthly": "428",
     "cb-creator-addon-plan-Yearly": "431",
     "cb-champion-addon-plan-Monthly": "432",
