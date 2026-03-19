@@ -9,6 +9,12 @@ const { RoleManager } = require('../../helper');
 const moment = require('moment');
 const { sendEmail } = require("../../helper/sendEmail");
 const { sales_user_details, sales_update_user, sales_delete_user } = require("../../helper/salesforce");
+const {
+  shouldUseDemoSms,
+  shouldUseDemoEmail,
+  shouldUseStaticVerificationCode,
+  getDemoOtpCode,
+} = require("../../helper/demoMode");
 // Use billing provider abstraction layer for UniBee/ChargeBee compatibility
 const { 
   update_subscription, 
@@ -267,6 +273,10 @@ module.exports = function(User) {
   // Send SMS
   const sendSMS = (number, message) => {
     try {
+      if (shouldUseDemoSms) {
+        console.log(`[DEMO SMS] To: ${number} | OTP: ${getDemoOtpCode()} | Message: ${message}`);
+        return Promise.resolve("success");
+      }
       let smsOptions = {
         type: 'sms',
         from: process.env.TWILIO_MESSAGINGSERVICE_SID,
@@ -873,7 +883,7 @@ module.exports = function(User) {
   
   // Send email code
   User.sendEmailCode = function(next) {
-    const emailVerificationCode = keygen.number({ length: 6 });
+    const emailVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
     const data = {
       subject: `Verfication Code | ${User.app.get('name')}`,
       template: "verification-code.ejs",
@@ -886,6 +896,9 @@ module.exports = function(User) {
     sendEmail(User.app, data, async (response) => {
       if (response.success) {
         await this.app.currentUser.updateAttributes({ emailVerificationCode });
+        if (shouldUseDemoEmail) {
+          console.log(`[DEMO EMAIL OTP] ${this.app.currentUser.email}: ${emailVerificationCode}`);
+        }
         next(null, 'success');
       } else {
         next(response.message);
@@ -921,7 +934,7 @@ module.exports = function(User) {
   // Send mobile login code
   User.sendMobileLoginCode = function(next) {
     if (this.app.currentUser.mobileVerified && this.app.currentUser.mobile.e164Number) {
-      let mobileVerificationCode = keygen.number({ length: 6 });
+      let mobileVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
       this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
         if (err) return next(err);
         else {
@@ -949,7 +962,7 @@ module.exports = function(User) {
       error.status = 400;
       next(error);
     } else {
-      let mobileVerificationCode = keygen.number({ length: 6 });
+      let mobileVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
       this.app.currentUser.updateAttributes({mobileVerificationCode}, {}, (err) => {
         if (err) return next(err);
         else {
@@ -1370,7 +1383,7 @@ module.exports = function(User) {
           });
         } else {
           // Generate verification code and send email
-          const emailVerificationCode = keygen.number({ length: 6 });
+          const emailVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
           const data = {
             subject: `Thanks for signing up | ${User.app.get('name')}`,
             template: "signup.ejs",
@@ -1382,6 +1395,9 @@ module.exports = function(User) {
           }
           sendEmail(User.app, data, async () => {
             await user.updateAttributes({ emailVerificationCode });
+            if (shouldUseDemoEmail) {
+              console.log(`[DEMO EMAIL OTP] ${user.email}: ${emailVerificationCode}`);
+            }
           });
         }
       });
@@ -1408,7 +1424,7 @@ module.exports = function(User) {
         // If email is not verified
         else if (!user.emailVerified) {
           next();
-          const emailVerificationCode = keygen.number({ length: 6 });
+          const emailVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
           const data = {
             subject: `Verfication Code | ${User.app.get('name')}`,
             template: "verification-code.ejs",
@@ -1420,12 +1436,15 @@ module.exports = function(User) {
           }
           sendEmail(User.app, data, async () => {
             await user.updateAttributes({ emailVerificationCode });
+            if (shouldUseDemoEmail) {
+              console.log(`[DEMO EMAIL OTP] ${user.email}: ${emailVerificationCode}`);
+            }
           });
         }
         // User is verified, checking for twoFactor enabled or not
         else {
           if (user.mobile && user._2faEnabled && user.mobileVerified) {
-            let mobileVerificationCode = keygen.number({ length: 6 });
+            let mobileVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({ length: 6 });
             user.updateAttributes({ mobileVerificationCode }, {}, err => {
               sendSMS(user.mobile.e164Number, `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`)
               .then(() => {}).catch(err => {});

@@ -1,6 +1,43 @@
 'use strict';
 const OpenAI = require("openai");
-const openai = new OpenAI({apiKey: process.env.OPENAI_API_KEY});
+const { shouldUseDemoOpenAI } = require('../../helper/demoMode');
+const openai = shouldUseDemoOpenAI ? null : new OpenAI({apiKey: process.env.OPENAI_API_KEY});
+
+const buildDemoSuggestionTree = (prompt, byPhase = false) => {
+    const subject = (prompt || 'Demo Goal').trim().slice(0, 40) || 'Demo Goal';
+    if (byPhase) {
+        return {
+            data: [
+                `${subject} Plan`,
+                `${subject} Execution`,
+                `${subject} Review`
+            ]
+        };
+    }
+
+    return {
+        type: 'GOAL',
+        name: subject,
+        children: [
+            {
+                type: 'CSF',
+                name: `${subject} Strategy`,
+                children: [
+                    { type: 'KPI', name: `${subject} KPI 1`, children: [] },
+                    { type: 'KPI', name: `${subject} KPI 2`, children: [] }
+                ]
+            },
+            {
+                type: 'CSF',
+                name: `${subject} Delivery`,
+                children: [
+                    { type: 'KPI', name: `${subject} KPI 3`, children: [] },
+                    { type: 'KPI', name: `${subject} KPI 4`, children: [] }
+                ]
+            }
+        ]
+    };
+};
 
 module.exports = function(Openai) {
     // Check JSON validation
@@ -73,6 +110,9 @@ module.exports = function(Openai) {
 
     async function returnOpenAIResponse(prompt, threadId, byPhase=null) {
         try {
+            if (shouldUseDemoOpenAI) {
+                return JSON.stringify(buildDemoSuggestionTree(prompt, byPhase));
+            }
             if (!byPhase){
                  prompt += `Respond ONLY with a single JSON object with this structure:
 
@@ -122,6 +162,16 @@ module.exports = function(Openai) {
             console.log("We are coming here")
             type = type || "";
             prompt = prompt || "I'm working in marketing department in IT industry. Suggest me some GOALs";
+            if (shouldUseDemoOpenAI) {
+                if (type == "button") {
+                    return buildDemoSuggestionTree(prompt);
+                }
+                return [
+                    { name: `${prompt.slice(0, 30) || 'Demo'} Goal 1`, type: "auto", title: `${prompt.slice(0, 30) || 'Demo'} Goal 1` },
+                    { name: `${prompt.slice(0, 30) || 'Demo'} Goal 2`, type: "auto", title: `${prompt.slice(0, 30) || 'Demo'} Goal 2` },
+                    { type: "manual" }
+                ];
+            }
             let thread = "";
             let kartaDetails = await Openai.app.models.karta.findById(kartaId);
             // JSON.parse(JSON.stringify(kartaDetails));
@@ -236,6 +286,14 @@ module.exports = function(Openai) {
     Openai.suggestGoalNamesByPhase = async (prompt, kartaId) => {
         try {
             console.log('by phase')
+            if (shouldUseDemoOpenAI) {
+                const response = buildDemoSuggestionTree(prompt, true);
+                let nodeValues = response.data.map(name => {
+                    return { name, type: "auto" };
+                });
+                nodeValues.push({ type: "manual" });
+                return nodeValues;
+            }
             let thread = "";
             let kartaDetails = await Openai.app.models.karta.findById(kartaId);
             JSON.parse(JSON.stringify(kartaDetails));

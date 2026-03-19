@@ -13,6 +13,7 @@ const cookieParser = require('cookie-parser');
 const session = require('express-session');
 const morgan = require('morgan');
 const cors = require('cors');
+const { serviceConfig } = require('../helper/demoMode');
 
 const app = module.exports = loopback();
 
@@ -162,6 +163,12 @@ boot(app, __dirname, function(err) {
   // Configure passport strategies for third party auth providers
   for (var s in config) {
     var c = config[s];
+    if ((c.provider === 'facebook' && !serviceConfig.facebook) ||
+      (c.provider === 'linkedin' && !serviceConfig.linkedin) ||
+      (c.provider === 'google' && !serviceConfig.google)) {
+      console.log(`Skipping passport provider ${c.provider} - missing credentials`);
+      continue;
+    }
     c.session = c.session !== false;
     c.profileToUser = customProfileToUser;
     passportConfigurator.configureProvider(s, c);

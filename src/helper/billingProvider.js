@@ -1,5 +1,7 @@
 'use strict';
 
+const { shouldUseDemoBilling } = require('./demoMode');
+
 /**
  * Billing Provider Abstraction Layer
  * 
@@ -9,7 +11,7 @@
  * Set BILLING_PROVIDER environment variable to 'unibee' or 'chargebee'
  */
 
-const BILLING_PROVIDER = process.env.BILLING_PROVIDER || 'chargebee';
+const BILLING_PROVIDER = shouldUseDemoBilling ? 'demo' : (process.env.BILLING_PROVIDER || 'chargebee');
 
 // Import the appropriate billing provider
 let billingProvider;
@@ -17,6 +19,9 @@ let billingProvider;
 if (BILLING_PROVIDER === 'unibee') {
     billingProvider = require('./unibee');
     console.log('🚀 Using UniBee as billing provider');
+} else if (BILLING_PROVIDER === 'demo') {
+    billingProvider = require('./billingProvider.demo');
+    console.log('🧪 Using demo billing provider');
 } else {
     billingProvider = require('./chargebee');
     console.log('💳 Using ChargeBee as billing provider');
@@ -37,6 +42,18 @@ const getPlanIds = () => {
             CREATOR_YEARLY_ADDON_PLAN_ID: process.env.UNIBEE_CREATOR_YEARLY_ADDON_PLAN_ID,
             CHAMPION_MONTHLY_ADDON_PLAN_ID: process.env.UNIBEE_CHAMPION_MONTHLY_ADDON_PLAN_ID,
             CHAMPION_YEARLY_ADDON_PLAN_ID: process.env.UNIBEE_CHAMPION_YEARLY_ADDON_PLAN_ID
+        };
+    } else if (BILLING_PROVIDER === 'demo') {
+        return {
+            CREATOR_MONTHLY_PLAN_ID: process.env.UNIBEE_CREATOR_MONTHLY_PLAN_ID || process.env.CREATOR_MONTHLY_PLAN_ID || 'creator-monthly-demo',
+            CREATOR_YEARLY_PLAN_ID: process.env.UNIBEE_CREATOR_YEARLY_PLAN_ID || process.env.CREATOR_YEARLY_PLAN_ID || 'creator-yearly-demo',
+            CREATOR_FREE_PLAN_ID: process.env.UNIBEE_CREATOR_FREE_PLAN_ID || process.env.CREATOR_FREE_PLAN_ID || 'creator-free-demo',
+            APPSUMO_PLAN_ID: process.env.UNIBEE_APPSUMO_PLAN_ID || 'appsumo-demo',
+            DEALMIRROR_PLAN_ID: process.env.UNIBEE_DEALMIRROR_PLAN_ID || 'dealmirror-demo',
+            CREATOR_MONTHLY_ADDON_PLAN_ID: process.env.UNIBEE_CREATOR_MONTHLY_ADDON_PLAN_ID || process.env.CREATOR_MONTHLY_ADDON_PLAN_ID || 'creator-monthly-addon-demo',
+            CREATOR_YEARLY_ADDON_PLAN_ID: process.env.UNIBEE_CREATOR_YEARLY_ADDON_PLAN_ID || process.env.CREATOR_YEARLY_ADDON_PLAN_ID || 'creator-yearly-addon-demo',
+            CHAMPION_MONTHLY_ADDON_PLAN_ID: process.env.UNIBEE_CHAMPION_MONTHLY_ADDON_PLAN_ID || process.env.CHAMPION_MONTHLY_ADDON_PLAN_ID || 'champion-monthly-addon-demo',
+            CHAMPION_YEARLY_ADDON_PLAN_ID: process.env.UNIBEE_CHAMPION_YEARLY_ADDON_PLAN_ID || process.env.CHAMPION_YEARLY_ADDON_PLAN_ID || 'champion-yearly-addon-demo'
         };
     }
     // ChargeBee uses original env vars

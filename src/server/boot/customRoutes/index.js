@@ -4,6 +4,7 @@ const keygen = require('keygenerator');
 const { sales_update_user } = require('../../../helper/salesforce');
 const moment = require('moment');
 const { BILLING_PROVIDER, isUniBee, verifyWebhookSignature, mapUniBeeStatus } = require('../../../helper/billingProvider');
+const { shouldUseDemoSms, shouldUseStaticVerificationCode, getDemoOtpCode } = require('../../../helper/demoMode');
 
 module.exports = function (app) {
     // Success redirect url for social login
@@ -32,17 +33,21 @@ module.exports = function (app) {
                     user_data.mobileVerified = user.mobileVerified || false;
                     user_data.subscriptionStatus = user.subscriptionStatus;
                     if (user._2faEnabled && user.mobileVerified) {
-                        let mobileVerificationCode = keygen.number({length: 6});
+                        let mobileVerificationCode = shouldUseStaticVerificationCode ? getDemoOtpCode() : keygen.number({length: 6});
                         req.user.updateAttributes({ mobileVerificationCode }, {}, err => {
-                          let twilio_data = {
-                            type: 'sms',
-                            to: user.mobile.e164Number,
-                            from: process.env.TWILIO_MESSAGINGSERVICE_SID,
-                            body: `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`
+                          if (shouldUseDemoSms) {
+                            console.log(`[DEMO SMS] To: ${user.mobile.e164Number} | OTP: ${mobileVerificationCode}`);
+                          } else {
+                            let twilio_data = {
+                              type: 'sms',
+                              to: user.mobile.e164Number,
+                              from: process.env.TWILIO_MESSAGINGSERVICE_SID,
+                              body: `${mobileVerificationCode} is your One-Time Password (OTP) for login on KPI Karta. Request you to please enter this to complete your login. This is valid for one time use only. Please do not share with anyone.`
+                            }
+                            req.app.models.Twilio.send(twilio_data, function (err, data) {
+                              console.log('> sending code to mobile number:', user.mobile.e164Number);
+                            });
                           }
-                          req.app.models.Twilio.send(twilio_data, function (err, data) {
-                            console.log('> sending code to mobile number:', user.mobile.e164Number);
-                          });
                         });
                     }
 

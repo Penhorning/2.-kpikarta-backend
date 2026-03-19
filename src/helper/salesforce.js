@@ -1,6 +1,7 @@
 const jsforce = require('jsforce');
 const conn = new jsforce.Connection();
 const moment = require('moment');
+const { shouldUseDemoSalesforce } = require('./demoMode');
 const salesForceInfo = {
     username: process.env.SALESFORCE_USERNAME,
     password: process.env.SALESFORCE_PASSWORD,
@@ -33,6 +34,10 @@ const salesForceModels = {
 }
 
 exports.sales_login = () => {
+    if (shouldUseDemoSalesforce) {
+        console.log('[SF] Demo mode active - skipping Salesforce login');
+        return;
+    }
     const username = salesForceInfo.username;
     const password = salesForceInfo.password;
     const token = salesForceInfo.token;
@@ -48,6 +53,10 @@ exports.sales_login = () => {
 
 exports.sales_user_details = async (user) => {
     try {
+        if (shouldUseDemoSalesforce) {
+            console.log('[SF] Demo mode active - skipping sales_user_details');
+            return { success: true, demo: true };
+        }
         user = JSON.parse(JSON.stringify(user));
         let mobile = user.mobile ? user.mobile.e164Number.split(user.mobile.dialCode).join("") : ( user.__data.mobile ? user.__data.mobile.e164Number.split(user.__data.mobile.dialCode).join("") : null);
         let userObject = {
@@ -79,6 +88,10 @@ exports.sales_user_details = async (user) => {
 
 exports.sales_update_user = (user, data) => {
     try {
+        if (shouldUseDemoSalesforce) {
+            console.log('[SF] Demo mode active - skipping sales_update_user');
+            return { success: true, demo: true };
+        }
         let timeValues = ["createdAt", "updatedAt", "kartaLastUpdate", "userUpdatedAt"];
         let updateObj = {
             Id : user.sforceId,
@@ -110,6 +123,10 @@ exports.sales_update_user = (user, data) => {
 
 exports.sales_update_karta = (karta_sforceId, upadatedValue) => {
     try {
+        if (shouldUseDemoSalesforce) {
+            console.log('[SF] Demo mode active - skipping sales_update_karta');
+            return { success: true, demo: true };
+        }
         let keyValues = {
             updatedAt: "LastUpdated__c",
             status: "IsActive__c",
@@ -137,6 +154,10 @@ exports.sales_update_karta = (karta_sforceId, upadatedValue) => {
 
 exports.sales_delete_user = (sforceId) => {
     try {
+        if (shouldUseDemoSalesforce) {
+            console.log('[SF] Demo mode active - skipping sales_delete_user');
+            return { success: true, demo: true };
+        }
         conn.sobject(salesForceInfo.contactModel).destroy(sforceId, function(err, ret) {
             if (err || !ret.success) { 
                 return console.error(err, ret); 
