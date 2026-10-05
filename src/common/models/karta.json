@@ -63,6 +63,14 @@
     "historyId": {
       "type": "string"
     },
+    "openaiResponseId": {
+      "type": "string",
+      "description": "Last Responses API response id for per-karta continuity (replaces retired Assistants threadId)"
+    },
+    "openaiConversationId": {
+      "type": "string",
+      "description": "Reserved for Conversations API chaining"
+    },
     "sample": {
       "type": "boolean"
     }
