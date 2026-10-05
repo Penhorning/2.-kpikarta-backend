@@ -114,11 +114,29 @@ module.exports = function (Openai) {
       msg.includes("model") && (msg.includes("not found") || msg.includes("does not exist") || msg.includes("unsupported"));
   }
 
-  // Primary path: Responses API (official Assistants successor).
-  // Falls back to Chat Completions so fine-tuned chat models
-  // (e.g. ft:gpt-3.5-turbo-*) keep working even if they don't
-  // support Responses. JSON mode is enforced on both so the model
-  // can't return double-encoded or prose-wrapped payloads.
+  // Bare chat call for phase suggestions: NO system prompt, NO appended
+  // instructions, NO response_format. Probing proved the fine-tuned model
+  // natively returns ["name", ...] arrays for bare KPI prompts, and every
+  // added instruction degrades it (trees, guardrail refusals).
+  async function createBareChatSuggestion(prompt) {
+    const client = getClient();
+    const completion = await client.chat.completions.create({
+      model: getModel(),
+      messages: [{ role: "user", content: prompt }],
+      temperature: 1,
+      max_tokens: 4096,
+      top_p: 1,
+      frequency_penalty: 0,
+      presence_penalty: 0,
+    });
+    const text = completion.choices && completion.choices[0] &&
+      completion.choices[0].message && completion.choices[0].message.content;
+    return text || "";
+  }
+
+  // Primary path for user-chat: Responses API (official Assistants
+  // successor), falling back to Chat Completions so fine-tuned chat models
+  // keep working even if they don't support Responses.
   async function createModelResponse({ prompt, instructions, previousResponseId }) {
     const client = getClient();
     const model = getModel();
@@ -475,10 +493,11 @@ module.exports = function (Openai) {
         });
       };
       // Accumulate unique names across attempts (each stateless call samples
-      // a different tree) until we have enough chips for the UI.
+      // a different output) until we have enough chips for the UI.
+      // Bare prompts: sent verbatim, exactly like the pre-Assistants code did.
       while (attempts < 3 && seen.length < 4) {
         attempts += 1;
-        let response = await returnOpenAIResponse(prompt, kartaId, true);
+        let response = await createBareChatSuggestion(prompt);
         lastRaw = response;
         console.log("RESPONSE FROM OPENAI (by phase) attempt " + attempts + ":", response);
         const parsed = tryFixMalformedJson(response);
