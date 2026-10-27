@@ -5,7 +5,8 @@ module.exports = {
     "name": "db",
     "connector": "mongodb",
     "maxDepthOfQuery": 11000,
-    "maxDepthOfData": 11000
+    "maxDepthOfData": 11000,
+    "port": 27018
   },
   "email": {
     "name": "email",
